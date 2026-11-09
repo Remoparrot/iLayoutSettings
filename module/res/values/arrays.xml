@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Default LSPosed scope: only the Settings app. -->
+    <string-array name="xposedscope">
+        <item>com.android.settings</item>
+    </string-array>
+</resources>

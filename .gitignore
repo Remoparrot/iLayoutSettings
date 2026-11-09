@@ -1,0 +1,31 @@
+# 构建产物 / 中间文件
+/build/
+**/build/
+**/build-*/
+*.log
+*.tmp
+*.bak
+
+# 签名材料：永远不要提交
+*.jks
+*.keystore
+*.p12
+*.pfx
+
+# 反编译 / 逆向工作目录（体积大且可重新生成）
+/tools/smali/
+/tools/dex/
+/target-res/
+/.tools/
+
+# 编辑器 / 系统
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 临时截图 / 探针输出
+/tmp/
+/out/

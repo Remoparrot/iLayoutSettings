@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">iOS 设置布局</string>
+    <string name="module_desc">把澎湃OS设置首页重绘为 iOS 风格</string>
+</resources>
