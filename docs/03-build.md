@@ -1,6 +1,6 @@
-﻿# 构建指南
+# 构建指南
 
-> 状态：**现行** · 对应版本：14.8 (83)
+> 状态：**现行** · 对应版本：14.9 (84)
 
 ## 1. 为什么不走 Gradle
 
@@ -66,7 +66,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File module\build.ps1
 ## 5. 成功判据
 
 ```
-package: name='com.abradant.iossettings' versionCode='83' versionName='14.8'
+package: name='com.abradant.iossettings' versionCode='84' versionName='14.9'
 sdkVersion:'29'
 targetSdkVersion:'36'
 dex version : 039

@@ -6,8 +6,8 @@
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.abradant.iossettings"
-    android:versionCode="83"
-    android:versionName="14.8">
+    android:versionCode="84"
+    android:versionName="14.9">
 
     <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="36" />
 

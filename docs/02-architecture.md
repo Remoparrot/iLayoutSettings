@@ -1,6 +1,6 @@
 # 架构与 Hook 链路
 
-> 状态：**现行** · 对应版本：14.8 (83)
+> 状态：**现行** · 对应版本：14.9 (84)
 > 源码：`module/src/com/abradant/iossettings/`
 
 ## 1. 从加载到生效
@@ -70,9 +70,12 @@ LSPosed
 3. 浮层尺寸：高 50dp，左右 8dp，底部 12dp；拿到导航栏 inset 后改为 `14dp + nav`；
 4. 列表底部 padding 同步加上 `搜索栏高 + nav + 24dp`，避免最后一张卡片被挡；
 5. 点击浮层 → 调原生 anchor 的 `performClick()` → 走 MIUI 自己的搜索 ActionMode；搜索界面出现时浮层自动隐藏；
-6. `SearchGlass` 负责「抓背景 → 模糊 → 裁到原生胶囊形状」的视觉层，`SearchHost` 在抓图那一帧跳过自身子树，避免把搜索栏自己拍进背景里。
+6. `SearchGlass` 负责视觉层，**每帧**：抓窗口（跳过自身子树）→ 10dp 模糊（`RenderEffect`）→
+   圆角矩形折射（`RuntimeShader` + AGSL）→ 45° 边缘高光 → 底部内阴影，全部裁在搜索栏胶囊内；
+7. 逐级兜底：全量 shader → 只有折射的 shader → 只有模糊 → 半透明胶囊（`shaderUnavailable` 只置一次，
+   不会每帧重试抛异常）。`SearchHost` 在抓图那一帧跳过自身子树，避免把搜索栏自己拍进背景里。
 
-> 抓图 + RenderEffect 模糊是整份代码里性能最敏感的部分，改之前先读 [设计思路](05-design-notes.md#3-玻璃与抓图)。
+> 抓图 + 两个 RenderEffect 是整份代码里性能最敏感的部分，改之前先读 [设计思路 · 2.4 玻璃](05-design-notes.md)。
 
 ## 5. 二级页图标（`SubPageIcons`）
 

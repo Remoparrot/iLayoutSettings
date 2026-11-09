@@ -12,13 +12,27 @@ final class Prefs {
     static final String CHROMATIC = "chromatic_aberration";
     static final String INNER_SHADOW = "inner_shadow";
     static final String SHADOW_W = "shadow_w";
+    static final String GLASS_BLUR = "glass_blur";
+    static final String RIM_ALPHA = "rim_alpha";
+    static final String RIM_WIDTH = "rim_width";
     static final String TOPBAR_BLUR = "topbar_blur";
 
-    static final float DEFAULT_REFRACTION_HEIGHT = 40f;
-    static final float DEFAULT_REFRACTION_AMOUNT = 20f;
+    /** Thickness of the refracted band at the capsule edge, in dp. */
+    static final float DEFAULT_REFRACTION_HEIGHT = 18f;
+    /** How far the lens pulls the backdrop inwards at the rim, in dp. */
+    static final float DEFAULT_REFRACTION_AMOUNT = 10f;
+    /** Reserved for Kyant's dispersion shader; 0 keeps the single-sample lens. */
     static final float DEFAULT_CHROMATIC = 0f;
-    static final float DEFAULT_INNER_SHADOW = 0.35f;
-    static final float DEFAULT_SHADOW_W = 20f;
+    /** Opacity of the dark band hugging the bottom edge. */
+    static final float DEFAULT_INNER_SHADOW = 0.18f;
+    /** Width of that inner-shadow band, in dp. */
+    static final float DEFAULT_SHADOW_W = 8f;
+    /** Backdrop blur radius before the lens, in dp. */
+    static final float DEFAULT_GLASS_BLUR = 10f;
+    /** Peak opacity of the 45° rim highlight. */
+    static final float DEFAULT_RIM_ALPHA = 0.5f;
+    /** Width of the rim highlight band, in dp. */
+    static final float DEFAULT_RIM_WIDTH = 1f;
     static final int DEFAULT_TOPBAR_BLUR = 110;
 
     private Prefs() {

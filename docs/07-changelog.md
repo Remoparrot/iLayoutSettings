@@ -3,10 +3,46 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前主线是 **14.8**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前主线是 **14.9**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
+
+---
+
+# iOS 设置布局 · LSPosed 模块（v14.9：搜索栏液态玻璃）
+
+## v14.9 变更
+
+搜索栏玻璃按用户要求换成 **Kyant0 的液态玻璃**（[Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass)，Apache-2.0）。
+源码取自 `ios-settings-mod/kyant_src` 的 `Shaders.kt` / `Lens.kt` / `HighlightStyle.Default` / `InnerShadow`，用 Java + AGSL 重新实现，没有搬 smali、没有引第三方库。
+
+- 合成顺序（每帧）：抓窗口 → **10dp 模糊**（`RenderEffect`）→ **圆角矩形折射**（`RuntimeShader`）→
+  **45° 边缘高光**（`pow(|cos(normal,45°)|, 1)`，白色 50%，1dp 带）→ **底部内阴影**（黑色 18%，8dp 带）
+- 折射 / 高光 / 内阴影在**同一个 AGSL** 里完成，只出一层 RenderNode；胶囊形状用 SDF 精确描述，
+  不再靠 `clipPath` 之外的第二套几何
+- 参数走 `Prefs`（GUI 未恢复）：`glass_blur` 10 / `refraction_height` 18 / `refraction_amount` 10 /
+  `rim_alpha` 0.5 / `rim_width` 1 / `inner_shadow` 0.18 / `shadow_w` 8
+- 逐级兜底：全量 shader → 只有折射的 shader → 只有模糊 → 半透明胶囊；任一层失败搜索栏都不会消失
+- 抓图 padding 4dp → 16dp（模糊需要胶囊外的真实像素）；RenderNode 统一 `setPosition(0,0)` + `canvas.translate`
+  （`drawRenderNode` 会再叠加一次节点位置，否则内容整体错位）
+- 版本：**14.9 / versionCode 84**；预览包 `dist/IosSettingsLayout-14.9.apk`（199,561 B，
+  sha256 `6010AAC2…`），**未上机验证**，dist 仍是 14.8
+
+## v14.9 校验
+
+```
+package: name='com.abradant.iossettings' versionCode='84' versionName='14.9'
+dex version : 039
+xposed_init : True
+module class: True
+reorder     : True
+size   : 199561 bytes
+sha256 : 6010AAC2CED9A9375910EDEAAAA10168B4BFD2F022D6FAC84538AB3AEE12E40A
+```
+
+AGSL 用 Skia 的 SkSL 编译器离线编译通过（`RuntimeEffect.MakeForShader`），uniform 名称/顺序与 Java 侧一致。
+真机观感、帧率、深色模式未验证。
 
 ---
 

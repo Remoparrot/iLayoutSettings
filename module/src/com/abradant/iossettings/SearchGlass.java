@@ -1,7 +1,6 @@
 package com.abradant.iossettings;
 
 import android.content.Context;
-import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -10,44 +9,131 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.RenderEffect;
 import android.graphics.RenderNode;
+import android.graphics.RuntimeShader;
 import android.graphics.Shader;
-import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.widget.FrameLayout;
 
 /**
- * Liquid-glass container used by the bottom search bar.
+ * Liquid-glass layer under the bottom search bar.
  *
- * <p>Before each frame it redraws the window content behind itself into a
- * bitmap (this view is made invisible for that one draw), feeds it through a
- * kyant-style refraction shader on a RenderNode and clips the result to the
- * native search pill. The native stub keeps its own fills on top; this view
- * only supplies the glass underneath it.</p>
+ * <p>Pipeline per frame (Kyant0's AndroidLiquidGlass, Apache-2.0): capture the
+ * window behind the bar → blur it → run the rounded-rect lens shader over it
+ * (edge refraction) → add the 45° rim highlight and a bottom inner shadow, all
+ * clipped to the bar's capsule.</p>
+ *
+ * <p>The AGSL source below is a Java port of {@code com.kyant.backdrop}
+ * ({@code Shaders.kt}, {@code Lens.kt}, {@code HighlightStyle.Default},
+ * {@code InnerShadow}), kept close to the original maths. Two deviations are
+ * deliberate and documented in {@code docs/06-pitfalls.md}: {@code sign()} is
+ * replaced by a never-zero {@code outerSign()} plus a length-guarded normal
+ * (the original {@code sign(0)} collapsed the SDF normal and painted a 1px seam
+ * across the bar), and the captured bitmap is un-premultiplied before the alpha
+ * is forced to 1 (otherwise the translucent window capture turns the glass
+ * grey).</p>
+ *
+ * <p>Every stage fails soft: shader → blur-only glass → raw backdrop → themed
+ * pill. The native search bar stays clickable either way.</p>
  */
 final class SearchGlass extends FrameLayout {
 
-    private final Paint bitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint shadePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final RectF rect = new RectF();
-    private final Path clipPath = new Path();
-    private long lastDiag;
-
-    private Bitmap backdrop;
-    private Bitmap maskBitmap;
-    private Drawable background9;
-    private RenderNode blurNode;
-    private RenderNode refractNode;
-    private android.graphics.RuntimeShader liquidShader;
-    private boolean shaderBroken;
-    private boolean glassActiveLogged;
+    /** Captured at 0.6×: the glass is a blur, the extra pixels are wasted work. */
+    private static final float CAPTURE_SCALE = 0.6f;
+    /** 120Hz: at most one capture per display frame. */
+    private static final long CAPTURE_INTERVAL_MS = 8;
     /**
-     * Kyant's rounded-rect refraction shader (Apache-2.0,
-     * https://github.com/Kyant0/AndroidLiquidGlass, com.kyant.backdrop).
-     * Adapted to run as a RenderEffect inside this module.
+     * How far around the bar the backdrop is captured. The blur needs real
+     * pixels outside the pill, otherwise its edge fades into clamping streaks.
+     */
+    private static final int CAPTURE_PAD_DP = 16;
+
+    /**
+     * Kyant's lens shader with the highlight and inner shadow folded in, so the
+     * whole glass is one pass instead of three layers.
      */
     private static final String LIQUID_GLASS_AGSL =
+            "uniform shader content;\n"
+            + "uniform float2 size;\n"
+            + "uniform float2 offset;\n"
+            + "uniform float4 cornerRadii;\n"
+            + "uniform float refractionHeight;\n"
+            + "uniform float refractionAmount;\n"
+            + "uniform float depthEffect;\n"
+            + "uniform float4 rimColor;\n"
+            + "uniform float rimAngle;\n"
+            + "uniform float rimFalloff;\n"
+            + "uniform float rimWidth;\n"
+            + "uniform float4 shadowColor;\n"
+            + "uniform float shadowBand;\n"
+            + "float radiusAt(float2 coord, float4 radii) {\n"
+            + "  if (coord.x >= 0.0) { if (coord.y <= 0.0) return radii.y; else return radii.z; }\n"
+            + "  else { if (coord.y <= 0.0) return radii.x; else return radii.w; }\n"
+            + "}\n"
+            + "float sdRoundedRect(float2 coord, float2 halfSize, float radius) {\n"
+            + "  float2 cornerCoord = abs(coord) - (halfSize - float2(radius));\n"
+            + "  float outside = length(max(cornerCoord, 0.0)) - radius;\n"
+            + "  float inside = min(max(cornerCoord.x, cornerCoord.y), 0.0);\n"
+            + "  return outside + inside;\n"
+            + "}\n"
+            + "float2 outerSign(float2 coord) {\n"
+            + "  return float2(coord.x >= 0.0 ? 1.0 : -1.0, coord.y >= 0.0 ? 1.0 : -1.0);\n"
+            + "}\n"
+            + "float2 gradSdRoundedRect(float2 coord, float2 halfSize, float radius) {\n"
+            + "  float2 cornerCoord = abs(coord) - (halfSize - float2(radius));\n"
+            + "  if (cornerCoord.x >= 0.0 || cornerCoord.y >= 0.0) {\n"
+            + "    float2 v = max(cornerCoord, 0.0);\n"
+            + "    return outerSign(coord) * v / max(length(v), 0.0001);\n"
+            + "  } else {\n"
+            + "    float gradX = step(cornerCoord.y, cornerCoord.x);\n"
+            + "    return outerSign(coord) * float2(gradX, 1.0 - gradX);\n"
+            + "  }\n"
+            + "}\n"
+            + "float circleMap(float x) { return 1.0 - sqrt(1.0 - x * x); }\n"
+            + "float3 unpremulColor(half4 c) {\n"
+            + "  float a = max(float(c.a), 0.05);\n"
+            + "  return clamp(float3(c.rgb) / a, 0.0, 1.0);\n"
+            + "}\n"
+            + "half4 toHalf4(float3 color) {\n"
+            + "  return half4(half(color.r), half(color.g), half(color.b), half(1.0));\n"
+            + "}\n"
+            + "half4 main(float2 coord) {\n"
+            + "  float2 halfSize = size * 0.5;\n"
+            + "  float2 local = coord + offset;\n"
+            + "  float2 centeredCoord = local - halfSize;\n"
+            + "  float radius = radiusAt(local, cornerRadii);\n"
+            + "  float sd = sdRoundedRect(centeredCoord, halfSize, radius);\n"
+            + "  float height = max(refractionHeight, 0.5);\n"
+            + "  float depth = -min(sd, 0.0);\n"
+            + "  if (depth >= height) {\n"
+            + "    return toHalf4(unpremulColor(content.eval(coord)));\n"
+            + "  }\n"
+            + "  float d = circleMap(1.0 - depth / height) * refractionAmount;\n"
+            + "  float gradRadius = min(radius * 1.5, min(halfSize.x, halfSize.y));\n"
+            + "  float2 gradRaw = gradSdRoundedRect(centeredCoord, halfSize, gradRadius)\n"
+            + "      + depthEffect * float2(0.0, 1.0);\n"
+            + "  float2 grad = gradRaw / max(length(gradRaw), 0.0001);\n"
+            + "  float3 color = unpremulColor(content.eval(coord + d * grad));\n"
+            // Kyant DefaultHighlight: |cos(normal, light)| ^ falloff, 45°.
+            + "  float rimCos = abs(dot(grad, float2(cos(rimAngle), sin(rimAngle))));\n"
+            + "  float rimIntensity = pow(rimCos, max(rimFalloff, 0.001));\n"
+            + "  float rimT = 1.0 - smoothstep(0.0, max(rimWidth, 0.5), depth);\n"
+            + "  color += rimColor.rgb * (rimColor.a * rimIntensity * rimT);\n"
+            // Kyant InnerShadow: dark band hugging the bottom edge.
+            + "  float ny = clamp(centeredCoord.y / max(halfSize.y, 0.5), -1.0, 1.0);\n"
+            + "  float bottom = smoothstep(-0.35, 1.0, ny);\n"
+            + "  float shadowT = 1.0 - smoothstep(0.0, max(shadowBand, 0.5), depth);\n"
+            + "  color = color * (1.0 - shadowColor.a * bottom * shadowT);\n"
+            + "  return toHalf4(color);\n"
+            + "}\n";
+
+    /**
+     * Lens without the rim/shadow uniforms. Used only when the full shader is
+     * rejected by the AGSL compiler, so a driver quirk degrades the look
+     * instead of removing the glass.
+     */
+    private static final String LENS_ONLY_AGSL =
             "uniform shader content;\n"
             + "uniform float2 size;\n"
             + "uniform float2 offset;\n"
@@ -65,46 +151,57 @@ final class SearchGlass extends FrameLayout {
             + "  float inside = min(max(cornerCoord.x, cornerCoord.y), 0.0);\n"
             + "  return outside + inside;\n"
             + "}\n"
+            + "float2 outerSign(float2 coord) {\n"
+            + "  return float2(coord.x >= 0.0 ? 1.0 : -1.0, coord.y >= 0.0 ? 1.0 : -1.0);\n"
+            + "}\n"
             + "float2 gradSdRoundedRect(float2 coord, float2 halfSize, float radius) {\n"
             + "  float2 cornerCoord = abs(coord) - (halfSize - float2(radius));\n"
             + "  if (cornerCoord.x >= 0.0 || cornerCoord.y >= 0.0) {\n"
             + "    float2 v = max(cornerCoord, 0.0);\n"
-            + "    return sign(coord) * v / max(length(v), 0.0001);\n"
+            + "    return outerSign(coord) * v / max(length(v), 0.0001);\n"
             + "  } else {\n"
             + "    float gradX = step(cornerCoord.y, cornerCoord.x);\n"
-            + "    return sign(coord) * float2(gradX, 1.0 - gradX);\n"
+            + "    return outerSign(coord) * float2(gradX, 1.0 - gradX);\n"
             + "  }\n"
             + "}\n"
             + "float circleMap(float x) { return 1.0 - sqrt(1.0 - x * x); }\n"
-            // The captured window is translucent, and content.eval() returns
-            // premultiplied colour. Divide it back out before forcing alpha to
-            // 1, otherwise the whole pill is multiplied by that alpha and looks
-            // flat grey. Explicit constructors only: mixing half3/float is where
-            // SkSL compilation tends to fail (that killed the shader in 16.2).
-            + "half4 unpremul(half4 c) {\n"
+            + "float3 unpremulColor(half4 c) {\n"
             + "  float a = max(float(c.a), 0.05);\n"
-            + "  float3 rgb = clamp(float3(c.rgb) / a, 0.0, 1.0);\n"
-            + "  return half4(half(rgb.r), half(rgb.g), half(rgb.b), half(1.0));\n"
+            + "  return clamp(float3(c.rgb) / a, 0.0, 1.0);\n"
+            + "}\n"
+            + "half4 toHalf4(float3 color) {\n"
+            + "  return half4(half(color.r), half(color.g), half(color.b), half(1.0));\n"
             + "}\n"
             + "half4 main(float2 coord) {\n"
             + "  float2 halfSize = size * 0.5;\n"
-            + "  float2 centeredCoord = (coord + offset) - halfSize;\n"
-            + "  float radius = radiusAt(coord, cornerRadii);\n"
+            + "  float2 local = coord + offset;\n"
+            + "  float2 centeredCoord = local - halfSize;\n"
+            + "  float radius = radiusAt(local, cornerRadii);\n"
             + "  float sd = sdRoundedRect(centeredCoord, halfSize, radius);\n"
-            + "  if (-sd >= refractionHeight) {\n"
-            + "    return unpremul(content.eval(coord));\n"
+            + "  float height = max(refractionHeight, 0.5);\n"
+            + "  float depth = -min(sd, 0.0);\n"
+            + "  if (depth >= height) {\n"
+            + "    return toHalf4(unpremulColor(content.eval(coord)));\n"
             + "  }\n"
-            + "  float d = circleMap(1.0 - (-min(sd, 0.0)) / refractionHeight) * refractionAmount;\n"
+            + "  float d = circleMap(1.0 - depth / height) * refractionAmount;\n"
             + "  float gradRadius = min(radius * 1.5, min(halfSize.x, halfSize.y));\n"
             + "  float2 gradRaw = gradSdRoundedRect(centeredCoord, halfSize, gradRadius)\n"
             + "      + depthEffect * float2(0.0, 1.0);\n"
             + "  float2 grad = gradRaw / max(length(gradRaw), 0.0001);\n"
-            // sign(0) == 0 collapses the SDF normal on the middle row, so fade
-            // the offset out over a few pixels there: no 1px seam can be painted.
-            + "  float seamFade = smoothstep(0.0, 6.0, abs(centeredCoord.y));\n"
-            + "  float2 refractedCoord = coord + d * grad * seamFade;\n"
-            + "  return unpremul(content.eval(refractedCoord));\n"
+            + "  return toHalf4(unpremulColor(content.eval(coord + d * grad)));\n"
             + "}\n";
+
+    private final Paint bitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint fallbackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final RectF rect = new RectF();
+    private final Path clipPath = new Path();
+
+    private Bitmap backdrop;
+    private RenderNode blurNode;
+    private RenderNode lensNode;
+    private RuntimeShader lensShader;
+    private boolean shaderUnavailable;
+    private boolean glassActiveLogged;
 
     private java.lang.ref.WeakReference<View> maskView;
     private java.lang.ref.WeakReference<SearchHost> captureHost;
@@ -112,24 +209,22 @@ final class SearchGlass extends FrameLayout {
     private long nextCaptureAt;
     private int fpsFrames;
     private long fpsWindowStart;
-    private int lastFps;
-    private int captureFails;
-    private final Paint debugPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private long lastDiag;
+
     private long lastPrefsLoad;
     private float prefRefractionHeight = Prefs.DEFAULT_REFRACTION_HEIGHT;
     private float prefRefractionAmount = Prefs.DEFAULT_REFRACTION_AMOUNT;
-    private float prefChromatic = Prefs.DEFAULT_CHROMATIC;
     private float prefInnerShadow = Prefs.DEFAULT_INNER_SHADOW;
     private float prefShadowW = Prefs.DEFAULT_SHADOW_W;
-    private static String shaderSource;
+    private float prefBlur = Prefs.DEFAULT_GLASS_BLUR;
+    private float prefRimAlpha = Prefs.DEFAULT_RIM_ALPHA;
+    private float prefRimWidth = Prefs.DEFAULT_RIM_WIDTH;
 
     SearchGlass(Context context) {
         super(context);
         setWillNotDraw(false);
         bitmapPaint.setFilterBitmap(true);
-        loadBackground(context);
         loadPrefs();
-        loadShader(context);
     }
 
     private void loadPrefs() {
@@ -139,35 +234,17 @@ final class SearchGlass extends FrameLayout {
                 Prefs.DEFAULT_REFRACTION_HEIGHT);
         prefRefractionAmount = Prefs.getFloat(prefs, Prefs.REFRACTION_AMOUNT,
                 Prefs.DEFAULT_REFRACTION_AMOUNT);
-        prefChromatic = Prefs.getFloat(prefs, Prefs.CHROMATIC, Prefs.DEFAULT_CHROMATIC);
         prefInnerShadow = Prefs.getFloat(prefs, Prefs.INNER_SHADOW,
                 Prefs.DEFAULT_INNER_SHADOW);
         prefShadowW = Prefs.getFloat(prefs, Prefs.SHADOW_W, Prefs.DEFAULT_SHADOW_W);
-    }
-
-    private static void loadShader(Context context) {
-        if (shaderSource != null) {
-            return;
+        prefBlur = Prefs.getFloat(prefs, Prefs.GLASS_BLUR, Prefs.DEFAULT_GLASS_BLUR);
+        prefRimAlpha = Prefs.getFloat(prefs, Prefs.RIM_ALPHA, Prefs.DEFAULT_RIM_ALPHA);
+        prefRimWidth = Prefs.getFloat(prefs, Prefs.RIM_WIDTH, Prefs.DEFAULT_RIM_WIDTH);
+        if (prefBlur < 0f) {
+            prefBlur = 0f;
         }
-        java.io.InputStream in = null;
-        try {
-            android.content.res.Resources res = context.getPackageManager()
-                    .getResourcesForApplication("com.abradant.iossettings");
-            in = res.getAssets().open("liquid_glass.agsl");
-            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-            byte[] buffer = new byte[4096];
-            int read;
-            while ((read = in.read(buffer)) > 0) {
-                out.write(buffer, 0, read);
-            }
-            shaderSource = out.toString("UTF-8");
-            XLog.i("lattice glass shader loaded");
-        } catch (Throwable t) {
-            XLog.w("load glass shader failed: " + t);
-        } finally {
-            if (in != null) {
-                try { in.close(); } catch (Throwable ignored) { }
-            }
+        if (prefRimWidth < 0f) {
+            prefRimWidth = 0f;
         }
     }
 
@@ -179,21 +256,6 @@ final class SearchGlass extends FrameLayout {
 
     void setCaptureHost(SearchHost host) {
         captureHost = host == null ? null : new java.lang.ref.WeakReference<>(host);
-    }
-
-    private void loadBackground(Context context) {
-        try {
-            Resources res = context.getPackageManager()
-                    .getResourcesForApplication("com.abradant.iossettings");
-            int id = res.getIdentifier("search_bar_bg", "drawable", "com.abradant.iossettings");
-            if (id != 0) {
-                background9 = res.getDrawable(id, null);
-            }
-            // reverted: the bitmap mask (bg.9.png) is no longer used
-            maskBitmap = null;
-        } catch (Throwable t) {
-            XLog.w("search bar background missing: " + t);
-        }
     }
 
     private final ViewTreeObserver.OnPreDrawListener preDraw =
@@ -245,12 +307,9 @@ final class SearchGlass extends FrameLayout {
         }
         backdrop = null;
         blurNode = null;
+        lensNode = null;
         super.onDetachedFromWindow();
     }
-
-    private static final float CAPTURE_SCALE = 0.6f;
-    /** 120Hz: capture once per display frame (8ms) instead of 60Hz (16ms). */
-    private static final long CAPTURE_INTERVAL_MS = 8;
 
     private void capture() {
         try {
@@ -258,7 +317,7 @@ final class SearchGlass extends FrameLayout {
             if (root == null || getWidth() <= 0 || getHeight() <= 0) {
                 return;
             }
-            int pad = dp(4);
+            int pad = dp(CAPTURE_PAD_DP);
             int w = Math.max(1, Math.round((getWidth() + pad * 2) * CAPTURE_SCALE));
             int h = Math.max(1, Math.round((getHeight() + pad * 2) * CAPTURE_SCALE));
             if (backdrop == null || backdrop.getWidth() != w || backdrop.getHeight() != h) {
@@ -292,8 +351,7 @@ final class SearchGlass extends FrameLayout {
                 }
             }
             long now = System.currentTimeMillis();
-            if (now - lastDiag > 2000 && backdrop != null
-                    && backdrop.getWidth() > 0 && backdrop.getHeight() > 0) {
+            if (now - lastDiag > 2000 && backdrop.getWidth() > 0 && backdrop.getHeight() > 0) {
                 lastDiag = now;
                 int center = backdrop.getPixel(backdrop.getWidth() / 2,
                         backdrop.getHeight() / 2);
@@ -306,20 +364,10 @@ final class SearchGlass extends FrameLayout {
         }
     }
 
-    @Override
-    protected void onDraw(Canvas canvas) {
-        if (capturing) {
-            return;
-        }
-        int w = getWidth();
-        int h = getHeight();
-        if (w <= 0 || h <= 0) {
-            return;
-        }
-        // Clip the blur to the native search bar background's exact bounds
-        // (miuix_appcompat_search_mode_edit_text_bg_*.9.png): same width, same
-        // height, same pill radius.
-        android.graphics.Rect mask = new android.graphics.Rect(0, 0, w, h);
+    private Rect computeMask(int w, int h) {
+        // Clip to the native search bar background's exact bounds when one was
+        // supplied; otherwise the whole 50dp bar is the capsule.
+        Rect mask = new Rect(0, 0, w, h);
         View maskTarget = maskView == null ? null : maskView.get();
         if (maskTarget != null && maskTarget.getWidth() > 0 && maskTarget.getHeight() > 0) {
             int[] targetLoc = new int[2];
@@ -330,24 +378,18 @@ final class SearchGlass extends FrameLayout {
             int top = targetLoc[1] - selfLoc[1];
             mask.set(left, top, left + maskTarget.getWidth(), top + maskTarget.getHeight());
             // The native 9-patch carries padding (white margins on the sides);
-            // inset the mask by it so the blur stops at the visible pill.
-            Drawable background = maskTarget.getBackground();
-            if (background != null) {
-                android.graphics.Rect padding = new android.graphics.Rect();
-                if (background.getPadding(padding)) {
+            // inset the mask by it so the glass stops at the visible pill.
+            if (maskTarget.getBackground() != null) {
+                Rect padding = new Rect();
+                if (maskTarget.getBackground().getPadding(padding)) {
                     mask.inset(padding.left, padding.top, padding.right, padding.bottom);
                 }
             }
-            // The theme's 9-patch has baked transparent side margins, so the
-            // visible pill is narrower than the drawable/view bounds. Pull the
-            // mask in by eye until it matches the visible search bar.
             int sideInset = dp(6);
             if (mask.width() > sideInset * 2) {
                 mask.inset(sideInset, 0, sideInset, 0);
             }
-            // The native pill may be shorter than the 50dp wrapper (the input
-            // area is 44dp and sits at the top); centre it so the glass capsule
-            // is centred in the bar instead of hugging the top edge.
+            // The native pill may be shorter than the 50dp wrapper; centre it.
             if (mask.height() < h) {
                 mask.offset(0, (h - mask.height()) / 2);
             }
@@ -355,45 +397,257 @@ final class SearchGlass extends FrameLayout {
                 mask.set(0, 0, w, h);
             }
         }
+        return mask;
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        if (capturing) {
+            return;
+        }
+        int w = getWidth();
+        int h = getHeight();
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        Rect mask = computeMask(w, h);
         rect.set(mask);
-        float radius = mask.height() / 2f;
+        float radius = Math.min(mask.width(), mask.height()) * 0.5f;
         clipPath.reset();
         clipPath.addRoundRect(rect, radius, radius, Path.Direction.CW);
 
-        boolean dark = UiTweaks.isDarkMode(getContext());
-        if (maskBitmap != null) {
-            int layer = canvas.saveLayer(0, 0, w, h, null);
-            if (backdrop != null) {
-                drawBlurred(canvas, w, h);
-            } else {
-                shadePaint.setColor(dark ? 0xFF1C1C1E : 0xFFFFFFFF);
-                canvas.drawRoundRect(rect, radius, radius, shadePaint);
-            }
-            Paint maskPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            maskPaint.setFilterBitmap(true);
-            android.graphics.Matrix matrix = new android.graphics.Matrix();
-            matrix.setScale(w / (float) maskBitmap.getWidth(), h / (float) maskBitmap.getHeight());
-            android.graphics.BitmapShader shader = new android.graphics.BitmapShader(
-                    maskBitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
-            shader.setLocalMatrix(matrix);
-            maskPaint.setShader(shader);
-            maskPaint.setXfermode(new android.graphics.PorterDuffXfermode(
-                    android.graphics.PorterDuff.Mode.DST_IN));
-            canvas.drawRect(0, 0, w, h, maskPaint);
-            canvas.restoreToCount(layer);
-        } else {
-            int save = canvas.save();
-            canvas.clipPath(clipPath);
-            if (backdrop != null) {
-                drawBlurred(canvas, w, h);
-            } else {
-                // No capture this frame: stay translucent so the bar never
-                // shows up as an opaque slab.
-                shadePaint.setColor(dark ? 0x66000000 : 0x66FFFFFF);
-                canvas.drawRoundRect(rect, radius, radius, shadePaint);
-            }
-            canvas.restoreToCount(save);
+        if (!canvas.isHardwareAccelerated()) {
+            drawPlain(canvas, mask, radius);
+            return;
         }
+        int save = canvas.save();
+        canvas.clipPath(clipPath);
+        boolean drawn = Build.VERSION.SDK_INT >= 33 && drawLens(canvas, mask, radius);
+        if (!drawn) {
+            drawn = drawBlurred(canvas, mask);
+        }
+        if (!drawn) {
+            drawShade(canvas, mask, radius);
+        }
+        canvas.restoreToCount(save);
+    }
+
+    /** Blur only (API 31+); used when the lens shader is unavailable. */
+    private boolean drawBlurred(Canvas canvas, Rect mask) {
+        try {
+            RenderNode node = recordBackdrop(mask, Math.max(0, dp(prefBlur)));
+            if (node == null) {
+                return false;
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                node.setRenderEffect(RenderEffect.createBlurEffect(
+                        Math.max(0, dp(prefBlur)), Math.max(0, dp(prefBlur)),
+                        Shader.TileMode.CLAMP));
+            }
+            drawNodeAt(canvas, node, mask);
+            return true;
+        } catch (Throwable t) {
+            XLog.w("search glass blur failed: " + t);
+            return false;
+        }
+    }
+
+    /**
+     * Blur → lens. Returns false without painting anything when the shader or
+     * the render nodes are not usable, so the caller can fall back.
+     */
+    private boolean drawLens(Canvas canvas, Rect pill, float radius) {
+        Bitmap bmp = backdrop;
+        if (bmp == null || bmp.isRecycled()) {
+            return false;
+        }
+        RuntimeShader shader = shader();
+        if (shader == null) {
+            return false;
+        }
+        try {
+            int blurPx = Math.max(0, dp(prefBlur));
+            int pad = blurPx + 2;
+            int left = pill.left - pad;
+            int top = pill.top - pad;
+            int nodeW = pill.width() + pad * 2;
+            int nodeH = pill.height() + pad * 2;
+            if (nodeW <= 0 || nodeH <= 0) {
+                return false;
+            }
+
+            if (blurNode == null) {
+                blurNode = new RenderNode("ios_search_blur");
+            }
+            // Nodes are recorded at (0,0); their placement is the canvas
+            // translate in drawNodeAt(). Keeping the position at the origin
+            // means drawRenderNode() inside another node needs no adjustment.
+            blurNode.setPosition(0, 0, nodeW, nodeH);
+            Canvas record = blurNode.beginRecording(nodeW, nodeH);
+            if (!drawBackdrop(record, bmp, left, top, nodeW, nodeH)) {
+                blurNode.endRecording();
+                return false;
+            }
+            blurNode.endRecording();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blurPx > 0) {
+                blurNode.setRenderEffect(RenderEffect.createBlurEffect(
+                        blurPx, blurPx, Shader.TileMode.CLAMP));
+            }
+
+            if (lensNode == null) {
+                lensNode = new RenderNode("ios_search_lens");
+            }
+            lensNode.setPosition(0, 0, nodeW, nodeH);
+            Canvas record2 = lensNode.beginRecording(nodeW, nodeH);
+            record2.drawRenderNode(blurNode);
+            lensNode.endRecording();
+
+            setLensUniforms(pill, radius, pad);
+            lensNode.setRenderEffect(
+                    RenderEffect.createRuntimeShaderEffect(shader, "content"));
+            drawNodeAt(canvas, lensNode, new Rect(left, top, left + nodeW, top + nodeH));
+            if (!glassActiveLogged) {
+                glassActiveLogged = true;
+                XLog.i("liquid glass active (lens + rim + inner shadow)");
+            }
+            return true;
+        } catch (Throwable t) {
+            XLog.e("liquid glass draw failed, falling back to blur", t);
+            return false;
+        }
+    }
+
+    private void drawNodeAt(Canvas canvas, RenderNode node, Rect at) {
+        int save = canvas.save();
+        canvas.translate(at.left, at.top);
+        canvas.drawRenderNode(node);
+        canvas.restoreToCount(save);
+    }
+
+    /** Blur node holding the captured backdrop, sized to the whole bar. */
+    private RenderNode recordBackdrop(Rect mask, int blurPx) {
+        Bitmap bmp = backdrop;
+        if (bmp == null || bmp.isRecycled()) {
+            return null;
+        }
+        int pad = blurPx + 2;
+        int left = mask.left - pad;
+        int top = mask.top - pad;
+        int nodeW = mask.width() + pad * 2;
+        int nodeH = mask.height() + pad * 2;
+        if (nodeW <= 0 || nodeH <= 0) {
+            return null;
+        }
+        if (blurNode == null) {
+            blurNode = new RenderNode("ios_search_blur");
+        }
+        blurNode.setPosition(0, 0, nodeW, nodeH);
+        Canvas record = blurNode.beginRecording(nodeW, nodeH);
+        if (!drawBackdrop(record, bmp, left, top, nodeW, nodeH)) {
+            blurNode.endRecording();
+            return null;
+        }
+        blurNode.endRecording();
+        return blurNode;
+    }
+
+    /**
+     * Draws the captured backdrop into a node of {@code nodeW × nodeH} placed
+     * at view coordinate {@code (left, top)}. The capture is 0.6× and padded by
+     * {@link #CAPTURE_PAD_DP}, so the source rect is mapped back to view space;
+     * when the node reaches past the screen edge the covered part simply stays
+     * transparent instead of being stretched.
+     */
+    private boolean drawBackdrop(Canvas record, Bitmap bmp, int left, int top,
+                                 int nodeW, int nodeH) {
+        int capPad = dp(CAPTURE_PAD_DP);
+        Rect src = new Rect(
+                Math.round((left + capPad) * CAPTURE_SCALE),
+                Math.round((top + capPad) * CAPTURE_SCALE),
+                Math.round((left + nodeW + capPad) * CAPTURE_SCALE),
+                Math.round((top + nodeH + capPad) * CAPTURE_SCALE));
+        if (!src.intersect(0, 0, bmp.getWidth(), bmp.getHeight())) {
+            return false;
+        }
+        RectF dst = new RectF(
+                src.left / CAPTURE_SCALE - capPad - left,
+                src.top / CAPTURE_SCALE - capPad - top,
+                src.right / CAPTURE_SCALE - capPad - left,
+                src.bottom / CAPTURE_SCALE - capPad - top);
+        record.drawBitmap(bmp, src, dst, bitmapPaint);
+        return true;
+    }
+
+    private RuntimeShader shader() {
+        if (lensShader != null) {
+            return lensShader;
+        }
+        if (shaderUnavailable) {
+            return null;
+        }
+        try {
+            lensShader = new RuntimeShader(LIQUID_GLASS_AGSL);
+            XLog.i("liquid glass shader compiled");
+            return lensShader;
+        } catch (Throwable t) {
+            XLog.w("full liquid glass shader rejected, trying lens-only: " + t);
+        }
+        try {
+            lensShader = new RuntimeShader(LENS_ONLY_AGSL);
+            XLog.i("lens-only glass shader compiled");
+            return lensShader;
+        } catch (Throwable t) {
+            shaderUnavailable = true;
+            XLog.e("liquid glass shaders unavailable, blur-only glass", t);
+            return null;
+        }
+    }
+
+    private void setLensUniforms(Rect pill, float radius, int pad) {
+        RuntimeShader shader = lensShader;
+        if (shader == null) {
+            return;
+        }
+        shader.setFloatUniform("size", (float) pill.width(), (float) pill.height());
+        shader.setFloatUniform("offset", (float) -pad, (float) -pad);
+        shader.setFloatUniform("cornerRadii", radius, radius, radius, radius);
+        shader.setFloatUniform("refractionHeight",
+                Math.max(1f, dp(prefRefractionHeight)));
+        shader.setFloatUniform("refractionAmount",
+                -Math.max(0f, dp(prefRefractionAmount)));
+        shader.setFloatUniform("depthEffect", 0f);
+        // The lens-only fallback shader has no rim/shadow uniforms: each set is
+        // allowed to fail on its own.
+        setUniform(shader, "rimColor", 1f, 1f, 1f,
+                Math.max(0f, Math.min(1f, prefRimAlpha)));
+        setUniform(shader, "rimAngle", (float) Math.toRadians(45.0));
+        setUniform(shader, "rimFalloff", 1f);
+        setUniform(shader, "rimWidth", Math.max(0.5f, dp(prefRimWidth)));
+        setUniform(shader, "shadowColor", 0f, 0f, 0f,
+                Math.max(0f, Math.min(1f, prefInnerShadow)));
+        setUniform(shader, "shadowBand", Math.max(1f, dp(prefShadowW)));
+    }
+
+    private static void setUniform(RuntimeShader shader, String name, float... values) {
+        try {
+            shader.setFloatUniform(name, values);
+        } catch (Throwable ignored) {
+            // Expected on the lens-only fallback shader.
+        }
+    }
+
+    /** No capture (or no hardware canvas): a translucent pill, never a hole. */
+    private void drawShade(Canvas canvas, Rect mask, float radius) {
+        boolean dark = UiTweaks.isDarkMode(getContext());
+        fallbackPaint.setColor(dark ? 0x66000000 : 0x66FFFFFF);
+        canvas.drawRoundRect(new RectF(mask), radius, radius, fallbackPaint);
+    }
+
+    /** Last resort when the canvas is software: draw the raw bitmap. */
+    private void drawPlain(Canvas canvas, Rect mask, float radius) {
+        boolean dark = UiTweaks.isDarkMode(getContext());
+        fallbackPaint.setColor(dark ? 0x661C1C1E : 0x66FFFFFF);
+        canvas.drawRoundRect(new RectF(mask), radius, radius, fallbackPaint);
     }
 
     @Override
@@ -402,107 +656,6 @@ final class SearchGlass extends FrameLayout {
             return;
         }
         super.dispatchDraw(canvas);
-    }
-
-    private static void setUniform(android.graphics.RuntimeShader shader, String name,
-                                   float value) {
-        try {
-            shader.setFloatUniform(name, value);
-        } catch (Throwable ignored) {
-            // The fallback (kyant) shader has no inner-shadow uniforms.
-        }
-    }
-
-    private void drawBlurred(Canvas canvas, int w, int h) {
-        try {
-            int pad = dp(4);
-            float scale = CAPTURE_SCALE;
-            Rect src = new Rect(
-                    Math.round(pad * scale), Math.round(pad * scale),
-                    Math.round((pad + w) * scale), Math.round((pad + h) * scale));
-            src.intersect(0, 0, backdrop.getWidth(), backdrop.getHeight());
-            if (src.isEmpty()) {
-                return;
-            }
-            if (!canvas.isHardwareAccelerated()) {
-                canvas.drawBitmap(backdrop, src, new Rect(0, 0, w, h), bitmapPaint);
-                return;
-            }
-            if (blurNode == null) {
-                blurNode = new RenderNode("ios_search_blur");
-            }
-            blurNode.setPosition(0, 0, w, h);
-            Canvas recording = blurNode.beginRecording(w, h);
-            recording.drawBitmap(backdrop, src, new Rect(0, 0, w, h), bitmapPaint);
-            blurNode.endRecording();
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                // kyant's glass blurs the backdrop before the lens pass.
-                blurNode.setRenderEffect(RenderEffect.createBlurEffect(
-                        dp(10), dp(10), Shader.TileMode.CLAMP));
-            }
-            if (false) { // refraction disabled: blur-only glass
-                // Kyant liquid glass: pure refraction, no blur.
-                try {
-                    if (refractNode == null) {
-                        refractNode = new RenderNode("ios_search_refract");
-                    }
-                    refractNode.setPosition(0, 0, w, h);
-                    Canvas record = refractNode.beginRecording(w, h);
-                    record.drawRenderNode(blurNode);
-                    refractNode.endRecording();
-                    if (liquidShader == null) {
-                        try {
-                            liquidShader = new android.graphics.RuntimeShader(
-                                    shaderSource != null ? shaderSource : LIQUID_GLASS_AGSL);
-                            XLog.i("liquid glass shader compiled");
-                        } catch (Throwable t) {
-                            XLog.e("lattice shader compile failed, fallback", t);
-                            liquidShader = new android.graphics.RuntimeShader(LIQUID_GLASS_AGSL);
-                        }
-                    }
-                    float radius = Math.min(w, h) / 2f;
-                    liquidShader.setFloatUniform("size", w, h);
-                    liquidShader.setFloatUniform("offset", 0f, 0f);
-                    liquidShader.setFloatUniform("cornerRadii", radius, radius, radius, radius);
-                    liquidShader.setFloatUniform("refractionHeight",
-                            dp(Math.max(1f, prefRefractionHeight)));
-                    liquidShader.setFloatUniform("refractionAmount",
-                            -dp(Math.max(0f, prefRefractionAmount)));
-                    liquidShader.setFloatUniform("depthEffect", 0f);
-                    setUniform(liquidShader, "chromaticAberration",
-                            Math.max(0f, Math.min(1f, prefChromatic)));
-                    setUniform(liquidShader, "innerShadow",
-                            Math.max(0f, Math.min(1f, prefInnerShadow)));
-                    setUniform(liquidShader, "shadowW", dp(Math.max(2f, prefShadowW)));
-                    refractNode.setRenderEffect(
-                            RenderEffect.createRuntimeShaderEffect(liquidShader, "content"));
-                    canvas.drawRenderNode(refractNode);
-                    if (!glassActiveLogged) {
-                        glassActiveLogged = true;
-                        XLog.i("liquid glass shader active");
-                    }
-                    return;
-                } catch (Throwable t) {
-                    // The native stub fill is behind this view: hide the glass
-                    // so the themed search bar shows instead of a blank strip.
-                    shaderBroken = true;
-                    liquidShader = null;
-                    XLog.e("liquid glass shader failed, native bar restored", t);
-                    setVisibility(View.GONE);
-                }
-            }
-            canvas.drawRenderNode(blurNode);
-        } catch (Throwable t) {
-            XLog.w("search glass blur failed: " + t);
-            try {
-                if (backdrop != null) {
-                    canvas.drawBitmap(backdrop,
-                            new Rect(0, 0, backdrop.getWidth(), backdrop.getHeight()),
-                            new Rect(0, 0, w, h), bitmapPaint);
-                }
-            } catch (Throwable ignored) {
-            }
-        }
     }
 
     private int dp(float v) {

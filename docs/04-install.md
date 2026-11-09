@@ -1,12 +1,12 @@
 # 安装与调试
 
-> 状态：**现行** · 对应版本：14.8 (83)
+> 状态：**现行** · 对应版本：14.9 (84)
 
 ## 1. 前置
 
 - 已 root / 已装 **LSPosed**（1.x 或 2.x，Zygisk 或 Riru 均可）；
 - 系统为澎湃 OS 3（HyperOS 3）；
-- 已安装 `dist/IosSettingsLayout-14.8.apk`。
+- 已安装 `dist/IosSettingsLayout-14.9.apk`（从 14.8 升级要先卸载，签名不同）。
 
 ## 2. 三步装好
 
@@ -69,7 +69,7 @@ IosSettings: airplane switch attached to 控制中心 row
 ```powershell
 # 覆盖安装失败时
 adb uninstall com.abradant.iossettings
-adb install dist\IosSettingsLayout-14.8.apk
+adb install dist\IosSettingsLayout-14.9.apk
 ```
 
 卸载模块不会影响系统设置数据。
