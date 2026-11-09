@@ -99,7 +99,10 @@ final class BottomSearch {
             // Reverted to our own SearchGlass (kyant refraction shader): the
             // lattice port produced ghosted text and missing icons on device.
             final SearchGlass glass = new SearchGlass(activity);
-            glass.setMaskView(null);
+            // The native capsule is the widget_frame LinearLayout (44dp, 9-patch
+            // background) inside the 56dp stub; clipping the glass to the stub
+            // itself made the lens wider and taller than the bar it sits in.
+            glass.setMaskView(pickNativePill(activity, bar));
             glass.setCaptureHost(wrap);
             boolean embedded = false;
             if (nativeStub) {
@@ -159,6 +162,7 @@ final class BottomSearch {
             wrap.setOnClickListener(openSearch);
             wrap.addView(bar, new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            final View barFinal = bar;
 
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, height, Gravity.BOTTOM);
@@ -230,6 +234,9 @@ final class BottomSearch {
                     XLog.i("bottom bar: vis=" + wrap.getVisibility()
                             + " w=" + wrap.getWidth() + " h=" + wrap.getHeight()
                             + " y=" + loc[1] + " rootH=" + wrap.getRootView().getHeight());
+                    if (DEBUG_TREE) {
+                        dumpTree(barFinal, 0);
+                    }
                 }
             });
             XLog.i("bottom search installed");
@@ -387,6 +394,25 @@ final class BottomSearch {
         }
     }
 
+    /**
+     * The visible capsule is the stub's {@code widget_frame} LinearLayout: the
+     * stub root is 56dp tall and mostly padding, the pill inside it is 44dp and
+     * carries the 9-patch. Falls back to the smallest view with a background.
+     */
+    private static View pickNativePill(Activity activity, View bar) {
+        try {
+            int id = activity.getResources().getIdentifier("widget_frame", "id", "android");
+            if (id != 0) {
+                View pill = bar.findViewById(id);
+                if (pill != null) {
+                    return pill;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return findBackgroundView(bar);
+    }
+
     private static View findBackgroundView(View root) {
         java.util.List<View> candidates = new java.util.ArrayList<>();
         collectBackgroundViews(root, candidates);
@@ -417,6 +443,43 @@ final class BottomSearch {
             }
         }
         return false;
+    }
+
+    /** Diagnostic switch: print the inflated stub tree (bounds + backgrounds). */
+    private static final boolean DEBUG_TREE = false;
+
+    /** Diagnostic: prints the stub tree so the pill can be identified by bounds. */
+    private static void dumpTree(View view, int depth) {
+        if (view == null || depth > 6) {
+            return;
+        }
+        try {
+            StringBuilder line = new StringBuilder();
+            for (int i = 0; i < depth; i++) {
+                line.append("  ");
+            }
+            line.append(view.getClass().getSimpleName());
+            if (view.getId() != View.NO_ID) {
+                try {
+                    line.append('#').append(view.getResources()
+                            .getResourceEntryName(view.getId()));
+                } catch (Throwable ignored) {
+                    line.append('#').append(Integer.toHexString(view.getId()));
+                }
+            }
+            line.append(' ').append(view.getWidth()).append('x').append(view.getHeight());
+            if (view.getBackground() != null) {
+                line.append(" bg=").append(view.getBackground().getClass().getSimpleName());
+            }
+            XLog.i("bar tree: " + line);
+            if (view instanceof ViewGroup) {
+                ViewGroup group = (ViewGroup) view;
+                for (int i = 0; i < group.getChildCount(); i++) {
+                    dumpTree(group.getChildAt(i), depth + 1);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     private static void collectBackgroundViews(View view, java.util.List<View> out) {

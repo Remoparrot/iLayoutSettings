@@ -13,7 +13,7 @@
 | minSdk / targetSdk | 29 / 36 |
 | 作用域 | `com.android.settings` |
 | 已发布包 | `dist/IosSettingsLayout-14.8.apk`（上一版，仍是 Release 用的包） |
-| 14.9 预览包 | `dist/IosSettingsLayout-14.9.apk`（**未发布、未上机验证**） |
+| 14.9 预览包 | `dist/IosSettingsLayout-14.9.apk`（**未发布，已上机验证**：2026-11-09 22:16，25053RT47C / HyperOS 3） |
 
 ## 发布物指纹
 
@@ -21,7 +21,7 @@
 | --- | --- | --- | --- |
 | `dist/IosSettingsLayout-14.8.apk`（用户提供的 14.8 发布包） | 195,465 B | `8D6DC362E5FDA29B3C2B56C5A14FB71325072A4626B141CE3428B2460B9F4951` | `b6f98da57965f604ae13a2f4fc967ffc6c09f14bbdef5b9329effca65dad0f4a` |
 | 14.8 同源码重编（默认 `.keystore` 密钥） | 195,465 B | 每次构建不同（zip 时间戳） | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
-| `dist/IosSettingsLayout-14.9.apk`（本次预览，dex 134,592 B） | 199,561 B | `6010AAC2CED9A9375910EDEAAAA10168B4BFD2F022D6FAC84538AB3AEE12E40A` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `dist/IosSettingsLayout-14.9.apk`（本次预览，dex 136,880 B） | 199,561 B | `C60DA20577DEAC40884630A6EE9091D20F79989779D342F6BDF47A88AA71B05B` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
 
 > 重编同一个 commit 的 sha256 会变（zip 条目时间戳），上表记录的是仓库里这份 APK 的哈希。
 
@@ -43,7 +43,8 @@
 - ✅ 控制中心行右侧飞行模式开关（`AirplaneSwitch`）
 - ✅ 二级页 24 个图标（`SubPageIcons`：23 条 key 映射 + 标题兜底）
 - ✅ 底部原生搜索栏 + **Kyant 液态玻璃**（`BottomSearch` / `SearchGlass` / `SearchHost`）：
-  抓窗口 → 10dp 模糊 → 圆角折射（AGSL）→ 45° 边缘高光 → 底部内阴影，裁在 50dp 胶囊内；
+  抓窗口 → 5dp 模糊 → 圆角折射（AGSL）→ 45° 边缘高光 → 底部内阴影，裁在 **44dp `widget_frame` 药丸**内；
+  抓图在 `OnPreDraw` 里做，**只有位图变化才重绘**（静止时不重画，`uiautomator` 能 idle）；
   shader 不可用时逐级退到「只有模糊 / 半透明胶囊」
 - ✅ 卡片末行双层圆角修正（`CardFix` / `SubPageCards`）
 - ✅ 顶栏按滚动出现的模糊（`ForceBlur` / `UiTweaks`）
@@ -56,9 +57,11 @@
    源码中仍留有后续版本才引入、但未被 `Hook` 调用的类（`GlassToggle`、`IntroCard`、`AboutIos`、`TitleFix`、`TitleOverlay`、`PrefsBridge`）以及 `BottomSearch` 里指向 lattice 的反射分支。
    → 影响：按源码重编的包与发布包行为可能有细微差异；升级会因签名不同失败。详见 `docs/06-pitfalls.md`、`docs/09-roadmap.md`。
 
-2. **14.9 的液态玻璃未上机验证**
-   只做了构建、APK 四项校验，以及用 Skia 的 SkSL 编译器离线编译 AGSL（`javac` 不校验 shader）。
-   真机观感、120Hz 帧率、深色模式、与原生 stub 9-patch 的边界对齐都还没有证据。
+2. **14.9 的液态玻璃已上机验证（2026-11-09 22:16）**
+   真机 25053RT47C / HyperOS 3 / Android 16 实测：`liquid glass shader compiled` + `liquid glass active`；
+   滚动时 `capture fps 108`、`draw fps 102`、`captureCostMs 5`；滚动前后胶囊内部逐像素 diff 9.51（不再定住）；
+   静止 10s 无重绘、`uiautomator dump` 可 idle；连续甩动 554 帧 jank 1 帧（0.18%）。
+   仍未验证：120Hz 慢动作录屏、分屏/平板、深浅色切换动画的中间帧。
 
 3. **`docs/07-changelog.md` 的「7. 校验」节数据过期**
    原文写 size 216,015 B，是后续版本的产物；14.8 实际为 195,465 B。已在该文件顶部标注。
@@ -69,13 +72,13 @@
 
 ## 下一步（优先级从高到低）
 
-1. 真机装 `dist/IosSettingsLayout-14.9.apk`，过滤 `IosSettings` 日志确认
-   `liquid glass shader compiled` + `liquid glass active`，并看 `search glass capture fps=`；
-2. 观感确认后再把 14.9 放进 `dist/`、更新 Release 与 README 下载链接；
+1. 观察真实使用几天的耗电与滚动观感（静止不重绘是否稳定成立）；
+2. 观感确认后再把 14.9 放进 Release、更新 README 下载链接；
 3. 用固定 keystore 重签并统一发布包与源码，解决「同版本不同二进制」；
 4. 清理 `Hook` 未引用的遗留类，或明确标注为「实验代码」；
 5. 接 GitHub Actions：tag 触发构建 + 自动生成 Release；
-6. 参数 GUI（`Prefs` 里 `glass_blur` / `rim_alpha` / `rim_width` / `refraction_*` 已就位）。
+6. 参数 GUI（`Prefs` 里 `glass_blur` / `rim_alpha` / `rim_width` / `refraction_*` 已就位）；
+7. 抓图若仍嫌慢：`CAPTURE_SCALE` 0.6 → 0.45 先试，再考虑硬件 `RecordingCanvas`（但会失去变化检测）。
 
 ## 环境事实（本机）
 

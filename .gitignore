@@ -5,6 +5,7 @@
 *.log
 *.tmp
 *.bak
+*.idsig
 
 # 签名材料：永远不要提交
 *.jks
@@ -30,3 +31,4 @@ desktop.ini
 # 临时截图 / 探针输出
 /tmp/
 /out/
+/dbg/

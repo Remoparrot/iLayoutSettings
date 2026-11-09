@@ -41,6 +41,10 @@ final class SearchGlass extends FrameLayout {
 
     /** Captured at 0.6×: the glass is a blur, the extra pixels are wasted work. */
     private static final float CAPTURE_SCALE = 0.6f;
+    /** Temporary diagnostic: draw the blurred capture alone, without the lens. */
+    private static final boolean DEBUG_BLUR_ONLY = false;
+    /** Temporary diagnostic: lens with no displacement, rim or shadow. */
+    private static final boolean DEBUG_PASS_THROUGH = false;
     /** 120Hz: at most one capture per display frame. */
     private static final long CAPTURE_INTERVAL_MS = 8;
     /**
@@ -210,6 +214,12 @@ final class SearchGlass extends FrameLayout {
     private int fpsFrames;
     private long fpsWindowStart;
     private long lastDiag;
+    private int drawFrames;
+    private long drawWindowStart;
+    private long captureCostMs;
+    private boolean maskLogged;
+    /** Last capture, kept only to answer "did the backdrop change?" cheaply. */
+    private Bitmap prevBackdrop;
 
     private long lastPrefsLoad;
     private float prefRefractionHeight = Prefs.DEFAULT_REFRACTION_HEIGHT;
@@ -272,6 +282,16 @@ final class SearchGlass extends FrameLayout {
                     long started = android.os.SystemClock.uptimeMillis();
                     capture();
                     long cost = android.os.SystemClock.uptimeMillis() - started;
+                    captureCostMs = cost;
+                    // The bar lives outside the scrolling list: nothing dirties
+                    // it when the list scrolls, so without this the glass is
+                    // painted once and stays frozen on that first backdrop.
+                    // Only repaint when the captured backdrop actually changed:
+                    // repainting unconditionally schedules a new frame from
+                    // inside preDraw and the window then never goes idle.
+                    if (backdropChanged()) {
+                        invalidate();
+                    }
                     // One capture per display frame (120Hz = 8ms), but never
                     // faster than the capture itself; this also keeps animating
                     // pages (外观 / 待机显示 / 墙纸 / 控制中心) alive instead of
@@ -306,6 +326,7 @@ final class SearchGlass extends FrameLayout {
         } catch (Throwable ignored) {
         }
         backdrop = null;
+        prevBackdrop = null;
         blurNode = null;
         lensNode = null;
         super.onDetachedFromWindow();
@@ -351,17 +372,53 @@ final class SearchGlass extends FrameLayout {
                 }
             }
             long now = System.currentTimeMillis();
-            if (now - lastDiag > 2000 && backdrop.getWidth() > 0 && backdrop.getHeight() > 0) {
+            if (now - lastDiag > 5000 && backdrop.getWidth() > 0 && backdrop.getHeight() > 0) {
                 lastDiag = now;
                 int center = backdrop.getPixel(backdrop.getWidth() / 2,
                         backdrop.getHeight() / 2);
+                StringBuilder strip = new StringBuilder();
+                int y = backdrop.getHeight() / 2;
+                for (int i = 0; i <= 8; i++) {
+                    int x = Math.min(backdrop.getWidth() - 1, i * (backdrop.getWidth() - 1) / 8);
+                    strip.append(Integer.toHexString(backdrop.getPixel(x, y))).append(' ');
+                }
                 XLog.i("search glass backdrop " + backdrop.getWidth() + "x"
-                        + backdrop.getHeight() + " center=#" + Integer.toHexString(center));
+                        + backdrop.getHeight() + " center=#" + Integer.toHexString(center)
+                        + " strip=" + strip);
             }
         } catch (Throwable t) {
             XLog.w("search glass capture failed: " + t);
             backdrop = null;
         }
+    }
+
+    /**
+     * Compares the fresh capture with the previous one and keeps the copy.
+     * Cheap enough for 120Hz (memcmp + one blit) and it is what keeps a static
+     * page from being redrawn forever.
+     */
+    private boolean backdropChanged() {
+        Bitmap current = backdrop;
+        if (current == null || current.isRecycled()) {
+            return false;
+        }
+        boolean changed;
+        if (prevBackdrop == null || prevBackdrop.getWidth() != current.getWidth()
+                || prevBackdrop.getHeight() != current.getHeight()) {
+            prevBackdrop = Bitmap.createBitmap(current.getWidth(), current.getHeight(),
+                    Bitmap.Config.ARGB_8888);
+            changed = true;
+        } else {
+            changed = !prevBackdrop.sameAs(current);
+        }
+        if (changed) {
+            try {
+                Canvas copy = new Canvas(prevBackdrop);
+                copy.drawBitmap(current, 0f, 0f, null);
+            } catch (Throwable ignored) {
+            }
+        }
+        return changed;
     }
 
     private Rect computeMask(int w, int h) {
@@ -385,16 +442,20 @@ final class SearchGlass extends FrameLayout {
                     mask.inset(padding.left, padding.top, padding.right, padding.bottom);
                 }
             }
-            int sideInset = dp(6);
-            if (mask.width() > sideInset * 2) {
-                mask.inset(sideInset, 0, sideInset, 0);
-            }
-            // The native pill may be shorter than the 50dp wrapper; centre it.
+            // The pill is 44dp tall inside the 56dp stub: centre the mask.
             if (mask.height() < h) {
                 mask.offset(0, (h - mask.height()) / 2);
             }
             if (!mask.intersect(0, 0, w, h)) {
                 mask.set(0, 0, w, h);
+            }
+            if (!maskLogged) {
+                maskLogged = true;
+                XLog.i("search glass mask=" + mask.toShortString() + " view=" + w + "x" + h
+                        + " target=" + maskTarget.getClass().getSimpleName() + " "
+                        + maskTarget.getWidth() + "x" + maskTarget.getHeight()
+                        + " pad=" + (maskTarget.getBackground() == null ? "none"
+                                : maskTarget.getBackground().getPadding(new Rect()) ? "yes" : "no"));
             }
         }
         return mask;
@@ -410,6 +471,17 @@ final class SearchGlass extends FrameLayout {
         if (w <= 0 || h <= 0) {
             return;
         }
+        long now = android.os.SystemClock.uptimeMillis();
+        drawFrames++;
+        if (drawWindowStart == 0) {
+            drawWindowStart = now;
+        } else if (now - drawWindowStart >= 2000) {
+            XLog.i("search glass draw fps="
+                    + (int) (drawFrames * 1000L / Math.max(1, now - drawWindowStart))
+                    + " captureCostMs=" + captureCostMs);
+            drawWindowStart = now;
+            drawFrames = 0;
+        }
         Rect mask = computeMask(w, h);
         rect.set(mask);
         float radius = Math.min(mask.width(), mask.height()) * 0.5f;
@@ -422,7 +494,8 @@ final class SearchGlass extends FrameLayout {
         }
         int save = canvas.save();
         canvas.clipPath(clipPath);
-        boolean drawn = Build.VERSION.SDK_INT >= 33 && drawLens(canvas, mask, radius);
+        boolean drawn = !DEBUG_BLUR_ONLY && Build.VERSION.SDK_INT >= 33
+                && drawLens(canvas, mask, radius);
         if (!drawn) {
             drawn = drawBlurred(canvas, mask);
         }
@@ -614,17 +687,17 @@ final class SearchGlass extends FrameLayout {
         shader.setFloatUniform("refractionHeight",
                 Math.max(1f, dp(prefRefractionHeight)));
         shader.setFloatUniform("refractionAmount",
-                -Math.max(0f, dp(prefRefractionAmount)));
+                DEBUG_PASS_THROUGH ? 0f : -Math.max(0f, dp(prefRefractionAmount)));
         shader.setFloatUniform("depthEffect", 0f);
         // The lens-only fallback shader has no rim/shadow uniforms: each set is
         // allowed to fail on its own.
         setUniform(shader, "rimColor", 1f, 1f, 1f,
-                Math.max(0f, Math.min(1f, prefRimAlpha)));
+                DEBUG_PASS_THROUGH ? 0f : Math.max(0f, Math.min(1f, prefRimAlpha)));
         setUniform(shader, "rimAngle", (float) Math.toRadians(45.0));
         setUniform(shader, "rimFalloff", 1f);
         setUniform(shader, "rimWidth", Math.max(0.5f, dp(prefRimWidth)));
         setUniform(shader, "shadowColor", 0f, 0f, 0f,
-                Math.max(0f, Math.min(1f, prefInnerShadow)));
+                DEBUG_PASS_THROUGH ? 0f : Math.max(0f, Math.min(1f, prefInnerShadow)));
         setUniform(shader, "shadowBand", Math.max(1f, dp(prefShadowW)));
     }
 

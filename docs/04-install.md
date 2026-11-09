@@ -33,8 +33,18 @@ IosSettings: hooks installed
 IosSettings: reordered N headers
 IosSettings: bottom search installed
 IosSettings: bottom bar: vis=0 w=... h=... y=... rootH=...
+IosSettings: search glass mask=[0,13][1152,153] view=1152x167 target=LinearLayout 1152x140 pad=no
+IosSettings: liquid glass shader compiled
+IosSettings: liquid glass active (lens + rim + inner shadow)
 IosSettings: hooked PreferenceFragmentCompat (sub-page icons)
 IosSettings: airplane switch attached to 控制中心 row
+```
+
+滚动时还会看到（每 2 秒一条，静止后停止）：
+
+```
+IosSettings: search glass capture fps=108
+IosSettings: search glass draw fps=102 captureCostMs=5
 ```
 
 对照表：
@@ -52,6 +62,8 @@ IosSettings: airplane switch attached to 控制中心 row
 - [ ] 首页顺序：账号卡 → 关于设备 → 网络卡（飞行模式在最上）→ 通用卡 → 通知/声音/屏幕时间 → 隐私卡 → 钱包/Game Center → App → 其他
 - [ ] 控制中心行右侧有开关，点开关只切飞行模式，点行进入原「更多连接」页
 - [ ] 底部搜索条悬浮在导航栏上方，不被手势条遮挡，最后一张卡片不被挡
+- [ ] **滚动时玻璃里的模糊内容跟着列表一起动**（不是固定在某一帧的旧图）
+- [ ] 玻璃胶囊和原生药丸同宽同高（左右不露出白边、上下不溢出）
 - [ ] 点底部搜索能进入系统搜索，搜索界面出现时底部条自动隐藏
 - [ ] 二级页（通用 / 更多设置）图标出现且大小一致
 - [ ] 深色模式、换主题后卡片圆角正常，没有双层圆角

@@ -36,18 +36,20 @@
 | --- | --- | --- |
 | ![首页](docs/assets/ios_account.png) | ![开关](docs/assets/row_switch.png) | ![图标](docs/assets/subpage-icons.png) |
 
-搜索栏液态玻璃（14.9，模拟渲染图，非真机截图）：
+搜索栏液态玻璃（14.9；上为浅色、下为深色，**均为真机截图**）：
 
-![搜索栏液态玻璃](docs/assets/search-glass-14.9-real.png)
+![搜索栏液态玻璃 · 浅色](docs/assets/search-glass-14.9-light.png)
+![搜索栏液态玻璃 · 深色](docs/assets/search-glass-14.9-dark.png)
 
 ## 安装
 
-1. 下载 [`dist/IosSettingsLayout-14.9.apk`](dist/IosSettingsLayout-14.9.apk)（液态玻璃预览，**未上机验证**）；
+1. 下载 [`dist/IosSettingsLayout-14.9.apk`](dist/IosSettingsLayout-14.9.apk)（液态玻璃预览，**已上机验证**）；
    想要稳定版就到 [Releases · v14.8](https://github.com/abradanthawk-design/iLyayot/releases/tag/v14.8) 下载 14.8；
 2. LSPosed 中启用模块，作用域只勾选 **设置**（`com.android.settings`）；
 3. **强制停止「设置」**（或重启手机），再打开设置。
 
-日志过滤 `IosSettings` 应能看到 `hooks installed`（14.9 还会打 `liquid glass shader compiled` / `liquid glass active`）。
+日志过滤 `IosSettings` 应能看到 `hooks installed`（14.9 还会打 `liquid glass shader compiled` /
+`liquid glass active` 和 `search glass mask=...` 的对齐诊断；滚动时每 2 秒一条 `capture fps`，静止后停止）。
 详见 [安装与调试](docs/04-install.md)。
 
 > 14.9 预览包用默认测试密钥签名，和 14.8 发布包**证书不同**：从 14.8 升级会提示「应用未安装 / 签名不一致」，

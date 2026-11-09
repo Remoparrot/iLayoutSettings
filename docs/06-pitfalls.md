@@ -114,6 +114,15 @@
 - **根因**：早期脚本把 `apk6ify\.downloads\...` 写死。
 - **处理**：现版本已改为「参数 → 环境变量 → 少量兼容路径」三级回退；仍保留开发机路径作为最后兜底，正式使用请传参数。
 
+#### 坑 D5：PowerShell 5.1 读写把 UTF-8 源码改出乱码
+
+- **现象**：用 `(Get-Content x.java) -replace ... | Set-Content -Encoding UTF8` 改完，文件里 `→` `×` `°` 和中文
+  注释变成 `鈫?` `脳` `掳` `澶栬`，编译照样过（在字符串/注释里），但 diff 一片红。
+- **根因**：Windows PowerShell 5.1 的 `Get-Content` 默认按 ANSI(GBK) 解码 UTF-8，字符在读取时就坏了，写回已经晚了。
+- **解法**：`git checkout -- <file>` 还原后重做；需要脚本处理时显式 `-Encoding UTF8` 读、`[IO.File]::WriteAllText`
+  （UTF-8 无 BOM）写，或改用编辑器/补丁工具。
+- **如何避免**：改完 Java 源码 `git diff` 必须扫一眼非 ASCII 行；本仓库源码统一 UTF-8 无 BOM。
+
 ### E. 发布与签名
 
 | 现象 | 根因 | 解法 |
@@ -166,6 +175,37 @@
 - **根因**：测试页在 bar 中间正好有一条色带边界，模糊后就是横向分层；逐行梯度统计没有尖峰，折射前后差异只有 1/255。
 - **解法**：用数值指标定位（逐行 |Δ| 排行、差分图），别用缩略图肉眼判断。
 - **如何避免**：任何「看起来有条线」的结论，先拿对照图和像素统计证伪。
+
+#### 坑 F6：玻璃「定住了」——只画一次，滚动时内容不动
+
+- **现象**：真机上胶囊里的模糊内容固定在某一帧；滚动前后截图逐像素相同（`mean abs diff 0.0`），
+  但日志有 `search glass capture fps=103` —— 抓图在跑，画面不更新。
+- **根因**：三层叠加。①`SearchGlass` 挂在 `android.R.id.content` 上，**不在滚动列表里**，列表滚动只弄脏
+  `RecyclerView` 自己，没人 invalidate 它；②`OnPreDraw` 只更新了 `backdrop` 位图，`onDraw` 根本没被调用；
+  ③`lensNode` 带 `RenderEffect`，图层有缓存，不标脏不会重跑 shader。
+- **解法**：`OnPreDraw` 抓图后与上一张位图 `sameAs()` 比对，**变了才** `invalidate()`。
+- **如何避免**：做「抓自己窗口」的浮层时先回答两个问题：谁会让它重画？静止时怎么停下来？
+  **不要**用无条件 `invalidate()` 糊过去——见 F7。
+
+#### 坑 F7：无脑 `invalidate()` 让窗口永不 idle
+
+- **现象**：`adb shell uiautomator dump` 报 `ERROR: could not get idle state`；日志里 `draw fps` 常年 120，
+  掉电明显。
+- **根因**：在 `OnPreDraw` 里 `invalidate()` 会为下一次 vsync 再排一次 traversal；下一帧的 `OnPreDraw` 又
+  invalidate，自激成永久 120Hz。
+- **解法**：只在「抓到的位图变了」时 invalidate；静止时最后一张比对相等，链条自然断掉。
+- **如何避免**：把「能不能 idle」当成验收项（`uiautomator dump` 成功 = 通过），别只看帧率。
+
+#### 坑 F8：玻璃胶囊比原生药丸大一圈
+
+- **现象**：玻璃上下边缘溢出白色药丸、左右各宽出一截，看起来「玻璃和搜索栏不是同一个东西」。
+- **根因**：`setMaskView(null)` 时遮罩 = 整个 `SearchGlass`（50dp 包装层 / 56dp stub），而原生药丸是 stub 里
+  `android.R.id.widget_frame` 的 `LinearLayout`，**44dp**（`miuix_appcompat_searchbar_bg_height`）；
+  另外 `computeMask()` 还叠了一个 `6dp` 手调内缩，是按整条包装层调出来的补偿值。
+- **解法**：遮罩取 `widget_frame`（`pickNativePill()`，兜底 `findBackgroundView()`），`computeMask()` 只按该视图
+  背景的 padding 内缩。实测 `mask=[0,13][1152,153]`，正好 44dp 药丸。
+- **如何避免**：布局尺寸别猜——`aapt2 dump xmltree --file res/layout/miuix_appcompat_search_stub.xml Settings.apk`
+  看 XML，`DEBUG_TREE` 的 `dumpTree()` 看真机实际尺寸。
 
 ---
 

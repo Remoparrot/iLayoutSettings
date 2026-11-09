@@ -28,7 +28,7 @@ final class Prefs {
     /** Width of that inner-shadow band, in dp. */
     static final float DEFAULT_SHADOW_W = 8f;
     /** Backdrop blur radius before the lens, in dp. */
-    static final float DEFAULT_GLASS_BLUR = 10f;
+    static final float DEFAULT_GLASS_BLUR = 5f;
     /** Peak opacity of the 45° rim highlight. */
     static final float DEFAULT_RIM_ALPHA = 0.5f;
     /** Width of the rim highlight band, in dp. */

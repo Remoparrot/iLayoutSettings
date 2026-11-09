@@ -70,12 +70,16 @@ LSPosed
 3. 浮层尺寸：高 50dp，左右 8dp，底部 12dp；拿到导航栏 inset 后改为 `14dp + nav`；
 4. 列表底部 padding 同步加上 `搜索栏高 + nav + 24dp`，避免最后一张卡片被挡；
 5. 点击浮层 → 调原生 anchor 的 `performClick()` → 走 MIUI 自己的搜索 ActionMode；搜索界面出现时浮层自动隐藏；
-6. `SearchGlass` 负责视觉层，**每帧**：抓窗口（跳过自身子树）→ 10dp 模糊（`RenderEffect`）→
-   圆角矩形折射（`RuntimeShader` + AGSL）→ 45° 边缘高光 → 底部内阴影，全部裁在搜索栏胶囊内；
+6. `SearchGlass` 负责视觉层：抓窗口（跳过自身子树）→ 5dp 模糊（`RenderEffect`）→
+   圆角矩形折射（`RuntimeShader` + AGSL）→ 45° 边缘高光 → 底部内阴影，全部裁在 `widget_frame`
+   原生药丸的胶囊范围内（44dp，不是 56dp 的 stub）；
+   **抓图在 `OnPreDraw` 里做，只有抓到的位图与前一张不同才 `invalidate()`**；
 7. 逐级兜底：全量 shader → 只有折射的 shader → 只有模糊 → 半透明胶囊（`shaderUnavailable` 只置一次，
    不会每帧重试抛异常）。`SearchHost` 在抓图那一帧跳过自身子树，避免把搜索栏自己拍进背景里。
 
 > 抓图 + 两个 RenderEffect 是整份代码里性能最敏感的部分，改之前先读 [设计思路 · 2.4 玻璃](05-design-notes.md)。
+> 搜索栏挂在 `android.R.id.content` 上，**不在滚动列表里**：列表滚动不会弄脏它，所以必须自己判断
+> 「背景变了」再重绘（见 [坑 F6](06-pitfalls.md)）。
 
 ## 5. 二级页图标（`SubPageIcons`）
 
