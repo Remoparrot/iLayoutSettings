@@ -197,6 +197,7 @@ module/                   模块源码
 dist/                     当前发布 APK
 lib/xposed-api-82.jar     Xposed API（编译期依赖）
 tools/make_subpage_icons.py  二级页图标生成脚本
+tools/check_agsl.py          AGSL 离线编译自检（需要 skia-python，改 shader 必跑）
 docs/                     文档（入口 docs/README.md）
 ```
 

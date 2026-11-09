@@ -40,6 +40,18 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File module\build.ps1
 > **必须加 `-ExecutionPolicy Bypass`**：本机默认执行策略禁止运行 `.ps1`，直接 `& .\build.ps1` 会报 `UnauthorizedAccess`。
 > 脚本用 Windows PowerShell 5.1 编写（`#Requires -Version 5.1`），**不需要** PowerShell 7。
 
+### 改了 AGSL 的话：先跑 shader 自检
+
+`javac` 不校验 AGSL（shader 是字符串，真机运行时才编译）。改了 `SearchGlass.java` 里的 shader，先跑：
+
+```powershell
+python -m pip install skia-python   # 只需一次
+python tools\check_agsl.py
+```
+
+它会抽出两个 shader 常量用 Skia 的 SkSL 编译器编译一遍，并核对 uniform 名称与 Java 侧一致；
+退出码 0 才继续构建。见 [踩坑 F1/F2](06-pitfalls.md)。
+
 ### 参数说明
 
 | 参数 | 默认 | 说明 |

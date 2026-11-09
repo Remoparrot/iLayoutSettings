@@ -65,7 +65,7 @@ AGSL 用 Skia 编译器离线校验通过（`javac` 不校验 shader），构建
 - **现象**：Java 编译、d8、打包全部成功，但 AGSL 是运行期才编译的，真机上才可能抛异常。
 - **根因**：AGSL 以字符串形式进 dex，构建链里没有任何一步会校验它。
 - **解法**：本机装 `skia-python`，用 `RuntimeEffect.MakeForShader(源码)` 离线编译，并核对 `effect.uniforms()` 的名字/顺序与 Java 里 `setFloatUniform` 完全一致。
-- **如何避免**：以后改 shader 先跑这个检查；smoke check 脚本见本次会话的 `_sksl_check.py`（未入库，逻辑在记录里）。
+- **如何避免**：以后改 shader 先跑这个检查；本次已固化成 `tools/check_agsl.py`（需要 `skia-python`）。
 
 ### 坑：RenderNode 位置被算两次，玻璃内容整体偏移
 

@@ -139,9 +139,10 @@
 
 - **现象**：构建四项校验全绿，但 AGSL 是运行期才编译的，真机上可能抛异常。
 - **根因**：AGSL 以字符串进 dex，构建链里没有任何一步校验它。
-- **解法**：本机 `python -m pip install skia-python`，用 `skia.RuntimeEffect.MakeForShader(源码)`
-  编译，并核对 `effect.uniforms()` 的名字/顺序和 Java 侧 `setFloatUniform` 一致。
-- **如何避免**：把这一步当成 shader 改动的固定回归；它能在打包前抓到语法和类型错误。
+- **解法**：`python -m pip install skia-python`，然后跑仓库里的 `python tools/check_agsl.py`：
+  它从 `SearchGlass.java` 抽出入内嵌的 AGSL、用 `RuntimeEffect.MakeForShader` 编译，并核对 uniform 名称与
+  Java 侧一致。
+- **如何避免**：把这一步当成 shader 改动的固定回归；它能在打包前抓到语法、类型和 uniform 不一致。
 
 #### 坑 F3：RenderNode 位置被算两次
 
