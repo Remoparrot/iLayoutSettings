@@ -1,6 +1,6 @@
 # 踩坑记录
 
-> 状态：**现行** · 对应版本：15.0 (85)
+> 状态：**现行** · 对应版本：15.3 (88)
 > 规则：每踩一个新坑就追加一条，写清 **现象 → 根因 → 解法 → 如何避免**。旧结论被推翻时保留原文并标「已过时」。
 
 ## 最贵的五个坑（先看这五条）
@@ -60,6 +60,9 @@
 | 手势条压住搜索栏 | 同上，只加了固定 dp | 用 `WindowInsets.Type.navigationBars()`，兼容旧 API 回退 `getSystemWindowInsetBottom()` |
 | 飞行模式开关偏下/不居中 | 只改 `translationY`，父容器类型不同 | `centerInParent()` 按 FrameLayout/RelativeLayout/LinearLayout 设 `CENTER_VERTICAL`，再用屏幕坐标微调 |
 | 顶栏模糊不出现 | 主题把 `background_blur_enable` 关了，`HyperMaterialUtils.isEnable()` 为 false | `ForceBlur` 同时改 `isEnable` / `isForceEnable` / `isFeatureEnable` 三个入口 |
+| 顶栏模糊滑杆完全没反应 | `Class.forName("miuix.core.util.MiuiBlurUtils", UiTweaks.class.getClassLoader())` 在 LSPosed 下抛 `ClassNotFoundException`（模块类与设置类不在同一 loader） | 改用 `appBar.getContext().getClassLoader()`，并以 `XposedHelpers.findClassIfExists(..., loader)` 兜底 |
+| 滚动后 `top bar blur` 只在 true/false 之间切、半径不更新 | 旧逻辑只比较「是否滚动」，且只在 `OnScrollChanged` 时读 prefs；滑杆变化被吞掉 | 同时跟踪半径并每 500ms 轮询 prefs；滚动源优先 `scroll_headers`，`mListView` 取不到时回退 |
+| 搜索栏去色后完全消失 | 把 `miuix_appcompat_search_mode_edit_text_bg_light/dark` 的 fill 清掉了；它才是可见胶囊 | 保留主题胶囊；只把 shader 的 `surfaceAlpha` 置 0，不再叠 shader 表面色 |
 | 外观页预览和卡片之间有空隙 | MIUI 自己加了 margin | 保留原间距，只在预览后补一层同色同圆角的卡片背景（`AppearanceTweak`） |
 
 ### C. 版本与回退（本仓库特有）

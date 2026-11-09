@@ -1,12 +1,12 @@
 # 安装与调试
 
-> 状态：**现行** · 对应版本：15.2 (87)
+> 状态：**现行** · 对应版本：15.3 (88)
 
 ## 1. 前置
 
 - 已 root / 已装 **LSPosed**（1.x 或 2.x，Zygisk 或 Riru 均可）；
 - 系统为澎湃 OS 3（HyperOS 3）；
-- 已安装 `dist/IosSettingsLayout-15.2.apk`（应用名 **iLyayot**；从 14.8 升级要先卸载，签名不同；14.9/15.0 可直接覆盖）。
+- 已安装 `dist/IosSettingsLayout-15.3.apk`（应用名 **iLyayot**；从 14.8 升级要先卸载，签名不同；14.9~15.2 可直接覆盖）。
 
 ## 2. 三步装好
 
@@ -83,7 +83,7 @@ IosSettings: search glass draw fps=102 captureCostMs=5
 ```powershell
 # 覆盖安装失败时
 adb uninstall com.abradant.iossettings
-adb install dist\IosSettingsLayout-15.2.apk
+adb install dist\IosSettingsLayout-15.3.apk
 ```
 
 卸载模块不会影响系统设置数据。

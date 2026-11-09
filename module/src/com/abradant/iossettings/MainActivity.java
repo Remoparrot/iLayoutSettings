@@ -25,7 +25,7 @@ import android.widget.TextView;
  */
 public final class MainActivity extends Activity {
 
-    private static final String VERSION = "15.2";
+    private static final String VERSION = "15.3";
 
     private SharedPreferences prefs;
     private boolean dark;

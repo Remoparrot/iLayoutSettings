@@ -80,7 +80,10 @@ final class BottomSearch {
             wrap.setTag(TAG);
             wrap.setClickable(true);
             wrap.setFocusable(true);
-            wrap.setElevation(dp(activity, 40));
+            // 15.3: the wrapper no longer casts an elevation shadow. On light
+            // pages that shadow was the hard grey halo around the pill; the
+            // visible capsule itself is still MIUI's own light/dark drawable.
+            wrap.setElevation(0);
 
             View bar = inflateNativeStub(activity, content, hint);
             boolean nativeStub = bar != null;

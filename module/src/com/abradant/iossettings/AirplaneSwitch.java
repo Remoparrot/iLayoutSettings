@@ -25,6 +25,9 @@ final class AirplaneSwitch {
     private static final String TAG = "ios_airplane_switch";
     private static final String GLASS_TAG = "ios_airplane_glass";
     private static final String GLASS_SPACER_TAG = "ios_airplane_glass_spacer";
+    /** Last UI mode each row's icon was resolved for, so a theme flip re-applies it. */
+    private static final java.util.Map<View, Integer> ICON_MODE =
+            new java.util.WeakHashMap<>();
 
     private AirplaneSwitch() {
     }
@@ -188,6 +191,7 @@ final class AirplaneSwitch {
             @Override
             public void onLayoutChange(View v, int left, int top, int right, int bottom,
                                        int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                refreshPlaneIcon(itemView);
                 recenter(itemView, switchView);
             }
         });
@@ -439,23 +443,39 @@ final class AirplaneSwitch {
         XLog.i("airplane row clicked -> " + next);
     }
 
-    /** Use the light / dark airplane artwork bundled in the module resources. */
+    /**
+     * Uses Settings' own themed {@code ic_airplane_mode_settings} artwork, so
+     * the row matches MIUI (and follows theme overlays / dark mode) instead of
+     * carrying the module's old orange tile. If the resource is missing the
+     * bundled {@code ic_plane_*} images are the fallback.
+     */
     private static void applyPlaneIcon(final Context context, final View itemView) {
         try {
             final View icon = itemView.findViewById(android.R.id.icon);
             if (!(icon instanceof android.widget.ImageView)) {
                 return;
             }
-            android.content.res.Resources modRes = context.getPackageManager()
-                    .getResourcesForApplication("com.abradant.iossettings");
-            String name = UiTweaks.isDarkMode(context) ? "ic_plane_dark" : "ic_plane_light";
-            int id = modRes.getIdentifier(name, "drawable", "com.abradant.iossettings");
-            if (id == 0) {
+            ICON_MODE.put(itemView, uiMode(context));
+            android.graphics.drawable.Drawable drawable = settingsPlaneIcon(context);
+            String source = "settings:ic_airplane_mode_settings";
+            if (drawable == null) {
+                source = UiTweaks.isDarkMode(context) ? "module:ic_plane_dark" : "module:ic_plane_light";
+                String name = UiTweaks.isDarkMode(context) ? "ic_plane_dark" : "ic_plane_light";
+                android.content.res.Resources modRes = context.getPackageManager()
+                        .getResourcesForApplication("com.abradant.iossettings");
+                int id = modRes.getIdentifier(name, "drawable", "com.abradant.iossettings");
+                if (id != 0) {
+                    drawable = modRes.getDrawable(id, null);
+                }
+            }
+            if (drawable == null) {
+                XLog.w("airplane icon: no Settings drawable and no module fallback");
                 return;
             }
-            ((android.widget.ImageView) icon).setImageDrawable(modRes.getDrawable(id, null));
+            ((android.widget.ImageView) icon).setImageDrawable(drawable);
             ((android.widget.ImageView) icon).setScaleType(
                     android.widget.ImageView.ScaleType.FIT_CENTER);
+            final String sourceFinal = source;
             // Do not hardcode a size: copy the exact size of a sibling row icon
             // so the plane lands on the same grid as every other icon.
             itemView.post(new Runnable() {
@@ -469,7 +489,7 @@ final class AirplaneSwitch {
                             lp.height = size;
                             icon.setLayoutParams(lp);
                         }
-                        XLog.i("airplane icon set: " + name + " size=" + size);
+                        XLog.i("airplane icon set: " + sourceFinal + " size=" + size);
                     } catch (Throwable t) {
                         XLog.w("airplane icon sizing failed: " + t);
                     }
@@ -478,6 +498,44 @@ final class AirplaneSwitch {
         } catch (Throwable t) {
             XLog.e("airplane icon failed", t);
         }
+    }
+
+    /** Settings' themed airplane drawable, or null when this ROM/theme has none. */
+    private static android.graphics.drawable.Drawable settingsPlaneIcon(Context context) {
+        try {
+            int id = context.getResources().getIdentifier(
+                    "ic_airplane_mode_settings", "drawable", "com.android.settings");
+            if (id == 0) {
+                return null;
+            }
+            return context.getDrawable(id);
+        } catch (Throwable t) {
+            XLog.w("Settings airplane drawable lookup failed: " + t);
+            return null;
+        }
+    }
+
+    /**
+     * A live theme change re-lays out the row without necessarily re-binding
+     * the adapter. Re-resolve the themed icon once per UI mode.
+     */
+    private static void refreshPlaneIcon(View itemView) {
+        try {
+            Context context = itemView.getContext();
+            int mode = uiMode(context);
+            Integer previous = ICON_MODE.get(itemView);
+            if (previous != null && previous == mode) {
+                return;
+            }
+            applyPlaneIcon(context, itemView);
+        } catch (Throwable t) {
+            XLog.w("airplane icon refresh failed: " + t);
+        }
+    }
+
+    private static int uiMode(Context context) {
+        return context.getResources().getConfiguration().uiMode
+                & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
     }
 
     private static int siblingIconSize(View itemView) {

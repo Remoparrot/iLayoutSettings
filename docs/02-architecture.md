@@ -1,6 +1,6 @@
 # 架构与 Hook 链路
 
-> 状态：**现行** · 对应版本：15.2 (87)
+> 状态：**现行** · 对应版本：15.3 (88)
 > 源码：`module/src/com/abradant/iossettings/`
 
 ## 1. 从加载到生效
@@ -71,9 +71,10 @@ LSPosed
 4. 列表底部 padding 同步加上 `搜索栏高 + nav + 24dp`，避免最后一张卡片被挡；
 5. 点击浮层 → 调原生 anchor 的 `performClick()` → 走 MIUI 自己的搜索 ActionMode；搜索界面出现时浮层自动隐藏；
 6. `SearchGlass` 负责视觉层：抓窗口（跳过自身子树）→ **1dp 模糊**（`RenderEffect`）→
-   圆角矩形折射（`RuntimeShader` + AGSL，**24dp 厚度 / 30dp 强度**）→ 45° 边缘高光 → 底部内阴影；
+   圆角矩形折射（`RuntimeShader` + AGSL，默认 **12dp 厚度 / 8dp 力度**）→ 深色保留底部内阴影、浅色关闭；
+   **不再往 shader 里混表面色**，原生 `miuix_appcompat_search_mode_edit_text_bg_light/dark` 胶囊保持主题原样；
    遮罩不是视图边界，而是 `paintedBackgroundBounds()` 把原生胶囊 drawable 画进位图后取的实际像素矩形
-   （主题 9-patch 的透明边距烘在 PNG 里，`getPadding()` 不可靠）；测量完成后再把原生 fill `setAlpha(0x80)`；
+   （主题 9-patch 的透明边距烘在 PNG 里，`getPadding()` 不可靠）；
    **抓图在 `OnPreDraw` 里做，只有抓到的位图与前一张不同才 `invalidate()`**；
 7. 逐级兜底：全量 shader → 只有折射的 shader → 只有模糊 → 半透明胶囊（`shaderUnavailable` 只置一次，
    不会每帧重试抛异常）。`SearchHost` 在抓图那一帧跳过自身子树，避免把搜索栏自己拍进背景里。
@@ -93,7 +94,20 @@ LSPosed
   都推不动它，而 MIUI 的 `widget_frame` 把 95px 高的开关放在 156px frame 的底部，于是开关下沉约 9dp。
 - **15.2 的解法**：不再自绘（15.0 的 `GlassToggle` 已停用），改为平移**父容器 `widget_frame`** 的 `translationY`；
   canvas 随父容器移动，hook 画在里面的开关跟着走。目标位置取标题视觉中心，实测 -30px 后旋钮中心 945 = 标题中心 945；
+- **15.3 图标**：优先 `context.getDrawable(com.android.settings:drawable/ic_airplane_mode_settings)`，
+  主题覆盖和深浅色由资源系统处理；资源缺失才回退模块 `ic_plane_dark/light`。行布局变化时按 `uiMode` 重新解析一次；
 - 行被回收成普通 header 时移除多出来的开关视图，并恢复 `widget_frame` 可见。
+
+### 4.2 顶栏滚动模糊（`UiTweaks` / `ForceBlur`）
+
+- 滚动源优先取 `com.android.settings:id/scroll_headers` 的 RecyclerView，取不到才回退 `fragment.mListView`；
+  原因是部分 HyperOS 3 版本里 `mListView` 不一定是真正滚动的那个 View，`computeVerticalScrollOffset()` 会一直是 0；
+- 滚动超过 4dp：顶栏底色换半透明，`MiuiBlurUtils.setBackgroundBlur(view, radius)` +
+  `setBackgroundBlurRadius(view, radius)`；回顶部恢复实色并 `clearBackgroundBlur`；
+- 15.3 用**设置进程的 classloader** 解析 `miuix.core.util.MiuiBlurUtils`。LSPosed 把模块类放在独立 loader 里，
+  之前的 `UiTweaks.class.getClassLoader()` 会 `ClassNotFoundException`，所以滑杆写进去了但从未生效；
+- 同时跟踪「是否滚动 + 当前半径」两个状态，并每 500ms 轮询一次 prefs；滑杆改完回到设置，
+  即使不再滚动也会重新套用新半径。
 
 ## 5. 二级页图标（`SubPageIcons`）
 

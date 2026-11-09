@@ -3,7 +3,7 @@
 > 把澎湃 OS（HyperOS 3）「设置」首页改成 iOS 风格：入口重排、二级页图标、搜索栏沉底、卡片细节修正。
 > **全部复用 MIUI 原生控件与原生数据，模块不重绘任何页面。**
 
-[![Version](https://img.shields.io/badge/version-15.2-1f6feb)](https://github.com/abradanthawk-design/iLyayot/releases)
+[![Version](https://img.shields.io/badge/version-15.3-1f6feb)](https://github.com/abradanthawk-design/iLyayot/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-HyperOS%203%20%7C%20Android%2015%2B-green)](docs/01-overview.md)
 [![LSPosed](https://img.shields.io/badge/framework-LSPosed-orange)](docs/04-install.md)
@@ -23,41 +23,49 @@
 | 能力 | 说明 |
 | --- | --- |
 | 首页重排 / 分组 | iOS 顺序 + 独立卡片，卡片圆角与间距仍由 miuix `CardItemDecoration` 绘制 |
-| 飞行模式开关 | 在「控制中心」行右侧使用**原生 `SlidingSwitch`**；装了 HyperiOS 时只平移 `widget_frame` 修正位置，不自绘开关 |
+| 飞行模式开关 | 右侧原生 `SlidingSwitch`；图标优先用设置主题里的 `ic_airplane_mode_settings`，缺失时回退模块内置图标，随深浅色/主题自动更新 |
 | 二级页图标 | 24 个 iOS 风格图标，按 preference key 匹配，标题关键词兜底 |
-| 底部搜索栏 | `miuix_appcompat_search_stub` 原生布局 + **Kyant backdrop 2.0.1 玻璃**（1dp 模糊 + 12dp/8dp 折射 + 内阴影，无光边，实心磨砂） |
-| 参数界面 | 应用内滑杆：搜索栏模糊 / 折射力度 / 折射厚度、顶栏模糊，即改即生效 |
+| 底部搜索栏 | `miuix_appcompat_search_stub` 原生布局 + **Kyant backdrop 2.0.1 玻璃**（模糊 + 12dp/8dp 折射；**不叠加 shader 表面色**，保留主题 `miuix_appcompat_search_mode_edit_text_bg_light/dark` 胶囊；浅色无阴影） |
+| 参数界面 | 应用内滑杆：搜索栏模糊 / 折射力度 / 折射厚度、顶栏模糊，滑杆即改即生效 |
 | 卡片细节修正 | 去掉每组最后一行的双层圆角/放大图标；外观页预览加卡片底 |
-| 顶部模糊 | 列表滚动时才出现，可调半径 |
+| 顶部模糊 | 列表滚动时出现；半径由 `topbar_blur` 实时读取，滑杆改完回到设置即生效 |
 | 关于本机 | （历史能力）iOS 风格「关于设备」页，见 [版本记录](docs/07-changelog.md) |
 
 ## 截图
 
 | 首页（账号 + 卡片分组） | 控制中心行的飞行模式开关（15.2 原生开关归位） | 二级页图标 |
 | --- | --- | --- |
-| ![首页](docs/assets/ios_account.png) | ![开关](docs/assets/row-switch-15.2.png) | ![图标](docs/assets/subpage-icons.png) |
+| ![首页](docs/assets/home-15.3-light.png) | ![开关](docs/assets/row-switch-15.2.png) | ![图标](docs/assets/subpage-icons.png) |
 
-搜索栏（15.2 测试构建，深色，真机裁切；已去光边、实心磨砂，浅色截图待补）：
+搜索栏（15.3 真机裁切；保留原生 light/dark 胶囊，去掉 shader 表面色与浅色阴影）：
 
-![搜索栏 · 深色](docs/assets/search-glass-15.2-dark.png)
+| 浅色 | 深色 |
+| --- | --- |
+| ![搜索栏 · 浅色](docs/assets/search-glass-15.3-light.png) | ![搜索栏 · 深色](docs/assets/search-glass-15.3-dark.png) |
 
-参数界面（15.2）：
+顶栏滚动模糊（15.3，浅色，滚动后）：
 
-![参数界面](docs/assets/gui-15.2.png)
+![顶栏模糊](docs/assets/topbar-blur-15.3.png)
+
+参数界面（15.3）：
+
+![参数界面](docs/assets/gui-15.3.png)
 
 ## 安装
 
-1. 下载 [`dist/IosSettingsLayout-15.2.apk`](dist/IosSettingsLayout-15.2.apk)（应用名 **iLyayot**，参数界面 + 实心玻璃 + 原生开关归位，**已上机**）；
+1. 下载 [`dist/IosSettingsLayout-15.3.apk`](dist/IosSettingsLayout-15.3.apk)（应用名 **iLyayot**，主题飞行图标 + 搜索栏去色/去浅色阴影 + 顶栏模糊实时生效，**已上机**）；
    想要稳定版就到 [Releases · v14.8](https://github.com/abradanthawk-design/iLyayot/releases/tag/v14.8) 下载 14.8；
 2. LSPosed 中启用模块，作用域只勾选 **设置**（`com.android.settings`）；
 3. **强制停止「设置」**（或重启手机），再打开设置；
 4. 打开桌面上的 **iLyayot** 图标即可调参数（模糊 / 折射 / 顶栏模糊）。
 
 日志过滤 `IosSettings` 应能看到 `hooks installed`、`liquid glass shader compiled` / `liquid glass active`、
-`search glass mask=...`、`airplane switch recentered by ... (frame translation)`；改滑杆后会出现 `glass tuning: ...`。
+`search glass mask=...`、`airplane icon set: settings:ic_airplane_mode_settings`、
+`airplane switch recentered by ... (frame translation)`；改滑杆后会出现 `glass tuning: ...` 与
+`top bar blur=true offset=... radius=... set=true`。
 详见 [安装与调试](docs/04-install.md)。
 
-> 15.0 与 14.9 使用同一测试密钥，可直接覆盖 14.9；与 14.8 发布包**证书不同**，
+> 15.x 使用同一测试密钥签名，可直接覆盖 14.9~15.2；与 14.8 发布包**证书不同**，
 > 从 14.8 升级会提示「应用未安装 / 签名不一致」，先卸载旧包再装。原因见 [踩坑记录 · 签名](docs/06-pitfalls.md#签名与升级)。
 
 ## 兼容性
@@ -81,7 +89,7 @@ pwsh -File module/build.ps1 `
   -AndroidJar C:\android-sdk\platforms\android-36\android.jar
 ```
 
-输出 `dist/IosSettingsLayout-15.2.apk`。完整工具链版本、可复现性说明见 [构建指南](docs/03-build.md)。
+输出 `dist/IosSettingsLayout-15.3.apk`。完整工具链版本、可复现性说明见 [构建指南](docs/03-build.md)。
 
 ## 文档
 

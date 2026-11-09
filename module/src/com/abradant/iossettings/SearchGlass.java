@@ -21,9 +21,11 @@ import android.widget.FrameLayout;
  *
  * <p>Pipeline per frame (Kyant0's backdrop 2.0.1, Apache-2.0): capture the
  * window behind the bar -> blur it -> run the rounded-rect lens shader over it
- * (edge refraction) plus a bottom inner shadow, clipped to the bar's capsule.
- * The white rim highlight of 15.0 is gone: the frosted sheet keeps a soft edge,
- * not a hard specular ring.</p>
+ * (edge refraction), clipped to the bar's capsule. 15.3 adds no surface colour:
+ * MIUI's own {@code miuix_appcompat_search_mode_edit_text_bg_light/dark}
+ * capsule stays visible and the glass only contributes blur + refraction. The
+ * inner shadow is kept in dark mode but disabled in light mode (it read as a
+ * dirty band on white).</p>
  *
  * <p>The AGSL source below is a Java port of {@code com.kyant.backdrop}
  * ({@code Shaders.kt}: {@code RoundedRectRefractionShaderString} and
@@ -109,10 +111,10 @@ final class SearchGlass extends FrameLayout {
             + "  float radius = radiusAt(local, cornerRadii);\n"
             + "  float sd = sdRoundedRect(centeredCoord, halfSize, radius);\n"
             // Kyant 2.0.1: pixels deeper than the refraction band are copied
-            // untouched, so only the edge ring pays for the shader. The surface
-            // tint still has to be applied here, otherwise the solid capsule
-            // only appears inside the refraction band and the middle of the bar
-            // shows the page through it.
+            // untouched, so only the edge ring pays for the shader. surfaceAlpha
+            // is 0 in 15.3, so the mix below is a no-op; the branch is kept so
+            // the shader still matches Kyant's structure and can be re-tinted
+            // without editing the AGSL string.
             + "  if (-sd >= refractionHeight) {\n"
             + "    float3 inside = unpremulColor(content.eval(coord));\n"
             + "    return toHalf4(mix(inside, surfaceColor.rgb, surfaceAlpha));\n"
@@ -126,10 +128,8 @@ final class SearchGlass extends FrameLayout {
             + "      + depthEffect * depthDir;\n"
             + "  float2 grad = gradRaw / max(length(gradRaw), 0.0001);\n"
             + "  float3 color = unpremulColor(content.eval(coord + d * grad));\n"
-            // 15.1: the capsule reads as a solid surface. The theme's own
-            // capsule drawable is translucent, so the page behind stayed
-            // readable through it; mixing in its exact colour makes the bar
-            // opaque without inventing a new tint.
+            // 15.3: no shader surface tint. MIUI's own light/dark capsule is
+            // the visible surface; this mix stays as a no-op at surfaceAlpha=0.
             + "  color = mix(color, surfaceColor.rgb, surfaceAlpha);\n"
             // Kyant InnerShadow: dark band hugging the bottom edge.
             + "  float ny = clamp(centeredCoord.y / max(halfSize.y, 0.5), -1.0, 1.0);\n"
@@ -226,15 +226,13 @@ final class SearchGlass extends FrameLayout {
     private int cachedMaskHeight;
     private Rect cachedVisibleBounds;
     private boolean visibleProbeDone;
-    private boolean fillSoftened;
-    /** Opaque colour of the native capsule, alpha forced to 0xFF; 0 = unknown. */
-    private int surfaceColor;
     /**
-     * How much of the glass is replaced by {@link #surfaceColor}. 15.0 left the
-     * bar readable-through (the theme capsule is translucent); 15.1 makes it a
-     * solid frosted surface, keeping 7% of the lens so the edge still bends.
+     * 15.3: no shader surface tint. The theme's own
+     * {@code miuix_appcompat_search_mode_edit_text_bg_light/dark} capsule is
+     * kept exactly as MIUI draws it; the glass contributes blur + refraction
+     * and the inner shadow is light-mode-only.
      */
-    private static final float SURFACE_ALPHA = 0.93f;
+    private static final float SURFACE_ALPHA = 0f;
     /** How often the settings screen's changes are picked up, in ms. */
     private static final long PREFS_RELOAD_MS = 500;
     private java.lang.ref.WeakReference<SearchHost> captureHost;
@@ -308,7 +306,6 @@ final class SearchGlass extends FrameLayout {
         cachedMaskTarget = null;
         cachedVisibleBounds = null;
         visibleProbeDone = false;
-        fillSoftened = false;
         XLog.i("search glass mask: " + (view == null ? "none (full bar)"
                 : view.getClass().getName()));
     }
@@ -521,63 +518,8 @@ final class SearchGlass extends FrameLayout {
                         + " bg=" + (maskTarget.getBackground() == null ? "none"
                                 : maskTarget.getBackground().getClass().getName()));
             }
-            // Probe first (the opaque capsule gives the honest outline), then
-            // let the lens show through the native fill. Doing it in this order
-            // matters: a translucent 9-patch's side caps fall below the alpha
-            // threshold and the measured pill comes out ~8dp too narrow.
-            if (visible != null && !fillSoftened) {
-                fillSoftened = true;
-                pickSurfaceColor(maskTarget);
-                restoreNativeFill(maskTarget);
-                postInvalidate();
-            }
         }
         return mask;
-    }
-
-    /**
-     * Picks the solid colour the capsule is rendered with.
-     *
-     * <p>The theme capsule is a translucent white veil (about 20% in dark
-     * mode), so mixing in the *drawable's* colour would turn the bar white.
-     * What the user sees is that veil over the page, which is why the bar can
-     * still be read through. Rendering the page colour at full opacity under
-     * the same veil keeps the theme's look and makes the bar solid.</p>
-     */
-    private void pickSurfaceColor(View target) {
-        boolean dark = UiTweaks.isDarkMode(getContext());
-        surfaceColor = dark ? 0xFF000000 : 0xFFE5E5EA;
-        int veil = 0xFF;
-        try {
-            android.graphics.drawable.Drawable background = target.getBackground();
-            if (background != null) {
-                veil = background.getAlpha();
-            }
-        } catch (Throwable ignored) {
-        }
-        XLog.i("search glass surface=#" + Integer.toHexString(surfaceColor)
-                + " veilAlpha=0x" + Integer.toHexString(veil) + " mix=" + SURFACE_ALPHA);
-    }
-
-    /**
-     * The theme capsule is the search bar's visible surface
-     * ({@code miuix_appcompat_search_mode_edit_text_bg_light/dark}). 15.0
-     * knocked its alpha down to 0x80 so more of the lens showed through, which
-     * left the bar translucent. 15.1 puts the drawable back to full opacity:
-     * the capsule is the solid frosted surface the theme designed, and the lens
-     * only contributes the soft refraction band at its edge.
-     */
-    private void restoreNativeFill(View target) {
-        try {
-            android.graphics.drawable.Drawable background = target.getBackground();
-            if (background == null) {
-                return;
-            }
-            background.mutate().setAlpha(0xFF);
-            XLog.i("search glass native fill alpha=0xFF (" + background.getClass().getName() + ")");
-        } catch (Throwable t) {
-            XLog.w("search glass fill restore failed: " + t);
-        }
     }
 
     /**
@@ -900,18 +842,18 @@ final class SearchGlass extends FrameLayout {
         shader.setFloatUniform("refractionAmount",
                 DEBUG_PASS_THROUGH ? 0f : -Math.max(0f, dp(prefRefractionAmount)));
         shader.setFloatUniform("depthEffect", 0f);
-        int surface = surfaceColor;
-        if (surface != 0) {
-            shader.setFloatUniform("surfaceColor",
-                    ((surface >> 16) & 0xFF) / 255f,
-                    ((surface >> 8) & 0xFF) / 255f,
-                    (surface & 0xFF) / 255f, 1f);
-        }
-        shader.setFloatUniform("surfaceAlpha", surface == 0 ? 0f : SURFACE_ALPHA);
+        // Clear glass: no surface tint in either mode. The uniform is still
+        // declared by the shader, so set it to black with alpha 0; the mix()
+        // then returns the blurred backdrop unchanged.
+        shader.setFloatUniform("surfaceColor", 0f, 0f, 0f, 1f);
+        shader.setFloatUniform("surfaceAlpha", SURFACE_ALPHA);
         // The lens-only fallback shader has no shadow uniforms: each set is
-        // allowed to fail on its own.
+        // allowed to fail on its own. Light mode drops the inner shadow: on
+        // white it reads as a dirty band under the bar.
+        boolean dark = UiTweaks.isDarkMode(getContext());
+        float shadow = dark ? Math.max(0f, Math.min(1f, prefInnerShadow)) : 0f;
         setUniform(shader, "shadowColor", 0f, 0f, 0f,
-                DEBUG_PASS_THROUGH ? 0f : Math.max(0f, Math.min(1f, prefInnerShadow)));
+                DEBUG_PASS_THROUGH ? 0f : shadow);
         setUniform(shader, "shadowBand", Math.max(1f, dp(prefShadowW)));
     }
 

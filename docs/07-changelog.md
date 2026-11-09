@@ -3,14 +3,58 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前主线是 **15.0**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前主线是 **15.3**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
 
 ---
 
-# iOS 设置布局 · LSPosed 模块（v15.2：参数界面 + 实心玻璃 + 原生开关归位）
+# iOS 设置布局 · LSPosed 模块（v15.3：主题飞行图标 + 搜索栏去色 + 顶栏模糊实时生效）
+
+## v15.3 变更
+
+- **飞行模式图标改用设置自己的资源**（`AirplaneSwitch`）：
+  - 优先 `com.android.settings:drawable/ic_airplane_mode_settings`，主题覆盖和深浅色由资源系统自动解析；
+  - 资源缺失时回退模块 `ic_plane_dark/light`，不会出现空图标；
+  - 行布局变化时按 `uiMode` 重新解析，主题切换后不依赖 adapter 重新 bind。
+- **搜索栏不再叠加 shader 表面色**（`SearchGlass`）：
+  - `surfaceAlpha` 93% → **0**，删掉 `surfaceColor` 的取色逻辑；
+  - **保留**主题的 `miuix_appcompat_search_mode_edit_text_bg_light/dark` 胶囊，不再改它的 alpha；
+  - 浅色模式关闭底部内阴影（深色保留）；wrapper 不再设 40dp elevation，去掉浅色下的外阴影。
+- **顶栏模糊修复**（`UiTweaks`）：
+  - 根因一：`Class.forName("miuix.core.util.MiuiBlurUtils", UiTweaks.class.getClassLoader())` 在 LSPosed 下
+    `ClassNotFoundException`，半径从未真正套用；改用设置进程的 classloader；
+  - 根因二：旧逻辑只比较「是否滚动」，滑杆变化被 `state` 短路；现在同时跟踪半径，并每 500ms 轮询 prefs，
+    滑杆改完回到设置立即生效；
+  - 滚动源优先 `com.android.settings:id/scroll_headers`，`mListView.computeVerticalScrollOffset()` 为 0 时不再漏判。
+- **版本**：15.3 / versionCode **88**；APK `dist/IosSettingsLayout-15.3.apk`，207,753 B。
+
+## v15.3 校验
+
+```
+package: name='com.abradant.iossettings' versionCode='88' versionName='15.3'
+application-label:'iLyayot'
+launchable-activity: com.abradant.iossettings.MainActivity
+dex version : 039
+xposed_init : True
+module class: True
+reorder     : True
+size   : 207753 bytes
+sha256 : 563AA37E88EC09A4D2052CB9B069DDC6312301C49967F57BD71DED2D04FB2840
+```
+
+真机 25053RT47C / HyperOS 3 / Android 16（2026-11-10 00:3x）：
+
+- `airplane icon set: settings:ic_airplane_mode_settings size=89`（浅色/深色两次启动均命中）；
+- `search glass mask=[17,1][1137,139]`，无 `native fill cleared`、无 `glass surface`（表面色逻辑已删）；
+- 顶栏滚动后 `top bar blur=true offset=50 radius=105 set=true radiusResult=true`；
+  滑杆 0 → 300 时同一滚动位置日志变为 `radius=0 (off)` / `radius=300 set=true`，截图顶部由清晰变重模糊。
+- 截图：`docs/assets/search-glass-15.3-light.png`、`search-glass-15.3-dark.png`、`topbar-blur-15.3.png`。
+
+> 兼容说明：本节的 15.3 是 2026-11-10 主线；更下方历史里的「v15.3 变更」属于已放弃的实验分支，不是同一支。
+
+---
 
 ## v15.2 变更
 

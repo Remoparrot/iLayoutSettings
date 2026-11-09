@@ -9,6 +9,8 @@ import android.view.ViewGroup;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
+import de.robv.android.xposed.XposedHelpers;
+
 /**
  * Small visual tweaks that ride on the native widgets:
  *
@@ -23,6 +25,9 @@ final class UiTweaks {
 
     private static final String BLUR = "miuix.core.util.MiuiBlurUtils";
     private static final java.util.Set<View> REFRESHING =
+            java.util.Collections.newSetFromMap(new java.util.WeakHashMap<View, Boolean>());
+    /** app_bar containers that already have the scroll-blur listeners. */
+    private static final java.util.Set<View> BLUR_ATTACHED =
             java.util.Collections.newSetFromMap(new java.util.WeakHashMap<View, Boolean>());
 
     private UiTweaks() {
@@ -297,49 +302,90 @@ final class UiTweaks {
             View appBar = activity.findViewById(activity.getResources().getIdentifier(
                     "action_bar_container", "id", "com.android.settings"));
             Object listObject = HeaderData.field(fragment, "mListView");
-            if (appBar == null || !(listObject instanceof View)) {
-                XLog.w("scroll blur: appBar=" + appBar + " list=" + listObject);
+            if (appBar == null) {
+                XLog.w("scroll blur: appBar=" + appBar);
                 return;
             }
             final View appBarView = appBar;
-            final View list = (View) listObject;
+            // mListView is not always the view that scrolls on HyperOS 3:
+            // the header list is the RecyclerView with id scroll_headers. Use
+            // that when present, otherwise fall back to the fragment field.
+            final View list = scrollList(activity, listObject);
+            if (list == null) {
+                XLog.w("scroll blur: no scrollable list (mListView=" + listObject + ")");
+                return;
+            }
+            if (!BLUR_ATTACHED.add(appBar)) {
+                return;
+            }
+            // Resolve MiuiBlurUtils through the *host* loader. In LSPosed the
+            // module classes can live in a sibling loader, and Class.forName on
+            // UiTweaks.class.getClassLoader() used to throw ClassNotFoundException
+            // here, so the blur radius was never actually applied.
+            final ClassLoader hostLoader = appBarView.getContext().getClassLoader();
             final boolean dark = isDark(activity);
             final int solid = dark ? 0xFF000000 : 0xFFF2F2F7;
             final int translucent = dark ? 0xCC000000 : 0xCCF2F2F7;
             final int[] state = {-1};
+            final int[] appliedRadius = {-1};
 
             final Runnable update = new Runnable() {
                 @Override
                 public void run() {
                     try {
-                        int offset = ((Integer) call(list, "computeVerticalScrollOffset")).intValue();
+                        int offset = 0;
+                        Object value = call(list, "computeVerticalScrollOffset");
+                        if (value instanceof Integer) {
+                            offset = ((Integer) value).intValue();
+                        }
                         boolean scrolled = offset > dp(appBarView.getContext(), 4);
+                        // Some MIUI RecyclerViews report 0 from
+                        // computeVerticalScrollOffset but still move their
+                        // first child up; use that as the honest signal.
+                        if (!scrolled && list instanceof ViewGroup) {
+                            ViewGroup group = (ViewGroup) list;
+                            if (group.getChildCount() > 0
+                                    && group.getChildAt(0).getTop()
+                                    < -dp(appBarView.getContext(), 4)) {
+                                scrolled = true;
+                            }
+                        }
+                        int blurRadius = scrolled
+                                ? Math.max(0, Prefs.getInt(appBarView.getContext(),
+                                        Prefs.TOPBAR_BLUR, Prefs.DEFAULT_TOPBAR_BLUR))
+                                : 0;
                         int s = scrolled ? 1 : 0;
-                        if (state[0] == s) {
+                        // The old code only reacted to "scrolled / not scrolled",
+                        // so moving the slider while already scrolled changed
+                        // nothing. Track the radius too, and poll below.
+                        if (state[0] == s && appliedRadius[0] == blurRadius) {
                             return;
                         }
                         state[0] = s;
+                        appliedRadius[0] = blurRadius;
                         if (scrolled) {
-                            int blurRadius = Prefs.getInt(appBarView.getContext(),
-                                    Prefs.TOPBAR_BLUR, Prefs.DEFAULT_TOPBAR_BLUR);
                             appBarView.setBackgroundColor(translucent);
                             if (blurRadius > 0) {
-                                callStatic(BLUR, "setBackgroundBlur", appBarView,
+                                Object set = callStatic(hostLoader, BLUR, "setBackgroundBlur",
+                                        appBarView, Integer.valueOf(blurRadius));
+                                Object radius = callStatic(hostLoader, BLUR,
+                                        "setBackgroundBlurRadius", appBarView,
                                         Integer.valueOf(blurRadius));
-                                callStatic(BLUR, "setBackgroundBlurRadius", appBarView,
-                                        Integer.valueOf(blurRadius));
+                                XLog.i("top bar blur=true offset=" + offset
+                                        + " radius=" + blurRadius
+                                        + " set=" + set + " radiusResult=" + radius);
                             } else {
-                                callStatic(BLUR, "clearBackgroundBlur", appBarView);
+                                callStatic(hostLoader, BLUR, "clearBackgroundBlur", appBarView);
+                                XLog.i("top bar blur=true offset=" + offset + " radius=0 (off)");
                             }
                         } else {
                             appBarView.setBackgroundColor(solid);
-                            callStatic(BLUR, "clearBackgroundBlur", appBarView);
+                            callStatic(hostLoader, BLUR, "clearBackgroundBlur", appBarView);
+                            XLog.i("top bar blur=false offset=" + offset + " radius=0");
                         }
-                        XLog.i("top bar blur=" + scrolled + " offset=" + offset
-                                + " radius=" + Prefs.getInt(appBarView.getContext(),
-                                Prefs.TOPBAR_BLUR, Prefs.DEFAULT_TOPBAR_BLUR));
                     } catch (Throwable t) {
-                        XLog.e("scroll blur update failed", t);
+                        // The list can be detached mid-poll; recompute next time.
+                        XLog.w("scroll blur update failed: " + t);
                     }
                 }
             };
@@ -350,11 +396,60 @@ final class UiTweaks {
                             update.run();
                         }
                     });
+
+            // The settings screen is a different activity: while it is in front
+            // the module's sliders can change the pref without any scroll event.
+            // Poll at 2 Hz (Prefs already caches for 400 ms) so the new radius
+            // lands as soon as the user comes back.
+            final Runnable[] poll = new Runnable[1];
+            poll[0] = new Runnable() {
+                @Override
+                public void run() {
+                    update.run();
+                    if (appBarView.isAttachedToWindow()) {
+                        appBarView.postDelayed(poll[0], 500);
+                    }
+                }
+            };
+            appBarView.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                @Override
+                public void onViewAttachedToWindow(View v) {
+                    v.removeCallbacks(poll[0]);
+                    v.postDelayed(poll[0], 500);
+                }
+
+                @Override
+                public void onViewDetachedFromWindow(View v) {
+                    v.removeCallbacks(poll[0]);
+                }
+            });
+            if (appBarView.isAttachedToWindow()) {
+                appBarView.postDelayed(poll[0], 500);
+            }
             update.run();
-            XLog.i("scroll blur attached");
+            XLog.i("scroll blur attached (live radius, list="
+                    + list.getClass().getSimpleName() + ", hostLoader="
+                    + (hostLoader == null ? "null" : hostLoader.getClass().getName()) + ")");
         } catch (Throwable t) {
             XLog.e("attachScrollBlur failed", t);
         }
+    }
+
+    /** The real scrolling RecyclerView, with the fragment field as fallback. */
+    private static View scrollList(Activity activity, Object fallback) {
+        try {
+            int id = activity.getResources().getIdentifier(
+                    "scroll_headers", "id", "com.android.settings");
+            if (id != 0) {
+                View view = activity.findViewById(id);
+                if (view != null) {
+                    return view;
+                }
+            }
+        } catch (Throwable t) {
+            XLog.w("scroll_headers lookup failed: " + t);
+        }
+        return fallback instanceof View ? (View) fallback : null;
     }
 
     /* ------------------------------- helpers -------------------------------- */
@@ -429,10 +524,19 @@ final class UiTweaks {
         return null;
     }
 
-    private static Object callStatic(String className, String name, Object... args) {
+    private static Object callStatic(ClassLoader loader, String className, String name,
+                                     Object... args) {
         try {
-            Class<?> c = Class.forName(className, false,
-                    UiTweaks.class.getClassLoader());
+            Class<?> c;
+            try {
+                c = Class.forName(className, false, loader);
+            } catch (Throwable notFound) {
+                c = XposedHelpers.findClassIfExists(className, loader);
+            }
+            if (c == null) {
+                XLog.w("static " + className + "." + name + ": class not found via host loader");
+                return null;
+            }
             for (Method m : c.getDeclaredMethods()) {
                 if (!m.getName().equals(name) || m.getParameterCount() != args.length) {
                     continue;
@@ -455,6 +559,7 @@ final class UiTweaks {
                 m.setAccessible(true);
                 return m.invoke(null, args);
             }
+            XLog.w("static " + className + "." + name + ": no matching method");
         } catch (Throwable t) {
             XLog.w("static " + className + "." + name + " failed: " + t);
         }
