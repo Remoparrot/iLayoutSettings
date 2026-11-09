@@ -84,6 +84,11 @@ pwsh -File module/build.ps1 `
 - 版本变化同步更新 [版本记录](docs/07-changelog.md)，新坑同步更新 [踩坑记录](docs/06-pitfalls.md)；
 - 新增文档必须登记到 [文档地图](docs/README.md)。
 
+**新开一个对话时，把这句话发给 AI：**
+
+> 读 `agent.md`、`docs/00-status.md`、`docs/README.md` 和 `docs/sessions/` 最新一份记录，
+> 先用 5 行给我接手确认，在我确认之前不要改代码。
+
 这样下一次开新对话时，读三份文件就能无缝接手。
 
 ## 许可与致谢

@@ -33,6 +33,7 @@
 | `module/build.ps1` | `$ErrorActionPreference` 由 `Stop` 改为 `Continue`，逐条检查 `$LASTEXITCODE` | PowerShell 5.1 把 javac 的 warning 当错误，构建会在第 2 步直接退出 |
 | `module/build.ps1` | `#Requires -Version 7.0` → `5.1` | 本机只有 Windows PowerShell 5.1，没有 `pwsh` |
 | `README.md` / `docs/*` / `agent.md` / `NOTICE.md` / `.gitignore` | 新建 | 对外说明 + 文档地图 + 强制协作规范 |
+| `agent.md` / `README.md` | 补「新对话开场白」 | 把「读哪几份、先别改代码」变成一句可直接复制的话，降低接手门槛 |
 | `docs/07-changelog.md` | 原文顶部加「历史全文」说明 | 原文「7. 校验」写的是 216,015 B，与 14.8 实际 195,465 B 不符 |
 | `lib/xposed-api-82.jar` | 从原工程 `.tools/api-82.jar` 复制 | 让构建自包含（android.jar 体积大，仍外部提供） |
 
