@@ -19,7 +19,7 @@
 | 包 | 大小 | SHA-256 | 签名证书 SHA-256 |
 | --- | --- | --- | --- |
 | `dist/IosSettingsLayout-14.8.apk`（用户提供的 14.8 发布包） | 195,465 B | `8D6DC362E5FDA29B3C2B56C5A14FB71325072A4626B141CE3428B2460B9F4951` | `b6f98da57965f604ae13a2f4fc967ffc6c09f14bbdef5b9329effca65dad0f4a` |
-| 同源码重编（默认测试密钥，本次验证） | 195,465 B | `DF4A0AAD5F506BBBC63E7A1BD2BB8B74B81F0CEA9A88C84F9DE9915ED894BC69` | `42fba9afb1658fb695a319d022660f970765feec1813e8bc0608839affd04ac8` |
+| 同源码重编（默认 `.keystore` 密钥） | 195,465 B | 每次构建不同（zip 时间戳；示例 `D1621E…` / `48F340…`） | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
 
 ⚠️ 两者**不等价于同一份二进制**，见「已知问题 1」。
 

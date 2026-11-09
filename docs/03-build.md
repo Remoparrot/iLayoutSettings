@@ -1,4 +1,4 @@
-# 构建指南
+﻿# 构建指南
 
 > 状态：**现行** · 对应版本：14.8 (83)
 
@@ -49,7 +49,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File module\build.ps1
 | `-AndroidJar` | `$env:ANDROID_JAR` | platform 的 `android.jar` |
 | `-ApiJar` | `lib/xposed-api-82.jar` | Xposed API |
 | `-OutDir` | `dist` | 产物目录 |
-| `-KeyStore` | `build/testkey.jks` | 签名库，不存在则自动生成 |
+| `-KeyStore` | `.keystore/testkey.jks` | 签名库，不存在则自动生成（首次构建后复用） |
 | `-KeyAlias` / `-KeyPass` | `iossettings` / `android` | 调试密钥参数 |
 
 ## 4. 每一步在干什么
@@ -79,7 +79,7 @@ reorder     : True
 
 ## 6. 签名与升级
 
-- 默认 `build/testkey.jks` 是**自动生成的一次性调试密钥**，每次删 `build/` 重新构建都会生成新的；
+- 默认 `.keystore/testkey.jks` 是**首次构建自动生成的调试密钥**，之后每次构建复用（它不在 `build/` 里，不会被清理）；
 - 同一个 APK 只有**同一把 key** 签出来的才能覆盖安装，否则 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`；
 - 正式发布请固定一把 keystore，通过 `-KeyStore` 传入，并且**不要提交到仓库**（`.gitignore` 已忽略 `*.jks`）；
 - 本仓库 `dist/IosSettingsLayout-14.8.apk` 是用户提供的发布包，其证书与源码重编产物**不同**，见 [状态](00-status.md#发布物指纹)。

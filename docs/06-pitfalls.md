@@ -119,7 +119,7 @@
 | 现象 | 根因 | 解法 |
 | --- | --- | --- |
 | `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | 新旧包证书不同 | 卸载旧包再装；发布时固定 keystore |
-| 每次构建签名都变 | 默认 key 在 `build/` 里，`build/` 每次被清空重建 | 把 keystore 放到仓库外，用 `-KeyStore` 固定 |
+| 每次构建签名都变（已修复） | 旧版默认 key 放在 `build/` 里，而 `build/` 每次构建都被清空 | 现版本默认 keystore 在 `.keystore/`，构建不再清理；正式发版仍应用 `-KeyStore` 固定仓库外的密钥 |
 | `versionName` 与产物名不一致 | 手改产物名 | 产物名由 manifest 版本号生成，不要手改 |
 
 ---

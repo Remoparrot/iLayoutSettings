@@ -20,7 +20,7 @@
     Output directory. Defaults to <repo>/dist.
 
 .PARAMETER KeyStore
-    Signing keystore. Defaults to <repo>/build/testkey.jks and is generated on demand.
+    Signing keystore. Defaults to <repo>/.keystore/testkey.jks and is generated on demand.
     Pass your own keystore for a release build: the shipped APK must be signed with
     the same key as the previous release, otherwise Android refuses to upgrade.
 
@@ -48,7 +48,9 @@ $here = $PSScriptRoot
 $root = Split-Path -Parent $here
 $build = Join-Path $root 'build'
 if (-not $OutDir) { $OutDir = Join-Path $root 'dist' }
-if (-not $KeyStore) { $KeyStore = Join-Path $build 'testkey.jks' }
+# The keystore must NOT live under build/: build/ is wiped on every run, which
+# used to regenerate the key and change the APK signature each build.
+if (-not $KeyStore) { $KeyStore = Join-Path $root '.keystore\testkey.jks' }
 
 function Find-First {
     param([string[]]$Candidates, [string]$Label)

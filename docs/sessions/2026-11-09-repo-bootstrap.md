@@ -32,6 +32,7 @@
 | `module/build.ps1` | 重写：参数化（`-Jdk` / `-BuildTools` / `-AndroidJar` / `-ApiJar` / `-OutDir` / `-KeyStore`）、三级路径回退、产物名从 manifest 读取、打印 sha256 | 原脚本硬编码开发机路径、`dist` 输出名写死、每构建清空整个 `dist` |
 | `module/build.ps1` | `$ErrorActionPreference` 由 `Stop` 改为 `Continue`，逐条检查 `$LASTEXITCODE` | PowerShell 5.1 把 javac 的 warning 当错误，构建会在第 2 步直接退出 |
 | `module/build.ps1` | `#Requires -Version 7.0` → `5.1` | 本机只有 Windows PowerShell 5.1，没有 `pwsh` |
+| `module/build.ps1` | 默认 keystore 从 `build/testkey.jks` 移到 `.keystore/testkey.jks` | `build/` 每次构建都被清空，导致每次构建重新生成密钥、签名全变；实测连续两次构建证书 SHA-256 已一致（`941e18c5…`），但 APK 因 zip 时间戳仍不同（`D1621E…` / `48F340…`） |
 | `README.md` / `docs/*` / `agent.md` / `NOTICE.md` / `.gitignore` | 新建 | 对外说明 + 文档地图 + 强制协作规范 |
 | `agent.md` / `README.md` | 补「新对话开场白」 | 把「读哪几份、先别改代码」变成一句可直接复制的话，降低接手门槛 |
 | `docs/07-changelog.md` | 原文顶部加「历史全文」说明 | 原文「7. 校验」写的是 216,015 B，与 14.8 实际 195,465 B 不符 |
@@ -91,6 +92,13 @@ AI 会话天然倾向「改完就说完成」。所以 `agent.md` 不写建议�
 - **根因**：14.8 是按功能逐项回退重建的，没有版本库快照；源码里残留后续版本的未挂载类（`GlassToggle`、`IntroCard`、`AboutIos` 等）和 `BottomSearch` 里的 lattice 反射分支。
 - **解法**：本次只在文档中公示差异（`00-status.md`、`06-pitfalls.md` C1/C2）；清理留到路线图 P0。
 - **如何避免**：回退必须用「可编译 + dex 体积对比 + 类引用清单」验收；发布包必须能追溯到具体 commit。
+
+### 坑：默认密钥放在会被清空的目录里
+
+- **现象**：同源代码连续两次构建，APK 签名证书不同，用户升级必然失败。
+- **根因**：`build.ps1` 默认 `-KeyStore build/testkey.jks`，而脚本开头 `Remove-Item -Recurse build`，等于每次都重新 `keytool -genkeypair`。
+- **解法**：默认路径改到仓库根 `.keystore/testkey.jks`（已加入 `.gitignore`），并实测两次构建证书一致。
+- **如何避免**：「会被构建脚本清理的目录」永远不要放需要持久化的文件（密钥、缓存、配置）。
 
 ### 坑：README 的校验数据过期
 
