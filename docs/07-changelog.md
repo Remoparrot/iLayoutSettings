@@ -1,4 +1,4 @@
-﻿# 版本记录（历史全文）
+# 版本记录（历史全文）
 
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
@@ -7,6 +7,58 @@
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
+
+---
+
+# iOS 设置布局 · LSPosed 模块（v15.2：参数界面 + 实心玻璃 + 原生开关归位）
+
+## v15.2 变更
+
+- **应用内参数界面**（`MainActivity` 重写）：搜索栏 **模糊 / 折射力度 / 折射厚度** + **顶栏模糊** 四个滑杆，
+  改动即时写入 `shared_prefs/ios_settings.xml`；带「恢复默认值」；深/浅色自适应，edge-to-edge 下自己处理状态栏/导航栏 insets。
+- **桌面图标重新显示**：`MainActivity` 加回 `MAIN` + `LAUNCHER` intent-filter。
+- **跨进程读参数换实现**（关键）：
+  - LSPosed 的 XSharedPreferences 镜像在 `/data/misc/apexdata/.../prefs/<pkg>/ios_settings.xml`，权限 `-rw-rw----`、属主是模块自己的 UID，
+    设置进程读不到：真机日志 `glass prefs: ... readable=false keys=[]`；
+  - 新增导出 `PrefsProvider`（`content://com.abradant.iossettings.prefs`），设置进程用 `ContentResolver.call()` 取一个 Bundle，
+    400ms 缓存；取不到再回退旧的 XSharedPreferences。
+- **搜索栏玻璃**：
+  - **删掉 45° rim 高光**：`rimColor / rimAngle / rimFalloff / rimWidth` 全部移除，单 pass 只剩透镜 + 底部内阴影；
+  - **折射调小**：`refraction_height` 24 → **12dp**，`refraction_amount` 30 → **8dp**；
+  - **原生胶囊不透明度拉满**：fill `setAlpha(0x80)` → **`0xFF`**（`miuix_appcompat_search_mode_edit_text_bg_light/dark`）；
+  - 新增 `surfaceColor / surfaceAlpha`：按主题表面色（深色 `#000000`、浅色 `#E5E5EA`）以 **93%** 混进 shader 输出，
+    整条 bar 变成**实心磨砂**（页面内容不再透出来），只保留边缘一丝折射；
+  - shader 对齐 **backdrop 2.0.1**（`RoundedRectRefractionShaderString` + `InnerShadow`，`depthEffect` 用归一化的 center 方向）；
+    踩坑：2.0.1 的 `-sd >= refractionHeight` 提前返回分支必须**同样混 surfaceColor**，否则只有边缘一圈是实心的、中部仍然透。
+- **飞行模式开关：不再自绘，只移动原开关**：
+  - 移除 15.0 的 `GlassToggle` 路径（类保留但不再引用），HyperiOS / 无 HyperiOS 都走 MIUI 原生 `SlidingSwitch`；
+  - 真机验证：HyperiOS 的 `LiquidTogglesHook` 会替换 `SlidingSwitch.onDraw`，并在**首次绘制时缓存开关的 box**，
+    因此 `setTranslationY(-30)` 和 `offsetTopAndBottom(-30)` 都推不动它（旋钮中心一直是 975）；
+  - 改为平移父容器 `widget_frame` 的 `translationY`：canvas 随父移动，hook 画在里面的开关跟着走；
+  - 目标仍是标题视觉中心；修正 -30px 后，旋钮中心与标题中心重合（945 vs 945，真机截图量像素）。
+- **版本**：15.2 / versionCode **87**；APK `dist/IosSettingsLayout-15.2.apk`。
+
+## v15.2 校验
+
+```
+package: name='com.abradant.iossettings' versionCode='87' versionName='15.2'
+application-label:'iLyayot'
+launchable-activity: com.abradant.iossettings.MainActivity
+dex version : 039
+xposed_init : True
+module class: True
+reorder     : True
+```
+
+真机 25053RT47C / HyperOS 3 / Android 16（2026-11-10 00:0x）：
+
+- `airplane switch recentered by -30 (frame translation)` → 截图像素：旋钮中心 Y=945、标题中心 Y=945；
+- `search glass surface=#ff000000 ... mix=0.93` + `native fill alpha=0xFF` → bar 像素整条 `(53,53,53)` 均匀，无光边、无透出；
+- 参数界面滑杆改值后，设置进程无需重启即可读到：`glass prefs via provider: blur=11.0` → `glass tuning: blur=11.0`，
+  再改成 3dp 后日志变为 `glass tuning: blur=3.0`。
+
+> 未完成：`topbar_blur` 滑杆只验证了写入与读取路径（滚动时 `top bar blur=... radius=...` 日志待补一次滚动截图）；
+> 设备随后进入锁屏 / 防误触模式，浅色主题与最终截图待补。
 
 ---
 

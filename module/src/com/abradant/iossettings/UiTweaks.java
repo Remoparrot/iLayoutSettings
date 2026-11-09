@@ -320,8 +320,8 @@ final class UiTweaks {
                         }
                         state[0] = s;
                         if (scrolled) {
-                            int blurRadius = Prefs.getInt(Prefs.read(), Prefs.TOPBAR_BLUR,
-                                    Prefs.DEFAULT_TOPBAR_BLUR);
+                            int blurRadius = Prefs.getInt(appBarView.getContext(),
+                                    Prefs.TOPBAR_BLUR, Prefs.DEFAULT_TOPBAR_BLUR);
                             appBarView.setBackgroundColor(translucent);
                             if (blurRadius > 0) {
                                 callStatic(BLUR, "setBackgroundBlur", appBarView,
@@ -335,7 +335,9 @@ final class UiTweaks {
                             appBarView.setBackgroundColor(solid);
                             callStatic(BLUR, "clearBackgroundBlur", appBarView);
                         }
-                        XLog.i("top bar blur=" + scrolled + " offset=" + offset);
+                        XLog.i("top bar blur=" + scrolled + " offset=" + offset
+                                + " radius=" + Prefs.getInt(appBarView.getContext(),
+                                Prefs.TOPBAR_BLUR, Prefs.DEFAULT_TOPBAR_BLUR));
                     } catch (Throwable t) {
                         XLog.e("scroll blur update failed", t);
                     }

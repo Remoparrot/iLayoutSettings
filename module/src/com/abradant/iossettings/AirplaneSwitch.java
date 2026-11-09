@@ -90,6 +90,7 @@ final class AirplaneSwitch {
             return;
         }
         frame.setVisibility(View.VISIBLE);
+        removeGlassToggle(itemView);
         applyPlaneIcon(context, itemView);
         frame.setMinimumWidth(0);
         frame.setPadding(0, 0, 0, 0);
@@ -114,16 +115,12 @@ final class AirplaneSwitch {
         // Native switch rows have no chevron; hide it so the switch sits at the
         // same right edge as every other switch in Settings.
         hideArrow(holder, itemView, context);
-        // HyperiOS 1.x hooks SlidingSwitch.onDraw and replaces it with its own
-        // Compose host, which snaps to the switch's layout box. That box is
-        // bottom-aligned inside MIUI's widget_frame, so any translation we apply
-        // is ignored by the host and the toggle looks sunken. Use our own
-        // View-based glass toggle instead: HyperiOS does not hook it, and it is
-        // centred by the row layout itself.
-        if (hasHyperios(context)) {
-            injectGlassToggle(itemView, frame, context);
-            return;
-        }
+        // Keep MIUI's own SlidingSwitch. HyperiOS draws its liquid-glass toggle
+        // *for* that switch, so replacing it with a module-drawn toggle (the
+        // 15.0 GlassToggle) loses the glass look and the knob geometry. What we
+        // fix instead is the position: recenter() slides the widget_frame that
+        // holds it, so the painted toggle lands on the title's visual centre.
+        // No custom drawing is involved.
         // Tapping the row itself also toggles airplane mode.
         final ViewGroup frameRef = frame;
         itemView.setOnClickListener(new View.OnClickListener() {
@@ -134,19 +131,7 @@ final class AirplaneSwitch {
         });
         if (existing != null) {
             setChecked(existing, Airplane.isOn(context));
-            final View reused = existing;
-            itemView.post(new Runnable() {
-                @Override
-                public void run() {
-                    recenter(itemView, reused);
-                }
-            });
-            itemView.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    recenter(itemView, reused);
-                }
-            }, 320);
+            watchPosition(itemView, existing);
             return;
         }
         View toggle = createSwitch(context);
@@ -185,9 +170,20 @@ final class AirplaneSwitch {
         frame.addView(toggle, toggleParams);
         setChecked(toggle, Airplane.isOn(context));
         wire(toggle, context);
-        final View switchView = toggle;
-        // HyperiOS changes the row's padding after MIUI's bind; keep re-centering
-        // the switch on every layout pass instead of doing it only once.
+        watchPosition(itemView, toggle);
+        XLog.i("airplane switch attached to 飞行模式 row");
+    }
+
+    /**
+     * Keeps the native switch centred on the title instead of replacing it.
+     *
+     * <p>HyperiOS changes the widget frame's padding and re-binds the switch
+     * after MIUI's own bind, so one measurement is not enough: re-assert on
+     * every layout pass plus a few posted passes (first layout, HyperiOS bind,
+     * theme change).</p>
+     */
+    private static void watchPosition(final View itemView, final View switchView) {
+        switchView.setTag(TAG);
         itemView.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
             @Override
             public void onLayoutChange(View v, int left, int top, int right, int bottom,
@@ -195,36 +191,24 @@ final class AirplaneSwitch {
                 recenter(itemView, switchView);
             }
         });
-        itemView.post(new Runnable() {
+        final Runnable pass = new Runnable() {
             @Override
             public void run() {
                 recenter(itemView, switchView);
             }
-        });
-        itemView.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                recenter(itemView, switchView);
-            }
-        }, 120);
-        itemView.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                recenter(itemView, switchView);
-            }
-        }, 450);
-        XLog.i("airplane switch attached to 飞行模式 row");
+        };
+        itemView.post(pass);
+        itemView.postDelayed(pass, 120);
+        itemView.postDelayed(pass, 450);
+        itemView.postDelayed(pass, 900);
+        itemView.postDelayed(pass, 1500);
     }
 
-    private static boolean hasHyperios(Context context) {
-        try {
-            context.getPackageManager().getPackageInfo("dev.hyperios.app", 0);
-            return true;
-        } catch (Throwable t) {
-            return false;
-        }
-    }
-
+    /**
+     * Removes the module-drawn toggle that 15.0 put into the row. The view is
+     * only still there when the module reloads into a running Settings process;
+     * a fresh process never creates it. Removing it restores MIUI's own switch.
+     */
     private static void removeGlassToggle(View itemView) {
         if (!(itemView instanceof ViewGroup)) {
             return;
@@ -240,79 +224,16 @@ final class AirplaneSwitch {
         }
     }
 
-    /**
-     * HyperiOS's liquid-toggle hook only understands MIUI's SlidingSwitch and
-     * pins its own overlay to that view's layout box. A plain View toggle is
-     * outside its hook list and can be centred by the row itself.
-     */
-    private static void injectGlassToggle(View itemView, ViewGroup frame, Context context) {
-        frame.setVisibility(View.GONE);
-        View existing = itemView.findViewWithTag(GLASS_TAG);
-        GlassToggle toggle;
-        if (existing instanceof GlassToggle) {
-            toggle = (GlassToggle) existing;
-        } else {
-            if (!(itemView instanceof ViewGroup)) {
-                return;
-            }
-            ViewGroup row = (ViewGroup) itemView;
-            toggle = new GlassToggle(context);
-            toggle.setTag(GLASS_TAG);
-            toggle.setClickable(true);
-            toggle.setFocusable(true);
-            if (row instanceof android.widget.LinearLayout) {
-                ((android.widget.LinearLayout) row).setBaselineAligned(false);
-                android.widget.Space spacer = new android.widget.Space(context);
-                spacer.setTag(GLASS_SPACER_TAG);
-                android.widget.LinearLayout.LayoutParams spacerParams =
-                        new android.widget.LinearLayout.LayoutParams(0, 1, 1f);
-                row.addView(spacer, spacerParams);
-                android.widget.LinearLayout.LayoutParams lp =
-                        new android.widget.LinearLayout.LayoutParams(dp(context, 56), dp(context, 32));
-                lp.gravity = android.view.Gravity.CENTER_VERTICAL;
-                lp.rightMargin = dp(context, 2);
-                row.addView(toggle, lp);
-            } else if (row instanceof android.widget.FrameLayout) {
-                android.widget.FrameLayout.LayoutParams lp =
-                        new android.widget.FrameLayout.LayoutParams(dp(context, 56), dp(context, 32),
-                                android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.END);
-                lp.rightMargin = dp(context, 2);
-                row.addView(toggle, lp);
-            } else {
-                return;
-            }
-            XLog.i("airplane glass toggle added to row (HyperiOS-safe)");
-        }
-        toggle.setChecked(Airplane.isOn(context));
-        toggle.setOnCheckedChangeListener(new GlassToggle.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(boolean checked) {
-                Airplane.set(context, checked);
-                XLog.i("glass airplane toggle -> " + checked);
-            }
-        });
-        final GlassToggle glass = toggle;
-        itemView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                glass.performClick();
-            }
-        });
-    }
-
     private static void recenter(View itemView, View switchView) {
         try {
-            if (!switchView.isAttachedToWindow() || !switchView.isLaidOut()
-                    || switchView.getWidth() <= 0 || switchView.getHeight() <= 0) {
+            ViewGroup frame = frameOf(itemView, switchView);
+            if (frame == null) {
                 return;
             }
-            ViewGroup frame = switchView.getParent() instanceof ViewGroup
-                    ? (ViewGroup) switchView.getParent() : null;
             if (normalizeFrame(frame)) {
                 // HyperiOS pads the widget frame after MIUI's bind; centring the
                 // child inside a padded frame still lands ~10dp too low, so put
                 // the frame back to zero padding and lay out again.
-                switchView.setTranslationY(0f);
                 final View item = itemView;
                 final View sw = switchView;
                 frame.post(new Runnable() {
@@ -323,17 +244,27 @@ final class AirplaneSwitch {
                 });
                 return;
             }
-            centerInParent(switchView);
-            int[] swLoc = new int[2];
-            int[] rowLoc = new int[2];
-            switchView.getLocationOnScreen(swLoc);
-            itemView.getLocationOnScreen(rowLoc);
-            if (swLoc[1] < 0 || rowLoc[1] < 0) {
+            java.util.List<View> toggles = toggleChildren(frame);
+            if (toggles.isEmpty()) {
                 return;
             }
+            int[] frameLoc = new int[2];
+            int[] rowLoc = new int[2];
+            frame.getLocationOnScreen(frameLoc);
+            itemView.getLocationOnScreen(rowLoc);
+            if (frameLoc[1] < 0 || rowLoc[1] < 0) {
+                return;
+            }
+            View anchor = toggles.get(0);
+            for (int i = 0; i < toggles.size(); i++) {
+                View toggle = toggles.get(i);
+                toggle.setTranslationY(0f);
+                if (toggle.getHeight() > 0) {
+                    anchor = toggle;
+                }
+            }
 
-            int swCenterY = swLoc[1] + switchView.getHeight() / 2;
-
+            int swCenterY = frameLoc[1] + anchor.getTop() + anchor.getHeight() / 2;
             // Anchor on the title instead of the row: HyperiOS's glass hook
             // changes the row's padding after MIUI binds it, and the row box
             // then no longer matches where the text/icon actually sit.
@@ -351,28 +282,76 @@ final class AirplaneSwitch {
             }
 
             int dy = targetCenterY - swCenterY;
-            int limit = dp(switchView.getContext(), 40);
-            if (Math.abs(dy) > limit) {
-                // During the first layout pass getLocationOnScreen can return
-                // Integer.MIN_VALUE; never translate on nonsense geometry.
-                if (Math.abs(switchView.getTranslationY()) > limit) {
-                    switchView.setTranslationY(0f);
-                }
-                XLog.w("airplane switch geometry not ready: dy=" + dy
-                        + " swCenterY=" + swCenterY + " targetCenterY=" + targetCenterY);
+            int sane = dp(anchor.getContext(), 16);
+            if (Math.abs(dy) > sane
+                    || Math.abs(frame.getTranslationY() + dy) > sane) {
+                XLog.w("airplane switch geometry unstable: dy=" + dy + " (frame="
+                        + frameLoc[1] + ", switchTop=" + anchor.getTop()
+                        + ", target=" + targetCenterY + ", translation="
+                        + frame.getTranslationY() + ")");
                 return;
             }
-            if (Math.abs(dy) > dp(switchView.getContext(), 1)) {
-                switchView.setTranslationY(switchView.getTranslationY() + dy);
-                XLog.i("airplane switch recentered by " + dy
-                        + " (view=" + switchView.getWidth() + "x" + switchView.getHeight()
-                        + ", titleCenterY=" + targetCenterY
-                        + ", switchCenterY=" + swCenterY + ")");
+            // Move the whole widget_frame, not the switch inside it. HyperiOS
+            // replaces SlidingSwitch.onDraw with its own painter and caches the
+            // box it first saw, so moving that box (or its translation) leaves
+            // the painted toggle behind; the frame's transform carries any
+            // painting done inside it along.
+            if (Math.abs(dy) > dp(anchor.getContext(), 1)) {
+                frame.setTranslationY(frame.getTranslationY() + dy);
+                XLog.i("airplane switch recentered by " + dy + " (frame translation)"
+                        + " titleCenterY=" + targetCenterY
+                        + " switchCenterY=" + swCenterY
+                        + " frame=" + frameLoc[1] + ".." + (frameLoc[1] + frame.getHeight())
+                        + " translation=" + frame.getTranslationY());
+            }
+            if (!geometryLogged) {
+                geometryLogged = true;
+                StringBuilder kids = new StringBuilder();
+                for (int i = 0; i < frame.getChildCount(); i++) {
+                    View child = frame.getChildAt(i);
+                    kids.append(" [").append(i).append("] ")
+                            .append(child.getClass().getSimpleName())
+                            .append(' ').append(child.getWidth()).append('x')
+                            .append(child.getHeight())
+                            .append(" top=").append(child.getTop())
+                            .append(" vis=").append(child.getVisibility());
+                }
+                XLog.i("airplane geometry: frame=" + frame.getWidth() + "x" + frame.getHeight()
+                        + " pad=" + frame.getPaddingTop()
+                        + " titleCenterY=" + targetCenterY
+                        + " switchCenterY=" + swCenterY + " kids:" + kids);
             }
         } catch (Throwable t) {
             XLog.w("airplane switch recenter failed: " + t);
         }
     }
+
+    /** The widget frame that holds the switch, even after HyperiOS swaps views. */
+    private static ViewGroup frameOf(View itemView, View fallback) {
+        if (fallback != null && fallback.getParent() instanceof ViewGroup) {
+            return (ViewGroup) fallback.getParent();
+        }
+        View frame = itemView.findViewById(android.R.id.widget_frame);
+        return frame instanceof ViewGroup ? (ViewGroup) frame : null;
+    }
+
+    /** Every child of the frame that can be the visible toggle. */
+    private static java.util.List<View> toggleChildren(ViewGroup frame) {
+        java.util.List<View> out = new java.util.ArrayList<>();
+        for (int i = 0; i < frame.getChildCount(); i++) {
+            View child = frame.getChildAt(i);
+            boolean toggle = child instanceof android.widget.Checkable
+                    || child instanceof android.widget.CompoundButton
+                    || child.getClass().getSimpleName().contains("Switch")
+                    || child.getClass().getSimpleName().contains("Toggle");
+            if (toggle && child.getVisibility() != View.GONE) {
+                out.add(child);
+            }
+        }
+        return out;
+    }
+
+    private static boolean geometryLogged;
 
     /** Clears padding HyperiOS adds to the widget frame. */
     private static boolean normalizeFrame(ViewGroup frame) {

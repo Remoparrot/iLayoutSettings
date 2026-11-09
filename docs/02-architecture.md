@@ -1,6 +1,6 @@
 # 架构与 Hook 链路
 
-> 状态：**现行** · 对应版本：15.0 (85)
+> 状态：**现行** · 对应版本：15.2 (87)
 > 源码：`module/src/com/abradant/iossettings/`
 
 ## 1. 从加载到生效
@@ -89,11 +89,11 @@ LSPosed
   用 `CENTER_VERTICAL` + 少量 `translationY` 校正；
 - **装了 HyperiOS**：HyperiOS 的 `LiquidTogglesHook` 会 hook `SlidingSwitch#onDraw`，
   `USE_LIQUID_GLASS_TOGGLE=true` 时直接 `LiquidToggleHost.ensure(view)` 并跳过原生绘制；
-  host 是按 view 的 layout box 定位的 ComposeView，`setTranslationY` 不会移动它，
-  而 MIUI 的 `widget_frame` 把 95px 高的开关放在 156px frame 的底部，于是开关下沉约 10dp。
-  15.0 改用模块自己的 `GlassToggle`（普通 View，不在 HyperiOS 的 hook 名单里），
-  加一个 `weight=1` 的 spacer 把开关推到行根右侧，竖向由行 LinearLayout 居中；
-- 行被回收成普通 header 时 `removeGlassToggle()` 移除开关和 spacer，并恢复 `widget_frame` 可见。
+  host 画在 `widget_frame` 的坐标系里，并在首帧缓存开关的 box —— `setTranslationY` 和 `offsetTopAndBottom`
+  都推不动它，而 MIUI 的 `widget_frame` 把 95px 高的开关放在 156px frame 的底部，于是开关下沉约 9dp。
+- **15.2 的解法**：不再自绘（15.0 的 `GlassToggle` 已停用），改为平移**父容器 `widget_frame`** 的 `translationY`；
+  canvas 随父容器移动，hook 画在里面的开关跟着走。目标位置取标题视觉中心，实测 -30px 后旋钮中心 945 = 标题中心 945；
+- 行被回收成普通 header 时移除多出来的开关视图，并恢复 `widget_frame` 可见。
 
 ## 5. 二级页图标（`SubPageIcons`）
 

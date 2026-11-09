@@ -19,13 +19,14 @@ import android.widget.FrameLayout;
 /**
  * Liquid-glass layer under the bottom search bar.
  *
- * <p>Pipeline per frame (Kyant0's AndroidLiquidGlass, Apache-2.0): capture the
- * window behind the bar → blur it → run the rounded-rect lens shader over it
- * (edge refraction) → add the 45° rim highlight and a bottom inner shadow, all
- * clipped to the bar's capsule.</p>
+ * <p>Pipeline per frame (Kyant0's backdrop 2.0.1, Apache-2.0): capture the
+ * window behind the bar -> blur it -> run the rounded-rect lens shader over it
+ * (edge refraction) plus a bottom inner shadow, clipped to the bar's capsule.
+ * The white rim highlight of 15.0 is gone: the frosted sheet keeps a soft edge,
+ * not a hard specular ring.</p>
  *
  * <p>The AGSL source below is a Java port of {@code com.kyant.backdrop}
- * ({@code Shaders.kt}, {@code Lens.kt}, {@code HighlightStyle.Default},
+ * ({@code Shaders.kt}: {@code RoundedRectRefractionShaderString} and
  * {@code InnerShadow}), kept close to the original maths. Two deviations are
  * deliberate and documented in {@code docs/06-pitfalls.md}: {@code sign()} is
  * replaced by a never-zero {@code outerSign()} plus a length-guarded normal
@@ -34,12 +35,12 @@ import android.widget.FrameLayout;
  * is forced to 1 (otherwise the translucent window capture turns the glass
  * grey).</p>
  *
- * <p>Every stage fails soft: shader → blur-only glass → raw backdrop → themed
+ * <p>Every stage fails soft: shader -> blur-only glass -> raw backdrop -> themed
  * pill. The native search bar stays clickable either way.</p>
  */
 final class SearchGlass extends FrameLayout {
 
-    /** Captured at 0.6×: the glass is a blur, the extra pixels are wasted work. */
+    /** Captured at 0.6x: the glass is a blur, the extra pixels are wasted work. */
     private static final float CAPTURE_SCALE = 0.6f;
     /** Temporary diagnostic: draw the blurred capture alone, without the lens. */
     private static final boolean DEBUG_BLUR_ONLY = false;
@@ -54,8 +55,9 @@ final class SearchGlass extends FrameLayout {
     private static final int CAPTURE_PAD_DP = 16;
 
     /**
-     * Kyant's lens shader with the highlight and inner shadow folded in, so the
-     * whole glass is one pass instead of three layers.
+     * Kyant's rounded-rect refraction (backdrop 2.0.1 {@code Shaders.kt}) with
+     * his {@code InnerShadow} folded in, so the glass is one pass. No rim term:
+     * the hard white edge is exactly what 15.1 removes.
      */
     private static final String LIQUID_GLASS_AGSL =
             "uniform shader content;\n"
@@ -65,12 +67,10 @@ final class SearchGlass extends FrameLayout {
             + "uniform float refractionHeight;\n"
             + "uniform float refractionAmount;\n"
             + "uniform float depthEffect;\n"
-            + "uniform float4 rimColor;\n"
-            + "uniform float rimAngle;\n"
-            + "uniform float rimFalloff;\n"
-            + "uniform float rimWidth;\n"
             + "uniform float4 shadowColor;\n"
             + "uniform float shadowBand;\n"
+            + "uniform float4 surfaceColor;\n"
+            + "uniform float surfaceAlpha;\n"
             + "float radiusAt(float2 coord, float4 radii) {\n"
             + "  if (coord.x >= 0.0) { if (coord.y <= 0.0) return radii.y; else return radii.z; }\n"
             + "  else { if (coord.y <= 0.0) return radii.x; else return radii.w; }\n"
@@ -108,22 +108,29 @@ final class SearchGlass extends FrameLayout {
             + "  float2 centeredCoord = local - halfSize;\n"
             + "  float radius = radiusAt(local, cornerRadii);\n"
             + "  float sd = sdRoundedRect(centeredCoord, halfSize, radius);\n"
-            + "  float height = max(refractionHeight, 0.5);\n"
-            + "  float depth = -min(sd, 0.0);\n"
-            + "  if (depth >= height) {\n"
-            + "    return toHalf4(unpremulColor(content.eval(coord)));\n"
+            // Kyant 2.0.1: pixels deeper than the refraction band are copied
+            // untouched, so only the edge ring pays for the shader. The surface
+            // tint still has to be applied here, otherwise the solid capsule
+            // only appears inside the refraction band and the middle of the bar
+            // shows the page through it.
+            + "  if (-sd >= refractionHeight) {\n"
+            + "    float3 inside = unpremulColor(content.eval(coord));\n"
+            + "    return toHalf4(mix(inside, surfaceColor.rgb, surfaceAlpha));\n"
             + "  }\n"
-            + "  float d = circleMap(1.0 - depth / height) * refractionAmount;\n"
+            + "  sd = min(sd, 0.0);\n"
+            + "  float depth = -sd;\n"
+            + "  float d = circleMap(1.0 - depth / refractionHeight) * refractionAmount;\n"
             + "  float gradRadius = min(radius * 1.5, min(halfSize.x, halfSize.y));\n"
+            + "  float2 depthDir = centeredCoord / max(length(centeredCoord), 0.0001);\n"
             + "  float2 gradRaw = gradSdRoundedRect(centeredCoord, halfSize, gradRadius)\n"
-            + "      + depthEffect * float2(0.0, 1.0);\n"
+            + "      + depthEffect * depthDir;\n"
             + "  float2 grad = gradRaw / max(length(gradRaw), 0.0001);\n"
             + "  float3 color = unpremulColor(content.eval(coord + d * grad));\n"
-            // Kyant DefaultHighlight: |cos(normal, light)| ^ falloff, 45°.
-            + "  float rimCos = abs(dot(grad, float2(cos(rimAngle), sin(rimAngle))));\n"
-            + "  float rimIntensity = pow(rimCos, max(rimFalloff, 0.001));\n"
-            + "  float rimT = 1.0 - smoothstep(0.0, max(rimWidth, 0.5), depth);\n"
-            + "  color += rimColor.rgb * (rimColor.a * rimIntensity * rimT);\n"
+            // 15.1: the capsule reads as a solid surface. The theme's own
+            // capsule drawable is translucent, so the page behind stayed
+            // readable through it; mixing in its exact colour makes the bar
+            // opaque without inventing a new tint.
+            + "  color = mix(color, surfaceColor.rgb, surfaceAlpha);\n"
             // Kyant InnerShadow: dark band hugging the bottom edge.
             + "  float ny = clamp(centeredCoord.y / max(halfSize.y, 0.5), -1.0, 1.0);\n"
             + "  float bottom = smoothstep(-0.35, 1.0, ny);\n"
@@ -133,9 +140,9 @@ final class SearchGlass extends FrameLayout {
             + "}\n";
 
     /**
-     * Lens without the rim/shadow uniforms. Used only when the full shader is
-     * rejected by the AGSL compiler, so a driver quirk degrades the look
-     * instead of removing the glass.
+     * Same lens without the inner-shadow uniforms. Used only when the full
+     * shader is rejected by the AGSL compiler, so a driver quirk degrades the
+     * look instead of removing the glass.
      */
     private static final String LENS_ONLY_AGSL =
             "uniform shader content;\n"
@@ -145,6 +152,8 @@ final class SearchGlass extends FrameLayout {
             + "uniform float refractionHeight;\n"
             + "uniform float refractionAmount;\n"
             + "uniform float depthEffect;\n"
+            + "uniform float4 surfaceColor;\n"
+            + "uniform float surfaceAlpha;\n"
             + "float radiusAt(float2 coord, float4 radii) {\n"
             + "  if (coord.x >= 0.0) { if (coord.y <= 0.0) return radii.y; else return radii.z; }\n"
             + "  else { if (coord.y <= 0.0) return radii.x; else return radii.w; }\n"
@@ -182,17 +191,20 @@ final class SearchGlass extends FrameLayout {
             + "  float2 centeredCoord = local - halfSize;\n"
             + "  float radius = radiusAt(local, cornerRadii);\n"
             + "  float sd = sdRoundedRect(centeredCoord, halfSize, radius);\n"
-            + "  float height = max(refractionHeight, 0.5);\n"
-            + "  float depth = -min(sd, 0.0);\n"
-            + "  if (depth >= height) {\n"
-            + "    return toHalf4(unpremulColor(content.eval(coord)));\n"
+            + "  if (-sd >= refractionHeight) {\n"
+            + "    float3 inside = unpremulColor(content.eval(coord));\n"
+            + "    return toHalf4(mix(inside, surfaceColor.rgb, surfaceAlpha));\n"
             + "  }\n"
-            + "  float d = circleMap(1.0 - depth / height) * refractionAmount;\n"
+            + "  sd = min(sd, 0.0);\n"
+            + "  float d = circleMap(1.0 - (-sd) / refractionHeight) * refractionAmount;\n"
             + "  float gradRadius = min(radius * 1.5, min(halfSize.x, halfSize.y));\n"
+            + "  float2 depthDir = centeredCoord / max(length(centeredCoord), 0.0001);\n"
             + "  float2 gradRaw = gradSdRoundedRect(centeredCoord, halfSize, gradRadius)\n"
-            + "      + depthEffect * float2(0.0, 1.0);\n"
+            + "      + depthEffect * depthDir;\n"
             + "  float2 grad = gradRaw / max(length(gradRaw), 0.0001);\n"
-            + "  return toHalf4(unpremulColor(content.eval(coord + d * grad)));\n"
+            + "  float3 color = unpremulColor(content.eval(coord + d * grad));\n"
+            + "  color = mix(color, surfaceColor.rgb, surfaceAlpha);\n"
+            + "  return toHalf4(color);\n"
             + "}\n";
 
     private final Paint bitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -205,6 +217,7 @@ final class SearchGlass extends FrameLayout {
     private RenderNode lensNode;
     private RuntimeShader lensShader;
     private boolean shaderUnavailable;
+    private static boolean prefsLogged;
     private boolean glassActiveLogged;
 
     private java.lang.ref.WeakReference<View> maskView;
@@ -214,6 +227,16 @@ final class SearchGlass extends FrameLayout {
     private Rect cachedVisibleBounds;
     private boolean visibleProbeDone;
     private boolean fillSoftened;
+    /** Opaque colour of the native capsule, alpha forced to 0xFF; 0 = unknown. */
+    private int surfaceColor;
+    /**
+     * How much of the glass is replaced by {@link #surfaceColor}. 15.0 left the
+     * bar readable-through (the theme capsule is translucent); 15.1 makes it a
+     * solid frosted surface, keeping 7% of the lens so the edge still bends.
+     */
+    private static final float SURFACE_ALPHA = 0.93f;
+    /** How often the settings screen's changes are picked up, in ms. */
+    private static final long PREFS_RELOAD_MS = 500;
     private java.lang.ref.WeakReference<SearchHost> captureHost;
     private boolean capturing;
     private long nextCaptureAt;
@@ -233,8 +256,6 @@ final class SearchGlass extends FrameLayout {
     private float prefInnerShadow = Prefs.DEFAULT_INNER_SHADOW;
     private float prefShadowW = Prefs.DEFAULT_SHADOW_W;
     private float prefBlur = Prefs.DEFAULT_GLASS_BLUR;
-    private float prefRimAlpha = Prefs.DEFAULT_RIM_ALPHA;
-    private float prefRimWidth = Prefs.DEFAULT_RIM_WIDTH;
 
     SearchGlass(Context context) {
         super(context);
@@ -244,26 +265,42 @@ final class SearchGlass extends FrameLayout {
     }
 
     private void loadPrefs() {
-        lastPrefsLoad = System.currentTimeMillis();
-        de.robv.android.xposed.XSharedPreferences prefs = Prefs.read();
-        prefRefractionHeight = Prefs.getFloat(prefs, Prefs.REFRACTION_HEIGHT,
-                Prefs.DEFAULT_REFRACTION_HEIGHT);
-        prefRefractionAmount = Prefs.getFloat(prefs, Prefs.REFRACTION_AMOUNT,
-                Prefs.DEFAULT_REFRACTION_AMOUNT);
-        prefInnerShadow = Prefs.getFloat(prefs, Prefs.INNER_SHADOW,
-                Prefs.DEFAULT_INNER_SHADOW);
-        prefShadowW = Prefs.getFloat(prefs, Prefs.SHADOW_W, Prefs.DEFAULT_SHADOW_W);
-        prefBlur = Prefs.getFloat(prefs, Prefs.GLASS_BLUR, Prefs.DEFAULT_GLASS_BLUR);
-        prefRimAlpha = Prefs.getFloat(prefs, Prefs.RIM_ALPHA, Prefs.DEFAULT_RIM_ALPHA);
-        prefRimWidth = Prefs.getFloat(prefs, Prefs.RIM_WIDTH, Prefs.DEFAULT_RIM_WIDTH);
-        if (prefBlur < 0f) {
-            prefBlur = 0f;
+        lastPrefsLoad = android.os.SystemClock.uptimeMillis();
+        android.content.Context context = getContext();
+        float height = Math.max(1f, Prefs.getFloat(context, Prefs.REFRACTION_HEIGHT,
+                Prefs.DEFAULT_REFRACTION_HEIGHT));
+        float amount = Math.max(0f, Prefs.getFloat(context, Prefs.REFRACTION_AMOUNT,
+                Prefs.DEFAULT_REFRACTION_AMOUNT));
+        float shadow = Math.max(0f, Math.min(1f, Prefs.getFloat(context, Prefs.INNER_SHADOW,
+                Prefs.DEFAULT_INNER_SHADOW)));
+        float shadowW = Math.max(1f, Prefs.getFloat(context, Prefs.SHADOW_W,
+                Prefs.DEFAULT_SHADOW_W));
+        float blur = Math.max(0f, Prefs.getFloat(context, Prefs.GLASS_BLUR,
+                Prefs.DEFAULT_GLASS_BLUR));
+        if (!prefsLogged) {
+            prefsLogged = true;
+            XLog.i("glass prefs via provider: blur=" + blur + " amount=" + amount
+                    + " height=" + height);
         }
-        if (prefRimWidth < 0f) {
-            prefRimWidth = 0f;
+        if (blur == prefBlur && amount == prefRefractionAmount && height == prefRefractionHeight
+                && shadow == prefInnerShadow && shadowW == prefShadowW) {
+            return;
         }
+        prefBlur = blur;
+        prefRefractionAmount = amount;
+        prefRefractionHeight = height;
+        prefInnerShadow = shadow;
+        prefShadowW = shadowW;
         XLog.i("glass tuning: blur=" + prefBlur + " refraction=" + prefRefractionAmount
-                + "/" + prefRefractionHeight + " rim=" + prefRimAlpha + "/" + prefRimWidth);
+                + "/" + prefRefractionHeight + " shadow=" + prefInnerShadow + "/" + prefShadowW);
+        invalidate();
+    }
+
+    /** The settings screen writes prefs at any time; pick changes up live. */
+    private void reloadPrefsIfStale() {
+        if (android.os.SystemClock.uptimeMillis() - lastPrefsLoad >= PREFS_RELOAD_MS) {
+            loadPrefs();
+        }
     }
 
     void setMaskView(View view) {
@@ -287,6 +324,10 @@ final class SearchGlass extends FrameLayout {
                     if (!isShown() || getWidth() <= 0 || getHeight() <= 0) {
                         return true;
                     }
+                    // The bar lives outside the scrolling list, so a static page
+                    // never redraws it. Poll the settings file here: preDraw runs
+                    // every frame, and a changed value invalidates the glass.
+                    reloadPrefsIfStale();
                     long now = android.os.SystemClock.uptimeMillis();
                     if (now < nextCaptureAt) {
                         return true;
@@ -306,7 +347,7 @@ final class SearchGlass extends FrameLayout {
                     }
                     // One capture per display frame (120Hz = 8ms), but never
                     // faster than the capture itself; this also keeps animating
-                    // pages (外观 / 待机显示 / 墙纸 / 控制中心) alive instead of
+                    // pages (appearance / standby / wallpaper / control centre) alive instead of
                     // freezing for 800ms when the list offset stops changing.
                     nextCaptureAt = started + Math.max(CAPTURE_INTERVAL_MS, cost);
                     fpsFrames++;
@@ -486,24 +527,56 @@ final class SearchGlass extends FrameLayout {
             // threshold and the measured pill comes out ~8dp too narrow.
             if (visible != null && !fillSoftened) {
                 fillSoftened = true;
-                softenNativeFill(maskTarget);
+                pickSurfaceColor(maskTarget);
+                restoreNativeFill(maskTarget);
                 postInvalidate();
             }
         }
         return mask;
     }
 
-    /** Turns the opaque native capsule into a tint over the lens. */
-    private void softenNativeFill(View target) {
+    /**
+     * Picks the solid colour the capsule is rendered with.
+     *
+     * <p>The theme capsule is a translucent white veil (about 20% in dark
+     * mode), so mixing in the *drawable's* colour would turn the bar white.
+     * What the user sees is that veil over the page, which is why the bar can
+     * still be read through. Rendering the page colour at full opacity under
+     * the same veil keeps the theme's look and makes the bar solid.</p>
+     */
+    private void pickSurfaceColor(View target) {
+        boolean dark = UiTweaks.isDarkMode(getContext());
+        surfaceColor = dark ? 0xFF000000 : 0xFFE5E5EA;
+        int veil = 0xFF;
+        try {
+            android.graphics.drawable.Drawable background = target.getBackground();
+            if (background != null) {
+                veil = background.getAlpha();
+            }
+        } catch (Throwable ignored) {
+        }
+        XLog.i("search glass surface=#" + Integer.toHexString(surfaceColor)
+                + " veilAlpha=0x" + Integer.toHexString(veil) + " mix=" + SURFACE_ALPHA);
+    }
+
+    /**
+     * The theme capsule is the search bar's visible surface
+     * ({@code miuix_appcompat_search_mode_edit_text_bg_light/dark}). 15.0
+     * knocked its alpha down to 0x80 so more of the lens showed through, which
+     * left the bar translucent. 15.1 puts the drawable back to full opacity:
+     * the capsule is the solid frosted surface the theme designed, and the lens
+     * only contributes the soft refraction band at its edge.
+     */
+    private void restoreNativeFill(View target) {
         try {
             android.graphics.drawable.Drawable background = target.getBackground();
             if (background == null) {
                 return;
             }
-            background.mutate().setAlpha(0x80);
-            XLog.i("search glass native fill alpha=0x80 (" + background.getClass().getName() + ")");
+            background.mutate().setAlpha(0xFF);
+            XLog.i("search glass native fill alpha=0xFF (" + background.getClass().getName() + ")");
         } catch (Throwable t) {
-            XLog.w("search glass fill softening failed: " + t);
+            XLog.w("search glass fill restore failed: " + t);
         }
     }
 
@@ -664,7 +737,7 @@ final class SearchGlass extends FrameLayout {
     }
 
     /**
-     * Blur → lens. Returns false without painting anything when the shader or
+     * Blur -> lens. Returns false without painting anything when the shader or
      * the render nodes are not usable, so the caller can fall back.
      */
     private boolean drawLens(Canvas canvas, Rect pill, float radius) {
@@ -719,7 +792,7 @@ final class SearchGlass extends FrameLayout {
             drawNodeAt(canvas, lensNode, new Rect(left, top, left + nodeW, top + nodeH));
             if (!glassActiveLogged) {
                 glassActiveLogged = true;
-                XLog.i("liquid glass active (lens + rim + inner shadow)");
+                XLog.i("liquid glass active (lens + inner shadow)");
             }
             return true;
         } catch (Throwable t) {
@@ -763,8 +836,8 @@ final class SearchGlass extends FrameLayout {
     }
 
     /**
-     * Draws the captured backdrop into a node of {@code nodeW × nodeH} placed
-     * at view coordinate {@code (left, top)}. The capture is 0.6× and padded by
+     * Draws the captured backdrop into a node of {@code nodeW x nodeH} placed
+     * at view coordinate {@code (left, top)}. The capture is 0.6x and padded by
      * {@link #CAPTURE_PAD_DP}, so the source rect is mapped back to view space;
      * when the node reaches past the screen edge the covered part simply stays
      * transparent instead of being stretched.
@@ -827,13 +900,16 @@ final class SearchGlass extends FrameLayout {
         shader.setFloatUniform("refractionAmount",
                 DEBUG_PASS_THROUGH ? 0f : -Math.max(0f, dp(prefRefractionAmount)));
         shader.setFloatUniform("depthEffect", 0f);
-        // The lens-only fallback shader has no rim/shadow uniforms: each set is
+        int surface = surfaceColor;
+        if (surface != 0) {
+            shader.setFloatUniform("surfaceColor",
+                    ((surface >> 16) & 0xFF) / 255f,
+                    ((surface >> 8) & 0xFF) / 255f,
+                    (surface & 0xFF) / 255f, 1f);
+        }
+        shader.setFloatUniform("surfaceAlpha", surface == 0 ? 0f : SURFACE_ALPHA);
+        // The lens-only fallback shader has no shadow uniforms: each set is
         // allowed to fail on its own.
-        setUniform(shader, "rimColor", 1f, 1f, 1f,
-                DEBUG_PASS_THROUGH ? 0f : Math.max(0f, Math.min(1f, prefRimAlpha)));
-        setUniform(shader, "rimAngle", (float) Math.toRadians(45.0));
-        setUniform(shader, "rimFalloff", 1f);
-        setUniform(shader, "rimWidth", Math.max(0.5f, dp(prefRimWidth)));
         setUniform(shader, "shadowColor", 0f, 0f, 0f,
                 DEBUG_PASS_THROUGH ? 0f : Math.max(0f, Math.min(1f, prefInnerShadow)));
         setUniform(shader, "shadowBand", Math.max(1f, dp(prefShadowW)));
