@@ -1,6 +1,6 @@
 # 踩坑记录
 
-> 状态：**现行** · 对应版本：14.9 (84)
+> 状态：**现行** · 对应版本：15.0 (85)
 > 规则：每踩一个新坑就追加一条，写清 **现象 → 根因 → 解法 → 如何避免**。旧结论被推翻时保留原文并标「已过时」。
 
 ## 最贵的五个坑（先看这五条）
@@ -206,6 +206,33 @@
   背景的 padding 内缩。实测 `mask=[0,13][1152,153]`，正好 44dp 药丸。
 - **如何避免**：布局尺寸别猜——`aapt2 dump xmltree --file res/layout/miuix_appcompat_search_stub.xml Settings.apk`
   看 XML，`DEBUG_TREE` 的 `dumpTree()` 看真机实际尺寸。
+
+#### 坑 F9：HyperiOS 把 `SlidingSwitch` 换成自己的 Compose host，开关「下沉」
+
+- **现象**：飞行模式行标题中心 Y=945，开关旋钮中心 Y=975（低 30px）；日志里 `setTranslationY(-30)` 已执行、
+  `getLocationOnScreen` 也变成了 898..993，但截图里旋钮仍在 938..1012，像是 translation 没生效。
+- **根因**：HyperiOS 1.x 的 `dev.hyperios.app.toggles.LiquidTogglesHook` hook 了
+  `miuix.slidingwidget.widget.SlidingSwitch#onDraw`。`USE_LIQUID_GLASS_TOGGLE=true` 时它调用
+  `LiquidToggleHost.ensure(view)` 后直接 `return`，原生 onDraw 被跳过；host 是挂在 `widget_frame` 上的
+  ComposeView，位置取 `view.getTop()`。MIUI 的 `widget_frame` 把 95px 高的开关放在 156px frame 的底部
+  （`top=61`），所以 host 永远画在底部，translation 不会移动它。
+- **解法**：检测到 `dev.hyperios.app` 时改用模块自有的 `GlassToggle`（普通 View，不在 HyperiOS 的
+  `TARGET_TOGGLE_CLASSES` 里），用 `weight=1` 的 spacer 推到行根右侧，竖向由行 LinearLayout 居中。
+- **如何避免**：别用「改坐标」去修另一个模块画的 View；先确认画面到底是谁画的。hook 别的模块的
+  `onDraw` 时，任何基于 layout box 的覆盖层都不会跟 translation/scale 走。
+
+#### 坑 F10：主题 9-patch 的透明边距烘在 PNG 里，`getPadding()` 返回 false
+
+- **现象**：玻璃胶囊比原生搜索栏宽一圈、向上错位；`mask=[63,1][1084,139]`（1021px）或 `[50,1][1137,139]`
+  取决于阈值，而原生可见 fill 约 94..1198（1104px）。
+- **根因**：主题把 `miuix_appcompat_search_mode_edit_text_bg_*` 换成了带透明边距的 9-patch；
+  透明区域是图片像素，不是 drawable padding，`getPadding()` 返回 false。按 `inputArea` 视图边界裁必然偏大；
+  再叠 `(h-mask.height())/2` 的手调居中还会上下错位。
+- **解法**：`paintedBackgroundBounds()` 把背景 drawable 画进 ARGB 位图，按 alpha ≥ 72 取实际像素外接矩形；
+  **先量不透明状态，再**把原生 fill `setAlpha(0x80)`（顺序反了，半透明 9-patch 的侧边会掉到阈值以下，
+  量出来会窄 8dp 左右）。遮罩直接用这个矩形，不再手调居中。
+- **如何避免**：主题/9-patch 场景不要信 `getPadding()`，直接测像素；阈值要在真机截图上核对
+  （本次 72 能覆盖可见 fill，96 会在左侧露一条原生 fill）。
 
 ---
 

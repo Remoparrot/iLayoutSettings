@@ -23,6 +23,8 @@ import de.robv.android.xposed.XposedHelpers;
 final class AirplaneSwitch {
 
     private static final String TAG = "ios_airplane_switch";
+    private static final String GLASS_TAG = "ios_airplane_glass";
+    private static final String GLASS_SPACER_TAG = "ios_airplane_glass_spacer";
 
     private AirplaneSwitch() {
     }
@@ -80,6 +82,8 @@ final class AirplaneSwitch {
             if (existing != null) {
                 frame.removeView(existing);
             }
+            removeGlassToggle(itemView);
+            frame.setVisibility(View.VISIBLE);
             // Recycled airplane rows keep the hidden arrow; put it back for rows
             // that normally show one.
             restoreArrow(header, holder, itemView, context);
@@ -90,12 +94,36 @@ final class AirplaneSwitch {
         frame.setMinimumWidth(0);
         frame.setPadding(0, 0, 0, 0);
         if (frame instanceof android.widget.LinearLayout) {
+            // The frame still holds MIUI's text_right TextView. With baseline
+            // alignment on, the horizontal LinearLayout shifts the switch down
+            // until its baseline matches that label - the "sunken" switch.
+            ((android.widget.LinearLayout) frame).setBaselineAligned(false);
+        }
+        // HyperiOS may dress the row in its own glass container; the switch is
+        // allowed to leave the widget_frame bounds so the visual centre can be
+        // corrected without being clipped.
+        frame.setClipChildren(false);
+        frame.setClipToPadding(false);
+        if (itemView instanceof ViewGroup) {
+            ((ViewGroup) itemView).setClipChildren(false);
+        }
+        if (frame instanceof android.widget.LinearLayout) {
             ((android.widget.LinearLayout) frame).setGravity(
                     android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.END);
         }
         // Native switch rows have no chevron; hide it so the switch sits at the
         // same right edge as every other switch in Settings.
         hideArrow(holder, itemView, context);
+        // HyperiOS 1.x hooks SlidingSwitch.onDraw and replaces it with its own
+        // Compose host, which snaps to the switch's layout box. That box is
+        // bottom-aligned inside MIUI's widget_frame, so any translation we apply
+        // is ignored by the host and the toggle looks sunken. Use our own
+        // View-based glass toggle instead: HyperiOS does not hook it, and it is
+        // centred by the row layout itself.
+        if (hasHyperios(context)) {
+            injectGlassToggle(itemView, frame, context);
+            return;
+        }
         // Tapping the row itself also toggles airplane mode.
         final ViewGroup frameRef = frame;
         itemView.setOnClickListener(new View.OnClickListener() {
@@ -113,6 +141,12 @@ final class AirplaneSwitch {
                     recenter(itemView, reused);
                 }
             });
+            itemView.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    recenter(itemView, reused);
+                }
+            }, 320);
             return;
         }
         View toggle = createSwitch(context);
@@ -124,8 +158,31 @@ final class AirplaneSwitch {
         toggle.setClickable(true);
         toggle.setFocusable(true);
         toggle.setEnabled(true);
-        frame.addView(toggle, new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        ViewGroup.LayoutParams toggleParams;
+        if (frame instanceof android.widget.FrameLayout) {
+            android.widget.FrameLayout.LayoutParams lp =
+                    new android.widget.FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.gravity = android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.END;
+            toggleParams = lp;
+        } else if (frame instanceof android.widget.RelativeLayout) {
+            android.widget.RelativeLayout.LayoutParams lp =
+                    new android.widget.RelativeLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
+            lp.addRule(android.widget.RelativeLayout.ALIGN_PARENT_END);
+            toggleParams = lp;
+        } else {
+            android.widget.LinearLayout.LayoutParams lp =
+                    new android.widget.LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.gravity = android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.END;
+            toggleParams = lp;
+        }
+        frame.addView(toggle, toggleParams);
         setChecked(toggle, Airplane.isOn(context));
         wire(toggle, context);
         final View switchView = toggle;
@@ -150,30 +207,185 @@ final class AirplaneSwitch {
                 recenter(itemView, switchView);
             }
         }, 120);
+        itemView.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                recenter(itemView, switchView);
+            }
+        }, 450);
         XLog.i("airplane switch attached to 飞行模式 row");
+    }
+
+    private static boolean hasHyperios(Context context) {
+        try {
+            context.getPackageManager().getPackageInfo("dev.hyperios.app", 0);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private static void removeGlassToggle(View itemView) {
+        if (!(itemView instanceof ViewGroup)) {
+            return;
+        }
+        ViewGroup row = (ViewGroup) itemView;
+        View glass = row.findViewWithTag(GLASS_TAG);
+        if (glass != null) {
+            row.removeView(glass);
+        }
+        View spacer = row.findViewWithTag(GLASS_SPACER_TAG);
+        if (spacer != null) {
+            row.removeView(spacer);
+        }
+    }
+
+    /**
+     * HyperiOS's liquid-toggle hook only understands MIUI's SlidingSwitch and
+     * pins its own overlay to that view's layout box. A plain View toggle is
+     * outside its hook list and can be centred by the row itself.
+     */
+    private static void injectGlassToggle(View itemView, ViewGroup frame, Context context) {
+        frame.setVisibility(View.GONE);
+        View existing = itemView.findViewWithTag(GLASS_TAG);
+        GlassToggle toggle;
+        if (existing instanceof GlassToggle) {
+            toggle = (GlassToggle) existing;
+        } else {
+            if (!(itemView instanceof ViewGroup)) {
+                return;
+            }
+            ViewGroup row = (ViewGroup) itemView;
+            toggle = new GlassToggle(context);
+            toggle.setTag(GLASS_TAG);
+            toggle.setClickable(true);
+            toggle.setFocusable(true);
+            if (row instanceof android.widget.LinearLayout) {
+                ((android.widget.LinearLayout) row).setBaselineAligned(false);
+                android.widget.Space spacer = new android.widget.Space(context);
+                spacer.setTag(GLASS_SPACER_TAG);
+                android.widget.LinearLayout.LayoutParams spacerParams =
+                        new android.widget.LinearLayout.LayoutParams(0, 1, 1f);
+                row.addView(spacer, spacerParams);
+                android.widget.LinearLayout.LayoutParams lp =
+                        new android.widget.LinearLayout.LayoutParams(dp(context, 56), dp(context, 32));
+                lp.gravity = android.view.Gravity.CENTER_VERTICAL;
+                lp.rightMargin = dp(context, 2);
+                row.addView(toggle, lp);
+            } else if (row instanceof android.widget.FrameLayout) {
+                android.widget.FrameLayout.LayoutParams lp =
+                        new android.widget.FrameLayout.LayoutParams(dp(context, 56), dp(context, 32),
+                                android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.END);
+                lp.rightMargin = dp(context, 2);
+                row.addView(toggle, lp);
+            } else {
+                return;
+            }
+            XLog.i("airplane glass toggle added to row (HyperiOS-safe)");
+        }
+        toggle.setChecked(Airplane.isOn(context));
+        toggle.setOnCheckedChangeListener(new GlassToggle.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(boolean checked) {
+                Airplane.set(context, checked);
+                XLog.i("glass airplane toggle -> " + checked);
+            }
+        });
+        final GlassToggle glass = toggle;
+        itemView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                glass.performClick();
+            }
+        });
     }
 
     private static void recenter(View itemView, View switchView) {
         try {
+            if (!switchView.isAttachedToWindow() || !switchView.isLaidOut()
+                    || switchView.getWidth() <= 0 || switchView.getHeight() <= 0) {
+                return;
+            }
+            ViewGroup frame = switchView.getParent() instanceof ViewGroup
+                    ? (ViewGroup) switchView.getParent() : null;
+            if (normalizeFrame(frame)) {
+                // HyperiOS pads the widget frame after MIUI's bind; centring the
+                // child inside a padded frame still lands ~10dp too low, so put
+                // the frame back to zero padding and lay out again.
+                switchView.setTranslationY(0f);
+                final View item = itemView;
+                final View sw = switchView;
+                frame.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        recenter(item, sw);
+                    }
+                });
+                return;
+            }
             centerInParent(switchView);
             int[] swLoc = new int[2];
             int[] rowLoc = new int[2];
             switchView.getLocationOnScreen(swLoc);
             itemView.getLocationOnScreen(rowLoc);
-            int rowRight = rowLoc[0] + itemView.getWidth();
-            int swRight = swLoc[0] + switchView.getWidth();
-            int rowCenterY = rowLoc[1] + itemView.getHeight() / 2;
+            if (swLoc[1] < 0 || rowLoc[1] < 0) {
+                return;
+            }
+
             int swCenterY = swLoc[1] + switchView.getHeight() / 2;
-            int dy = swCenterY - rowCenterY;
+
+            // Anchor on the title instead of the row: HyperiOS's glass hook
+            // changes the row's padding after MIUI binds it, and the row box
+            // then no longer matches where the text/icon actually sit.
+            View title = itemView.findViewById(android.R.id.title);
+            int targetCenterY = rowLoc[1] + itemView.getHeight() / 2;
+            if (title != null && title.getHeight() > 0) {
+                int[] titleLoc = new int[2];
+                title.getLocationOnScreen(titleLoc);
+                int titleCenter = titleLoc[1] + title.getHeight() / 2;
+                // A recycled row can still report the previous item's title
+                // position for one pass; only trust it inside this row.
+                if (titleCenter >= rowLoc[1] && titleCenter <= rowLoc[1] + itemView.getHeight()) {
+                    targetCenterY = titleCenter;
+                }
+            }
+
+            int dy = targetCenterY - swCenterY;
+            int limit = dp(switchView.getContext(), 40);
+            if (Math.abs(dy) > limit) {
+                // During the first layout pass getLocationOnScreen can return
+                // Integer.MIN_VALUE; never translate on nonsense geometry.
+                if (Math.abs(switchView.getTranslationY()) > limit) {
+                    switchView.setTranslationY(0f);
+                }
+                XLog.w("airplane switch geometry not ready: dy=" + dy
+                        + " swCenterY=" + swCenterY + " targetCenterY=" + targetCenterY);
+                return;
+            }
             if (Math.abs(dy) > dp(switchView.getContext(), 1)) {
-                switchView.setTranslationY(switchView.getTranslationY() - dy);
-                XLog.i("airplane switch recentered by " + (-dy)
-                        + " (gap=" + (rowRight - swRight) + ", sw="
-                        + switchView.getWidth() + "x" + switchView.getHeight() + ")");
+                switchView.setTranslationY(switchView.getTranslationY() + dy);
+                XLog.i("airplane switch recentered by " + dy
+                        + " (view=" + switchView.getWidth() + "x" + switchView.getHeight()
+                        + ", titleCenterY=" + targetCenterY
+                        + ", switchCenterY=" + swCenterY + ")");
             }
         } catch (Throwable t) {
             XLog.w("airplane switch recenter failed: " + t);
         }
+    }
+
+    /** Clears padding HyperiOS adds to the widget frame. */
+    private static boolean normalizeFrame(ViewGroup frame) {
+        if (frame == null) {
+            return false;
+        }
+        if (frame.getPaddingLeft() == 0 && frame.getPaddingTop() == 0
+                && frame.getPaddingRight() == 0 && frame.getPaddingBottom() == 0) {
+            return false;
+        }
+        frame.setPadding(0, 0, 0, 0);
+        frame.requestLayout();
+        return true;
     }
 
     /** Ask the layout itself to centre the switch vertically (HyperiOS-safe). */
@@ -183,19 +395,38 @@ final class AirplaneSwitch {
             ViewGroup.LayoutParams params = switchView.getLayoutParams();
             if (parent instanceof android.widget.FrameLayout
                     && params instanceof android.widget.FrameLayout.LayoutParams) {
-                ((android.widget.FrameLayout.LayoutParams) params).gravity =
-                        android.view.Gravity.CENTER_VERTICAL;
-                switchView.setLayoutParams(params);
+                android.widget.FrameLayout.LayoutParams lp =
+                        (android.widget.FrameLayout.LayoutParams) params;
+                if (lp.gravity != android.view.Gravity.CENTER_VERTICAL) {
+                    lp.gravity = android.view.Gravity.CENTER_VERTICAL;
+                    switchView.setLayoutParams(lp);
+                }
             } else if (parent instanceof android.widget.RelativeLayout
                     && params instanceof android.widget.RelativeLayout.LayoutParams) {
-                ((android.widget.RelativeLayout.LayoutParams) params)
-                        .addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
-                switchView.setLayoutParams(params);
+                android.widget.RelativeLayout.LayoutParams lp =
+                        (android.widget.RelativeLayout.LayoutParams) params;
+                if (lp.getRules()[android.widget.RelativeLayout.CENTER_VERTICAL]
+                        != android.widget.RelativeLayout.TRUE) {
+                    lp.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
+                    switchView.setLayoutParams(lp);
+                }
             } else if (parent instanceof android.widget.LinearLayout
                     && params instanceof android.widget.LinearLayout.LayoutParams) {
-                ((android.widget.LinearLayout.LayoutParams) params).gravity =
-                        android.view.Gravity.CENTER_VERTICAL;
-                switchView.setLayoutParams(params);
+                android.widget.LinearLayout.LayoutParams lp =
+                        (android.widget.LinearLayout.LayoutParams) params;
+                android.widget.LinearLayout linear = (android.widget.LinearLayout) parent;
+                boolean changed = false;
+                if (lp.gravity != android.view.Gravity.CENTER_VERTICAL) {
+                    lp.gravity = android.view.Gravity.CENTER_VERTICAL;
+                    changed = true;
+                }
+                if (linear.isBaselineAligned()) {
+                    linear.setBaselineAligned(false);
+                    changed = true;
+                }
+                if (changed) {
+                    switchView.setLayoutParams(lp);
+                }
             }
         } catch (Throwable ignored) {
         }

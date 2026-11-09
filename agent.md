@@ -33,7 +33,7 @@
 
 ```
 接手确认
-- 当前版本：14.9 (84)
+- 当前版本：15.0 (85)
 - 本次目标：<一句话>
 - 受影响文件：<预估>
 - 主要风险：<例如：改 Header 顺序可能影响卡片分组>
@@ -168,14 +168,14 @@ $env:ANDROID_JAR         = "C:\path\to\platforms\android-36\android.jar"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File module\build.ps1
 
 # 3) 校验产物
-Get-FileHash dist\IosSettingsLayout-14.9.apk -Algorithm SHA256
-& "$env:ANDROID_BUILD_TOOLS\aapt2.exe" dump badging dist\IosSettingsLayout-14.9.apk |
+Get-FileHash dist\IosSettingsLayout-15.0.apk -Algorithm SHA256
+& "$env:ANDROID_BUILD_TOOLS\aapt2.exe" dump badging dist\IosSettingsLayout-15.0.apk |
   Select-String '^package:|^sdkVersion|^targetSdkVersion'
-& "$env:ANDROID_BUILD_TOOLS\apksigner.bat" verify --print-certs dist\IosSettingsLayout-14.9.apk
+& "$env:ANDROID_BUILD_TOOLS\apksigner.bat" verify --print-certs dist\IosSettingsLayout-15.0.apk
 ```
 
 构建成功的判定（缺一不可）：
-`package: name='com.abradant.iossettings' versionCode='84' versionName='14.9'`、
+`package: name='com.abradant.iossettings' versionCode='85' versionName='15.0'`、
 `xposed_init : True`、`module class: True`、`reorder : True`、apksigner `Verified`。
 
 **没有设备实测的改动，必须在记录第 6 节写「未上机验证」。**

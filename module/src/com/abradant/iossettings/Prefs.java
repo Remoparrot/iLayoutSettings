@@ -18,9 +18,9 @@ final class Prefs {
     static final String TOPBAR_BLUR = "topbar_blur";
 
     /** Thickness of the refracted band at the capsule edge, in dp. */
-    static final float DEFAULT_REFRACTION_HEIGHT = 18f;
+    static final float DEFAULT_REFRACTION_HEIGHT = 24f;
     /** How far the lens pulls the backdrop inwards at the rim, in dp. */
-    static final float DEFAULT_REFRACTION_AMOUNT = 10f;
+    static final float DEFAULT_REFRACTION_AMOUNT = 30f;
     /** Reserved for Kyant's dispersion shader; 0 keeps the single-sample lens. */
     static final float DEFAULT_CHROMATIC = 0f;
     /** Opacity of the dark band hugging the bottom edge. */
@@ -28,7 +28,7 @@ final class Prefs {
     /** Width of that inner-shadow band, in dp. */
     static final float DEFAULT_SHADOW_W = 8f;
     /** Backdrop blur radius before the lens, in dp. */
-    static final float DEFAULT_GLASS_BLUR = 5f;
+    static final float DEFAULT_GLASS_BLUR = 1f;
     /** Peak opacity of the 45° rim highlight. */
     static final float DEFAULT_RIM_ALPHA = 0.5f;
     /** Width of the rim highlight band, in dp. */

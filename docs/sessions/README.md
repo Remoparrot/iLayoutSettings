@@ -14,6 +14,7 @@
 
 | 日期 | 标题 | 一句话结论 | 状态 |
 | --- | --- | --- | --- |
+| 2026-11-09 | [搜索栏玻璃对齐与 v15.0](2026-11-09-search-glass-alignment-and-v15.md) | HyperiOS 接管 `SlidingSwitch.onDraw` 导致开关下沉，改用自有 `GlassToggle`；玻璃遮罩改为渲染背景取像素；15.0 应用名 iLyayot | 部分完成（收尾参数仅日志验证） |
 | 2026-11-09 | [搜索栏玻璃「定住」修复与几何对齐](2026-11-09-search-glass-freeze-and-geometry.md) | 玻璃只画一次就定住：改成「抓图比对、变了才重绘」；胶囊对齐 44dp `widget_frame` 药丸；模糊默认 5dp | 已完成 |
 | 2026-11-09 | [搜索栏接入 Kyant 液态玻璃](2026-11-09-search-bar-liquid-glass.md) | 搜索栏改为「模糊 + 圆角折射 + 边缘高光 + 内阴影」；shader 用 Skia 离线编译校验，14.9 预览包未上机 | 已完成 |
 | 2026-11-09 | [仓库初始化与文档体系](2026-11-09-repo-bootstrap.md) | 建立 iLyayot 仓库、文档地图、agent.md 强制记录规范；发现源码与发布包不一致 | 已完成 |

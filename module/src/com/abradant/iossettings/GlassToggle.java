@@ -280,7 +280,7 @@ final class GlassToggle extends View {
                 canvas.drawBitmap(backdrop, src, dst, bitmapPaint);
             }
             // Frost the lens a little so it reads as glass, not as a mirror.
-            paint.setColor(dark ? 0x40FFFFFF : 0x55FFFFFF);
+            paint.setColor(dark ? 0xB3FFFFFF : 0xCCFFFFFF);
             canvas.drawCircle(knobRect.centerX(), knobRect.centerY(), knobSize / 2f, paint);
         } else {
             paint.setShader(new RadialGradient(

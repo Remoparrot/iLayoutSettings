@@ -1,6 +1,6 @@
 # 架构与 Hook 链路
 
-> 状态：**现行** · 对应版本：14.9 (84)
+> 状态：**现行** · 对应版本：15.0 (85)
 > 源码：`module/src/com/abradant/iossettings/`
 
 ## 1. 从加载到生效
@@ -33,7 +33,7 @@ LSPosed
 | 同上 | `onViewCreated` | 原生搜索条 `mAnchorView` 此时才赋值，之后再装底部栏 | `BottomSearch` |
 | 同上 | `onResume` | MIUI 可能刷新 header，回来后再排一次 | `HeaderData` |
 | `androidx.preference.PreferenceFragmentCompat` | `onCreate` / `onViewCreated` / `onResume` | 二级页每次进入都补图标 | `SubPageIcons` |
-| `MiuiSettings$HeaderAdapter` | `onBindViewHolder(HeaderViewHolder,int)` | 控制中心行塞开关；末行清理主题 drawable | `AirplaneSwitch` / `CardFix` |
+| `MiuiSettings$HeaderAdapter` | `onBindViewHolder(HeaderViewHolder,int)` | 控制中心行塞开关（HyperiOS 时用自有 `GlassToggle`）；末行清理主题 drawable | `AirplaneSwitch` / `CardFix` |
 | `ResourcesImpl` | `loadDrawable` | 末行绑定时把四个主题 drawable 换成透明图 | `CardFix` |
 | `androidx.preference.Preference` | `onBindViewHolder` | 二级页每组最后一行去双层圆角 | `SubPageCards` |
 | `MiuiWirelessSettings` | `onViewCreated` / `onResume` | 删飞行模式行、补「隔空播放与连续互通」 | `WirelessPage` |
@@ -70,9 +70,10 @@ LSPosed
 3. 浮层尺寸：高 50dp，左右 8dp，底部 12dp；拿到导航栏 inset 后改为 `14dp + nav`；
 4. 列表底部 padding 同步加上 `搜索栏高 + nav + 24dp`，避免最后一张卡片被挡；
 5. 点击浮层 → 调原生 anchor 的 `performClick()` → 走 MIUI 自己的搜索 ActionMode；搜索界面出现时浮层自动隐藏；
-6. `SearchGlass` 负责视觉层：抓窗口（跳过自身子树）→ 5dp 模糊（`RenderEffect`）→
-   圆角矩形折射（`RuntimeShader` + AGSL）→ 45° 边缘高光 → 底部内阴影，全部裁在 `widget_frame`
-   原生药丸的胶囊范围内（44dp，不是 56dp 的 stub）；
+6. `SearchGlass` 负责视觉层：抓窗口（跳过自身子树）→ **1dp 模糊**（`RenderEffect`）→
+   圆角矩形折射（`RuntimeShader` + AGSL，**24dp 厚度 / 30dp 强度**）→ 45° 边缘高光 → 底部内阴影；
+   遮罩不是视图边界，而是 `paintedBackgroundBounds()` 把原生胶囊 drawable 画进位图后取的实际像素矩形
+   （主题 9-patch 的透明边距烘在 PNG 里，`getPadding()` 不可靠）；测量完成后再把原生 fill `setAlpha(0x80)`；
    **抓图在 `OnPreDraw` 里做，只有抓到的位图与前一张不同才 `invalidate()`**；
 7. 逐级兜底：全量 shader → 只有折射的 shader → 只有模糊 → 半透明胶囊（`shaderUnavailable` 只置一次，
    不会每帧重试抛异常）。`SearchHost` 在抓图那一帧跳过自身子树，避免把搜索栏自己拍进背景里。
@@ -80,6 +81,19 @@ LSPosed
 > 抓图 + 两个 RenderEffect 是整份代码里性能最敏感的部分，改之前先读 [设计思路 · 2.4 玻璃](05-design-notes.md)。
 > 搜索栏挂在 `android.R.id.content` 上，**不在滚动列表里**：列表滚动不会弄脏它，所以必须自己判断
 > 「背景变了」再重绘（见 [坑 F6](06-pitfalls.md)）。
+
+### 4.1 飞行模式开关（`AirplaneSwitch`）
+
+- 行是 `MiuiSettings$HeaderAdapter` 合成出来的，`widget_frame` 里原本只有 `text_right`；
+- **未装 HyperiOS**：inflate `miuix_preference_widget_switch`（`SlidingSwitch`）加到 `widget_frame`，
+  用 `CENTER_VERTICAL` + 少量 `translationY` 校正；
+- **装了 HyperiOS**：HyperiOS 的 `LiquidTogglesHook` 会 hook `SlidingSwitch#onDraw`，
+  `USE_LIQUID_GLASS_TOGGLE=true` 时直接 `LiquidToggleHost.ensure(view)` 并跳过原生绘制；
+  host 是按 view 的 layout box 定位的 ComposeView，`setTranslationY` 不会移动它，
+  而 MIUI 的 `widget_frame` 把 95px 高的开关放在 156px frame 的底部，于是开关下沉约 10dp。
+  15.0 改用模块自己的 `GlassToggle`（普通 View，不在 HyperiOS 的 hook 名单里），
+  加一个 `weight=1` 的 spacer 把开关推到行根右侧，竖向由行 LinearLayout 居中；
+- 行被回收成普通 header 时 `removeGlassToggle()` 移除开关和 spacer，并恢复 `widget_frame` 可见。
 
 ## 5. 二级页图标（`SubPageIcons`）
 
@@ -100,7 +114,7 @@ MIUI 会给每一行再叠一层「卡片形状」的 9-patch 背景/前景，�
 
 | 类 | 原用途 | 状态 |
 | --- | --- | --- |
-| `GlassToggle` | 飞行模式行的液态玻璃开关 | 未挂载 |
+| `GlassToggle` | 飞行模式行的液态玻璃开关 | **在用**（HyperiOS 安装时的开关实现） |
 | `IntroCard` | 二级页顶部 iOS 大标题卡片 | 未挂载 |
 | `AboutIos` / `AboutExtras` | 替换「关于本机」为 iOS 页 | 未挂载（互相引用，整条链死） |
 | `TitleFix` / `TitleOverlay` | 强制二级页标题常显 | 未挂载 |

@@ -24,9 +24,9 @@ public final class MainActivity extends Activity {
         root.setPadding(dp(24), dp(32), dp(24), dp(40));
         scroll.addView(root);
 
-        root.addView(text("iOS 设置布局", 30, Typeface.DEFAULT_BOLD));
+        root.addView(text("iLyayot", 30, Typeface.DEFAULT_BOLD));
 
-        TextView sub = text("LSPosed 模块 · v14.9", 14, Typeface.DEFAULT);
+        TextView sub = text("LSPosed 模块 · v15.0", 14, Typeface.DEFAULT);
         sub.setTextColor(0xFF8E8E93);
         LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);

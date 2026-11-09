@@ -208,6 +208,12 @@ final class SearchGlass extends FrameLayout {
     private boolean glassActiveLogged;
 
     private java.lang.ref.WeakReference<View> maskView;
+    private java.lang.ref.WeakReference<View> cachedMaskTarget;
+    private int cachedMaskWidth;
+    private int cachedMaskHeight;
+    private Rect cachedVisibleBounds;
+    private boolean visibleProbeDone;
+    private boolean fillSoftened;
     private java.lang.ref.WeakReference<SearchHost> captureHost;
     private boolean capturing;
     private long nextCaptureAt;
@@ -256,10 +262,16 @@ final class SearchGlass extends FrameLayout {
         if (prefRimWidth < 0f) {
             prefRimWidth = 0f;
         }
+        XLog.i("glass tuning: blur=" + prefBlur + " refraction=" + prefRefractionAmount
+                + "/" + prefRefractionHeight + " rim=" + prefRimAlpha + "/" + prefRimWidth);
     }
 
     void setMaskView(View view) {
         maskView = view == null ? null : new java.lang.ref.WeakReference<>(view);
+        cachedMaskTarget = null;
+        cachedVisibleBounds = null;
+        visibleProbeDone = false;
+        fillSoftened = false;
         XLog.i("search glass mask: " + (view == null ? "none (full bar)"
                 : view.getClass().getName()));
     }
@@ -433,18 +445,28 @@ final class SearchGlass extends FrameLayout {
             getLocationInWindow(selfLoc);
             int left = targetLoc[0] - selfLoc[0];
             int top = targetLoc[1] - selfLoc[1];
-            mask.set(left, top, left + maskTarget.getWidth(), top + maskTarget.getHeight());
-            // The native 9-patch carries padding (white margins on the sides);
-            // inset the mask by it so the glass stops at the visible pill.
-            if (maskTarget.getBackground() != null) {
-                Rect padding = new Rect();
-                if (maskTarget.getBackground().getPadding(padding)) {
-                    mask.inset(padding.left, padding.top, padding.right, padding.bottom);
+            Rect visible = visibleBackgroundBounds(maskTarget);
+            if (visible != null) {
+                // The theme bakes transparent margins into the capsule drawable
+                // (getPadding() reports nothing), so the view bounds can be
+                // wider/taller than the painted pill. Use the painted pixels;
+                // they already carry the real position inside the target.
+                mask.set(left + visible.left, top + visible.top,
+                        left + visible.right, top + visible.bottom);
+            } else {
+                mask.set(left, top, left + maskTarget.getWidth(), top + maskTarget.getHeight());
+                // The native 9-patch carries padding (white margins on the sides);
+                // inset the mask by it so the glass stops at the visible pill.
+                if (maskTarget.getBackground() != null) {
+                    Rect padding = new Rect();
+                    if (maskTarget.getBackground().getPadding(padding)) {
+                        mask.inset(padding.left, padding.top, padding.right, padding.bottom);
+                    }
                 }
-            }
-            // The pill is 44dp tall inside the 56dp stub: centre the mask.
-            if (mask.height() < h) {
-                mask.offset(0, (h - mask.height()) / 2);
+                // The pill is 44dp tall inside the 56dp stub: centre the mask.
+                if (mask.height() < h) {
+                    mask.offset(0, (h - mask.height()) / 2);
+                }
             }
             if (!mask.intersect(0, 0, w, h)) {
                 mask.set(0, 0, w, h);
@@ -454,11 +476,127 @@ final class SearchGlass extends FrameLayout {
                 XLog.i("search glass mask=" + mask.toShortString() + " view=" + w + "x" + h
                         + " target=" + maskTarget.getClass().getSimpleName() + " "
                         + maskTarget.getWidth() + "x" + maskTarget.getHeight()
-                        + " pad=" + (maskTarget.getBackground() == null ? "none"
-                                : maskTarget.getBackground().getPadding(new Rect()) ? "yes" : "no"));
+                        + " visible=" + (visible == null ? "none" : visible.toShortString())
+                        + " bg=" + (maskTarget.getBackground() == null ? "none"
+                                : maskTarget.getBackground().getClass().getName()));
+            }
+            // Probe first (the opaque capsule gives the honest outline), then
+            // let the lens show through the native fill. Doing it in this order
+            // matters: a translucent 9-patch's side caps fall below the alpha
+            // threshold and the measured pill comes out ~8dp too narrow.
+            if (visible != null && !fillSoftened) {
+                fillSoftened = true;
+                softenNativeFill(maskTarget);
+                postInvalidate();
             }
         }
         return mask;
+    }
+
+    /** Turns the opaque native capsule into a tint over the lens. */
+    private void softenNativeFill(View target) {
+        try {
+            android.graphics.drawable.Drawable background = target.getBackground();
+            if (background == null) {
+                return;
+            }
+            background.mutate().setAlpha(0x80);
+            XLog.i("search glass native fill alpha=0x80 (" + background.getClass().getName() + ")");
+        } catch (Throwable t) {
+            XLog.w("search glass fill softening failed: " + t);
+        }
+    }
+
+    /**
+     * Renders the native capsule drawable and returns the bounds of the pixels
+     * it actually paints. Theme capsules are 9-patches with transparent margins
+     * baked into the PNG, so {@code getPadding()} returns nothing while the
+     * visible pill is several dp smaller than its view.
+     */
+    private Rect visibleBackgroundBounds(View target) {
+        if (cachedMaskTarget != null && cachedMaskTarget.get() == target
+                && cachedMaskWidth == target.getWidth()
+                && cachedMaskHeight == target.getHeight()) {
+            return cachedVisibleBounds;
+        }
+        if (visibleProbeDone) {
+            return null;
+        }
+        visibleProbeDone = true;
+        Rect rect = paintedBackgroundBounds(target);
+        if (rect == null) {
+            cachedMaskTarget = null;
+            cachedVisibleBounds = null;
+            return null;
+        }
+        cachedMaskTarget = new java.lang.ref.WeakReference<>(target);
+        cachedMaskWidth = target.getWidth();
+        cachedMaskHeight = target.getHeight();
+        cachedVisibleBounds = rect;
+        return rect;
+    }
+
+    /**
+     * Renders a view's background drawable at its current size and returns the
+     * bounds of the pixels it actually paints. Package-visible so the bottom
+     * search installer can log what each candidate capsule really covers.
+     */
+    static Rect paintedBackgroundBounds(View target) {
+        int w = target.getWidth();
+        int h = target.getHeight();
+        android.graphics.drawable.Drawable background = target.getBackground();
+        if (w <= 0 || h <= 0 || background == null) {
+            return null;
+        }
+        Bitmap bitmap = null;
+        try {
+            bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            Rect oldBounds = new Rect();
+            background.copyBounds(oldBounds);
+            try {
+                background.setBounds(0, 0, w, h);
+                background.draw(canvas);
+            } finally {
+                background.setBounds(oldBounds);
+            }
+            int[] pixels = new int[w * h];
+            bitmap.getPixels(pixels, 0, w, 0, 0, w, h);
+            int minX = w;
+            int minY = h;
+            int maxX = -1;
+            int maxY = -1;
+            for (int y = 0; y < h; y++) {
+                int row = y * w;
+                for (int x = 0; x < w; x++) {
+                    if ((pixels[row + x] >>> 24) >= 72) {
+                        if (x < minX) {
+                            minX = x;
+                        }
+                        if (x > maxX) {
+                            maxX = x;
+                        }
+                        if (y < minY) {
+                            minY = y;
+                        }
+                        if (y > maxY) {
+                            maxY = y;
+                        }
+                    }
+                }
+            }
+            if (maxX < minX || maxY < minY) {
+                return null;
+            }
+            return new Rect(minX, minY, maxX + 1, maxY + 1);
+        } catch (Throwable t) {
+            XLog.w("search glass visible-bounds probe failed: " + t);
+            return null;
+        } finally {
+            if (bitmap != null) {
+                bitmap.recycle();
+            }
+        }
     }
 
     @Override

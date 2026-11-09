@@ -1,17 +1,17 @@
 # 安装与调试
 
-> 状态：**现行** · 对应版本：14.9 (84)
+> 状态：**现行** · 对应版本：15.0 (85)
 
 ## 1. 前置
 
 - 已 root / 已装 **LSPosed**（1.x 或 2.x，Zygisk 或 Riru 均可）；
 - 系统为澎湃 OS 3（HyperOS 3）；
-- 已安装 `dist/IosSettingsLayout-14.9.apk`（从 14.8 升级要先卸载，签名不同）。
+- 已安装 `dist/IosSettingsLayout-15.0.apk`（应用名 **iLyayot**；从 14.8 升级要先卸载，签名不同；14.9 可直接覆盖）。
 
 ## 2. 三步装好
 
 1. **安装 APK**（直接点开安装，或用 `adb install -r`）；
-2. **LSPosed → 模块 → 启用「iOS 设置布局」**，作用域只勾 **设置**（`com.android.settings`）；
+2. **LSPosed → 模块 → 启用「iLyayot」**，作用域只勾 **设置**（`com.android.settings`）；
 3. **强制停止「设置」**，再重新打开：
 
 ```powershell
@@ -33,11 +33,12 @@ IosSettings: hooks installed
 IosSettings: reordered N headers
 IosSettings: bottom search installed
 IosSettings: bottom bar: vis=0 w=... h=... y=... rootH=...
-IosSettings: search glass mask=[0,13][1152,153] view=1152x167 target=LinearLayout 1152x140 pad=no
+IosSettings: search glass mask=[17,1][1137,139] view=1152x167 target=LinearLayout 1152x140 visible=[17,1][1137,139]
+IosSettings: search glass native fill alpha=0x80 (android.graphics.drawable.NinePatchDrawable)
 IosSettings: liquid glass shader compiled
 IosSettings: liquid glass active (lens + rim + inner shadow)
 IosSettings: hooked PreferenceFragmentCompat (sub-page icons)
-IosSettings: airplane switch attached to 控制中心 row
+IosSettings: airplane glass toggle added to row (HyperiOS-safe)
 ```
 
 滚动时还会看到（每 2 秒一条，静止后停止）：
@@ -54,16 +55,17 @@ IosSettings: search glass draw fps=102 captureCostMs=5
 | `hooks installed` | 模块真的进了设置进程 | 作用域没勾 / 没重启设置 / 模块没启用 |
 | `reordered N headers` | 首页重排执行了 | `buildAdapter` 没 hook 上（ROM 类名变了） |
 | `bottom search installed` | 底部栏装上了 | stub 找不到，退化了 |
-| `airplane switch attached ...` | 开关塞进控制中心行 | `widget_frame` 没找到或开关创建失败 |
+| `airplane glass toggle added to row` | HyperiOS 路径下用自有 GlassToggle 塞进控制中心行 | `widget_frame` 没找到或行不是飞行模式行 |
+| `airplane switch attached to 飞行模式 row` | 未装 HyperiOS，走原生开关路径 | 同上 |
 | `no header found for slot ids: ...` | 部分入口在这台机器上不存在 | 正常现象，看缺的是哪个 |
 
 ## 4. 首次使用检查清单
 
 - [ ] 首页顺序：账号卡 → 关于设备 → 网络卡（飞行模式在最上）→ 通用卡 → 通知/声音/屏幕时间 → 隐私卡 → 钱包/Game Center → App → 其他
-- [ ] 控制中心行右侧有开关，点开关只切飞行模式，点行进入原「更多连接」页
+- [ ] 控制中心行右侧有开关，点开关只切飞行模式，点行进入原「更多连接」页；装 HyperiOS 时开关也应与标题垂直居中对齐
 - [ ] 底部搜索条悬浮在导航栏上方，不被手势条遮挡，最后一张卡片不被挡
 - [ ] **滚动时玻璃里的模糊内容跟着列表一起动**（不是固定在某一帧的旧图）
-- [ ] 玻璃胶囊和原生药丸同宽同高（左右不露出白边、上下不溢出）
+- [ ] 玻璃胶囊不溢出原生胶囊，左右不露出原生 fill 的窄边
 - [ ] 点底部搜索能进入系统搜索，搜索界面出现时底部条自动隐藏
 - [ ] 二级页（通用 / 更多设置）图标出现且大小一致
 - [ ] 深色模式、换主题后卡片圆角正常，没有双层圆角
@@ -81,7 +83,7 @@ IosSettings: search glass draw fps=102 captureCostMs=5
 ```powershell
 # 覆盖安装失败时
 adb uninstall com.abradant.iossettings
-adb install dist\IosSettingsLayout-14.9.apk
+adb install dist\IosSettingsLayout-15.0.apk
 ```
 
 卸载模块不会影响系统设置数据。

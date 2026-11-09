@@ -3,7 +3,7 @@
 > 把澎湃 OS（HyperOS 3）「设置」首页改成 iOS 风格：入口重排、二级页图标、搜索栏沉底、卡片细节修正。
 > **全部复用 MIUI 原生控件与原生数据，模块不重绘任何页面。**
 
-[![Version](https://img.shields.io/badge/version-14.9-1f6feb)](https://github.com/abradanthawk-design/iLyayot/releases)
+[![Version](https://img.shields.io/badge/version-15.0-1f6feb)](https://github.com/abradanthawk-design/iLyayot/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-HyperOS%203%20%7C%20Android%2015%2B-green)](docs/01-overview.md)
 [![LSPosed](https://img.shields.io/badge/framework-LSPosed-orange)](docs/04-install.md)
@@ -23,9 +23,9 @@
 | 能力 | 说明 |
 | --- | --- |
 | 首页重排 / 分组 | iOS 顺序 + 独立卡片，卡片圆角与间距仍由 miuix `CardItemDecoration` 绘制 |
-| 飞行模式开关 | 在「控制中心」行右侧放一个原生 `SlidingSwitch`，行点击仍是原逻辑 |
+| 飞行模式开关 | 在「控制中心」行右侧放一个原生 `SlidingSwitch`；装了 HyperiOS 时改用自带 `GlassToggle`，避免被它的液态开关 hook 拉到底部 |
 | 二级页图标 | 24 个 iOS 风格图标，按 preference key 匹配，标题关键词兜底 |
-| 底部搜索栏 | `miuix_appcompat_search_stub` 原生布局 + **Kyant 液态玻璃**（模糊 + 边缘折射 + 高光 + 内阴影） |
+| 底部搜索栏 | `miuix_appcompat_search_stub` 原生布局 + **Kyant 液态玻璃**（1dp 模糊 + 24dp/30dp 折射 + 边缘高光 + 内阴影） |
 | 卡片细节修正 | 去掉每组最后一行的双层圆角/放大图标；外观页预览加卡片底 |
 | 顶部模糊 | 列表滚动时才出现，可调半径 |
 | 关于本机 | （历史能力）iOS 风格「关于设备」页，见 [版本记录](docs/07-changelog.md) |
@@ -34,26 +34,25 @@
 
 | 首页（账号 + 卡片分组） | 控制中心行的飞行模式开关 | 二级页图标 |
 | --- | --- | --- |
-| ![首页](docs/assets/ios_account.png) | ![开关](docs/assets/row_switch.png) | ![图标](docs/assets/subpage-icons.png) |
+| ![首页](docs/assets/ios_account.png) | ![开关](docs/assets/row-switch-15.0.png) | ![图标](docs/assets/subpage-icons.png) |
 
-搜索栏液态玻璃（14.9；上为浅色、下为深色，**均为真机截图**）：
+搜索栏液态玻璃（15.0 测试构建，深色，真机裁切；最终遮罩阈值/右间距微调后的截图待补）：
 
-![搜索栏液态玻璃 · 浅色](docs/assets/search-glass-14.9-light.png)
-![搜索栏液态玻璃 · 深色](docs/assets/search-glass-14.9-dark.png)
+![搜索栏液态玻璃 · 深色](docs/assets/search-glass-15.0-dark.png)
 
 ## 安装
 
-1. 下载 [`dist/IosSettingsLayout-14.9.apk`](dist/IosSettingsLayout-14.9.apk)（液态玻璃预览，**已上机验证**）；
+1. 下载 [`dist/IosSettingsLayout-15.0.apk`](dist/IosSettingsLayout-15.0.apk)（应用名 **iLyayot**，液态玻璃 + 15.0 修复，**已上机**）；
    想要稳定版就到 [Releases · v14.8](https://github.com/abradanthawk-design/iLyayot/releases/tag/v14.8) 下载 14.8；
 2. LSPosed 中启用模块，作用域只勾选 **设置**（`com.android.settings`）；
 3. **强制停止「设置」**（或重启手机），再打开设置。
 
-日志过滤 `IosSettings` 应能看到 `hooks installed`（14.9 还会打 `liquid glass shader compiled` /
-`liquid glass active` 和 `search glass mask=...` 的对齐诊断；滚动时每 2 秒一条 `capture fps`，静止后停止）。
+日志过滤 `IosSettings` 应能看到 `hooks installed`（15.0 还会打 `liquid glass shader compiled` /
+`liquid glass active`、`search glass mask=...` 和 `airplane glass toggle added to row`；滚动时每 2 秒一条 `capture fps`，静止后停止）。
 详见 [安装与调试](docs/04-install.md)。
 
-> 14.9 预览包用默认测试密钥签名，和 14.8 发布包**证书不同**：从 14.8 升级会提示「应用未安装 / 签名不一致」，
-> 先卸载旧包再装。原因见 [踩坑记录 · 签名](docs/06-pitfalls.md#签名与升级)。
+> 15.0 与 14.9 使用同一测试密钥，可直接覆盖 14.9；与 14.8 发布包**证书不同**，
+> 从 14.8 升级会提示「应用未安装 / 签名不一致」，先卸载旧包再装。原因见 [踩坑记录 · 签名](docs/06-pitfalls.md#签名与升级)。
 
 ## 兼容性
 
@@ -76,7 +75,7 @@ pwsh -File module/build.ps1 `
   -AndroidJar C:\android-sdk\platforms\android-36\android.jar
 ```
 
-输出 `dist/IosSettingsLayout-14.9.apk`。完整工具链版本、可复现性说明见 [构建指南](docs/03-build.md)。
+输出 `dist/IosSettingsLayout-15.0.apk`。完整工具链版本、可复现性说明见 [构建指南](docs/03-build.md)。
 
 ## 文档
 
@@ -108,4 +107,4 @@ pwsh -File module/build.ps1 `
 
 ---
 
-<sub>仓库名 `iLyayot`，应用名「iOS 设置布局」，包名 `com.abradant.iossettings`。</sub>
+<sub>仓库名 `iLyayot`，应用名 **iLyayot**（iOS 设置布局），包名 `com.abradant.iossettings`。</sub>

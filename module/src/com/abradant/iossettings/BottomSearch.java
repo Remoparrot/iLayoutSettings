@@ -102,7 +102,8 @@ final class BottomSearch {
             // The native capsule is the widget_frame LinearLayout (44dp, 9-patch
             // background) inside the 56dp stub; clipping the glass to the stub
             // itself made the lens wider and taller than the bar it sits in.
-            glass.setMaskView(pickNativePill(activity, bar));
+            View pill = pickNativePill(activity, bar);
+            glass.setMaskView(pill);
             glass.setCaptureHost(wrap);
             boolean embedded = false;
             if (nativeStub) {

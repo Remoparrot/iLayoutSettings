@@ -1,12 +1,52 @@
-# 版本记录（历史全文）
+﻿# 版本记录（历史全文）
 
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前主线是 **14.9**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前主线是 **15.0**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
+
+---
+
+# iOS 设置布局 · LSPosed 模块（v15.0：玻璃对齐 + iLyayot）
+
+## v15.0 变更
+
+> 说明：这里的 v15.0 是 14.9 之后的**新主线**，与下面历史里 2025 年那批已放弃的 v15.x 实验不是同一支。
+
+- **应用标题改为 `iLyayot`**（与 GitHub 仓库同名）：`app_name`、`MainActivity` 标题、`module_desc` 同步；包名 `com.abradant.iossettings` 不变。
+- **搜索栏玻璃几何**：
+  - 遮罩不再用 `inputArea` 视图边界：主题 9-patch 把透明边距烘在 PNG 里，`getPadding()` 返回 false，按视图裁会宽一圈、向上错位；
+  - 新增 `paintedBackgroundBounds()`：把胶囊 drawable 画进 ARGB 位图，按 alpha ≥ 72 取真实像素边界（本次 `[17,1][1137,139]`，屏幕 x=81..1201）；
+  - 先量不透明边界，再把原生 fill `setAlpha(0x80)`，让透镜透出来又保留原生染色；不再叠加 `(h-mask.height())/2` 的手调居中。
+- **参数**：`glass_blur` 5 → **1dp**；`refraction_height` 18 → **24dp**；`refraction_amount` 10 → **30dp**。
+- **飞行模式开关**：
+  - 装了 HyperiOS 时，HyperiOS 的 `LiquidTogglesHook` 会接管 `SlidingSwitch.onDraw`，用 Compose host 按 layout box 画；
+    MIUI 的 `widget_frame` 把开关放到底部，`setTranslationY` 对 host 无效，所以开关看起来下沉约 10dp；
+  - 15.0 在检测到 `dev.hyperios.app` 时改用模块自有的 `GlassToggle`（普通 View，不在 HyperiOS 的 hook 名单里），
+    以 weight spacer 推进行根右侧，竖向由行布局居中；未装 HyperiOS 的机器仍走原生 `SlidingSwitch`；
+  - 原生路径补了 `setBaselineAligned(false)`、零 padding、显式 `CENTER_VERTICAL` 与首帧 `getLocationOnScreen` 哨兵保护。
+- **版本**：15.0 / versionCode **85**；APK `dist/IosSettingsLayout-15.0.apk`，203,657 B。
+
+## v15.0 校验
+
+```
+package: name='com.abradant.iossettings' versionCode='85' versionName='15.0'
+application-label:'iLyayot'
+dex version : 039
+xposed_init : True
+module class: True
+reorder     : True
+size   : 203657 bytes
+sha256 : 3A80A921ACD695D2852346FB3F5AB9B7A5A4FDDFBBF17AE86ED7C0E8892E2A20
+```
+
+真机 25053RT47C / HyperOS 3 / Android 16（2026-11-09 23:29）：
+`airplane glass toggle added to row (HyperiOS-safe)`、`search glass mask=[17,1][1137,139]`、
+`native fill alpha=0x80`、`liquid glass active`；开关旋钮中心 Y=944.5 vs 标题 945。
+最终遮罩阈值 72 与右间距 2dp 只过了日志：装机后设备进入防误触模式、屏幕黑屏，未补到最终截图。
 
 ---
 
