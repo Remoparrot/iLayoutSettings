@@ -118,8 +118,8 @@ LENS_ONLY_AGSL    OK  uniforms: [size, offset, cornerRadii, refractionHeight, re
 
 预览（numpy 复刻同一套公式，非真机截图）：
 
-- ![14.8 模糊 vs 14.9 液态玻璃](assets/search-glass-14.9-before-after.png)
-- ![14.9 在模拟设置页上的样子](assets/search-glass-14.9-real.png)
+- ![14.8 模糊 vs 14.9 液态玻璃](../assets/search-glass-14.9-before-after.png)
+- ![14.9 在模拟设置页上的样子](../assets/search-glass-14.9-real.png)
 
 **未验证**：
 

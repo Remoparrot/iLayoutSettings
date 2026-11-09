@@ -36,6 +36,10 @@
 | --- | --- | --- |
 | ![首页](docs/assets/ios_account.png) | ![开关](docs/assets/row_switch.png) | ![图标](docs/assets/subpage-icons.png) |
 
+搜索栏液态玻璃（14.9，模拟渲染图，非真机截图）：
+
+![搜索栏液态玻璃](docs/assets/search-glass-14.9-real.png)
+
 ## 安装
 
 1. 下载 [`dist/IosSettingsLayout-14.9.apk`](dist/IosSettingsLayout-14.9.apk)（液态玻璃预览，**未上机验证**）；
