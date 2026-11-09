@@ -23,11 +23,20 @@
 
 ⚠️ 两者**不等价于同一份二进制**，见「已知问题 1」。
 
+## 仓库与发布
+
+| 项 | 值 |
+| --- | --- |
+| 仓库 | https://github.com/abradanthawk-design/iLyayot |
+| 默认分支 | `main` |
+| Release | https://github.com/abradanthawk-design/iLyayot/releases/tag/v14.8 |
+| 初始提交 | `173a302` |
+
 ## 现在能做什么
 
 - ✅ 首页入口按 iOS 分组重排（`HeaderData`）
 - ✅ 控制中心行右侧飞行模式开关（`AirplaneSwitch`）
-- ✅ 二级页 26 个图标（`SubPageIcons` + `tools/make_subpage_icons.py`）
+- ✅ 二级页 24 个图标（`SubPageIcons`：23 条 key 映射 + 标题兜底）
 - ✅ 底部原生搜索栏 + 玻璃/模糊层（`BottomSearch` / `SearchGlass` / `SearchHost`）
 - ✅ 卡片末行双层圆角修正（`CardFix` / `SubPageCards`）
 - ✅ 顶栏按滚动出现的模糊（`ForceBlur` / `UiTweaks`）

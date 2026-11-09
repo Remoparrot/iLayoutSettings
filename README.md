@@ -24,7 +24,7 @@
 | --- | --- |
 | 首页重排 / 分组 | iOS 顺序 + 独立卡片，卡片圆角与间距仍由 miuix `CardItemDecoration` 绘制 |
 | 飞行模式开关 | 在「控制中心」行右侧放一个原生 `SlidingSwitch`，行点击仍是原逻辑 |
-| 二级页图标 | 26 个 iOS 风格图标，按 preference key 匹配，标题关键词兜底 |
+| 二级页图标 | 24 个 iOS 风格图标，按 preference key 匹配，标题关键词兜底 |
 | 底部搜索栏 | `miuix_appcompat_search_stub` 原生布局，带玻璃/模糊底层 |
 | 卡片细节修正 | 去掉每组最后一行的双层圆角/放大图标；外观页预览加卡片底 |
 | 顶部模糊 | 列表滚动时才出现，可调半径 |
@@ -38,7 +38,7 @@
 
 ## 安装
 
-1. 下载 [`dist/IosSettingsLayout-14.8.apk`](dist/IosSettingsLayout-14.8.apk)（或到 [Releases](https://github.com/abradanthawk-design/iLyayot/releases) 下载）；
+1. 下载 [`dist/IosSettingsLayout-14.8.apk`](dist/IosSettingsLayout-14.8.apk)（或到 [Releases · v14.8](https://github.com/abradanthawk-design/iLyayot/releases/tag/v14.8) 下载）；
 2. LSPosed 中启用模块，作用域只勾选 **设置**（`com.android.settings`）；
 3. **强制停止「设置」**（或重启手机），再打开设置。
 
