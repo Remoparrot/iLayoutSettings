@@ -32,7 +32,7 @@
 | --- | --- |
 | 仓库 | https://github.com/abradanthawk-design/iLayoutSettings （旧 `iLyayot` 自动跳转） |
 | 默认分支 | `main` |
-| 最新 Release | `v16.0`（tag 指向 16.0 提交，附件 `iLayoutSettings-16.0.apk`） |
+| 最新 Release | [v16.0](https://github.com/abradanthawk-design/iLayoutSettings/releases/tag/v16.0)（tag 指向 16.0 提交，附件 `iLayoutSettings-16.0.apk`，220,209 B） |
 | 自动发版 | `tools/release.ps1`：构建 → 校验 → 打 tag → 建 Release → 上传附件，一条命令完成 |
 | 旧 Release | v15.5、v14.8 保留 |
 

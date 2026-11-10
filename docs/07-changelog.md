@@ -67,7 +67,7 @@ sha256 : 8DA082CD8FC578676EB5138F7150BDCFB40C4DBE45CD3625E8B0521923921A73
 
 ## v16.0 发布
 
-- 发布到 GitHub **Release · v16.0**（仓库已改名 iLayoutSettings）：
+- 发布到 GitHub [Release · v16.0](https://github.com/abradanthawk-design/iLayoutSettings/releases/tag/v16.0)（仓库已改名 iLayoutSettings）：
   tag `v16.0`，附件 `iLayoutSettings-16.0.apk`，与 `dist/` 同一份。
 - 旧 Release v15.5 / v14.8 保留。
 

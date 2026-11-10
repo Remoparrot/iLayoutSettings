@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     iLayoutSettings 自动发版：构建 → 校验 → 打 tag → 建 GitHub Release → 上传 APK。
@@ -94,7 +94,20 @@ if (-not (Test-Path -LiteralPath $apk)) { throw "apk not found: $apk" }
 $size = (Get-Item -LiteralPath $apk).Length
 $sha256 = (Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash
 
-$buildTools = 'C:\Users\AbradantHawk\Documents\deepseek-harness\default-workspace\apk6ify\.downloads\bt\android-14'
+$buildTools = @(
+    $env:ANDROID_BUILD_TOOLS,
+    'C:\Users\AbradantHawk\Documents\deepseek-harness\default-workspace\apk6ify\.downloads\bt\android-14'
+) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
+
+# apksigner.bat needs JAVA_HOME; build.ps1 sets it for its own child process only.
+$jdkHome = @(
+    $env:JAVA_HOME,
+    'C:\Users\AbradantHawk\Documents\deepseek-harness\default-workspace\apk6ify\.downloads\jdk\jdk17.0.21_0'
+) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
+if ($jdkHome) {
+    $env:JAVA_HOME = $jdkHome
+    $env:PATH = "$jdkHome\bin;$env:PATH"
+}
 $badging = ''
 if (Test-Path (Join-Path $buildTools 'aapt2.exe')) {
     $badging = (& (Join-Path $buildTools 'aapt2.exe') dump badging $apk 2>$null |
@@ -139,46 +152,50 @@ $token = ($cred | Select-String -Pattern '^password=' | Select-Object -First 1).
 if (-not $token) { throw 'GitHub token not found in git credential (git credential fill).' }
 $token = $token -replace '^password=', ''
 
-$body = @"
-## iLayoutSettings $versionName ($versionCode)
+$bodyTemplate = @'
+## iLayoutSettings {{VERSION}} ({{CODE}})
 
-自动构建发布：``$apkName``（$size B）
+自动构建发布：`{{APK}}`（{{SIZE}} B）
 
-- SHA-256：``$sha256``
-- 包名：``$packageName``
-- 签名证书 SHA-256：``$certDigest``
+- SHA-256：`{{SHA}}`
+- 包名：`{{PKG}}`
+- 签名证书 SHA-256：`{{CERT}}`
 
 ### 安装
 
-1. 先卸载旧模块（包名已改为 ``com.Remo.ilayoutsettings``，不能覆盖安装旧包）；
-2. 安装本附件，然后在 LSPosed 里启用 **iLayoutSettings**，作用域只勾 **设置**（``com.android.settings``）；
+1. 先卸载旧模块（包名已改为 `com.Remo.ilayoutsettings`，不能覆盖安装旧包）；
+2. 安装本附件，然后在 LSPosed 里启用 **iLayoutSettings**，作用域只勾 **设置**（`com.android.settings`）；
 3. 强制停止「设置」后重新打开。
 
-> 本机 MIUI 可能拦截 adb 安装新包（``INSTALL_FAILED_USER_RESTRICTED``），请把 APK 拷到手机手动安装。
+> 本机 MIUI 可能拦截 adb 安装新包（`INSTALL_FAILED_USER_RESTRICTED`），请把 APK 拷到手机手动安装。
 
 ### 本版内容
 
-- 应用 / 仓库改名 **iLayoutSettings**，包名 ``com.Remo.ilayoutsettings``；
+- 应用 / 仓库改名 **iLayoutSettings**，包名 `com.Remo.ilayoutsettings`；
 - 新增 **iCloud** 行（Game Center 下方，打开小米云服务）；
 - 新增 **软件更新** 卡片（仅在系统更新发现新版本时显示，带红色「1」角标）；
 - 新增 **耳机** 卡片（仅在连接耳机时显示，标题为设备名）；
 - 底部搜索栏进出场过渡动画（220ms，进出搜索不再瞬移）。
 
 完整变更见 [docs/07-changelog.md](../blob/main/docs/07-changelog.md)。
-"@
-if ($Notes) { $body += "`n`n$Notes" }
+'@
+$body = [string]$bodyTemplate
+$body = $body.Replace('{{VERSION}}', $versionName).Replace('{{CODE}}', [string]$versionCode)
+$body = $body.Replace('{{APK}}', $apkName).Replace('{{SIZE}}', [string]$size)
+$body = $body.Replace('{{SHA}}', $sha256).Replace('{{PKG}}', $packageName)
+$body = $body.Replace('{{CERT}}', $certDigest)
+if ($Notes) { $body = $body + "`n`n" + $Notes }
 
 $tmp = [System.IO.Path]::GetTempFileName()
 try {
-    [System.IO.File]::WriteAllText($tmp, ($body.Trim()), (New-Object System.Text.UTF8Encoding($false)))
     $payload = @{
         tag_name   = $tag
         name       = "iLayoutSettings $Version"
-        body       = (Get-Content -LiteralPath $tmp -Raw -Encoding UTF8)
+        body       = [string]$body.Trim()
         draft      = $false
         prerelease = $false
     } | ConvertTo-Json -Depth 5 -Compress
-    [System.IO.File]::WriteAllText($tmp, $payload, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($tmp, [string]$payload, (New-Object System.Text.UTF8Encoding($false)))
 
     $api = "https://api.github.com/repos/$Repo/releases"
     $resp = & curl.exe -sS -X POST `
