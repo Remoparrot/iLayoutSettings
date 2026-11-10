@@ -2,7 +2,7 @@
 
 状态：已完成
 关联版本：16.1 → 16.2
-关联提交：<待提交>
+关联提交：a6648c0（Release v16.2）
 
 ## 1. TL;DR
 
@@ -147,7 +147,9 @@ sha256 : 2D2F068C8DEC1A5D5B982F6347F71580F6C4800B8BE89F4286C2836E945AEC3B
   - `setBlurParams` hook 日志：`hooked MiuiBlurUiHelper.setBlurParams (header radius)`。
 - 默认值：重置后 provider 返回
   `{refraction_amount=19.0, refraction_height=12.0, glass_blur=1.0, topbar_blur=30, topbar_alpha=45}`。
-- 清理：手机 `/sdcard/Download/iLayoutSettings/` 为空；`settings get global ilayout_fake_headset` 为 `null`。
+- 清理：手机 `/sdcard/Download/iLayoutSettings/` 为空；`settings get global ilayout_fake_headset` 为 `null`；本地测试截图目录已删除。
+- 发布：`https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.2`
+  （附件 `iLayoutSettings-16.2.apk`，236,593 B，sha256 与上面一致；tag 指向 `a6648c0`）。
 - **未验证**：深色模式下发展开态的分隔线对比度；其他 HyperOS 3 机型上 `NestedHeaderLayout$2` 的类名是否一致（软失败，只影响模糊半径）。
 
 ## 7. 未完成 / 下一步 / 风险
