@@ -19,7 +19,7 @@
     要发版的版本号；默认取 manifest 的 versionName。
 
 .PARAMETER Repo
-    GitHub 仓库 owner/name，默认 abradanthawk-design/iLayoutSettings。
+    GitHub 仓库 owner/name，默认 Remoparrot/iLayoutSettings。
 
 .PARAMETER AndroidJar
     API 36 android.jar；默认按 docs/03-build.md 的本机路径找。
@@ -48,7 +48,7 @@
 [CmdletBinding()]
 param(
     [string]$Version,
-    [string]$Repo = 'abradanthawk-design/iLayoutSettings',
+    [string]$Repo = 'Remoparrot/iLayoutSettings',
     [string]$AndroidJar,
     [switch]$SkipBuild,
     [switch]$SkipPush,

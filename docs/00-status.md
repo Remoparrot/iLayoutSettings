@@ -31,9 +31,9 @@
 
 | 项 | 值 |
 | --- | --- |
-| 仓库 | https://github.com/abradanthawk-design/iLayoutSettings （旧 `iLyayot` 自动跳转） |
+| 仓库 | https://github.com/Remoparrot/iLayoutSettings （旧 `iLyayot` 自动跳转） |
 | 默认分支 | `main` |
-| 最新 Release | [v16.2](https://github.com/abradanthawk-design/iLayoutSettings/releases/tag/v16.2)（附件 `iLayoutSettings-16.2.apk`，236,593 B，SHA-256 `2D2F068C…EC3B`） |
+| 最新 Release | [v16.2](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.2)（附件 `iLayoutSettings-16.2.apk`，236,593 B，SHA-256 `2D2F068C…EC3B`） |
 | 自动发版 | `tools/release.ps1`：构建 → 校验 → **自动 add/commit/push 当前分支** → 打 tag → 建 Release → 上传附件 |
 | 旧 Release | v16.1、v16.0、v15.5、v14.8 保留（本地 `dist/` 不再保留旧包） |
 

@@ -3,7 +3,7 @@
 > 把澎湃 OS（HyperOS 3）「设置」首页改成 iOS 风格：入口重排、条件卡片（软件更新 / 耳机 / iCloud）、搜索栏沉底、卡片细节修正。
 > **全部复用 MIUI 原生控件与原生数据，模块不重绘任何页面。**
 
-[![Version](https://img.shields.io/badge/version-16.2-1f6feb)](https://github.com/abradanthawk-design/iLayoutSettings/releases)
+[![Version](https://img.shields.io/badge/version-16.2-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-HyperOS%203%20%7C%20Android%2015%2B-green)](docs/01-overview.md)
 [![LSPosed](https://img.shields.io/badge/framework-LSPosed-orange)](docs/04-install.md)
@@ -49,7 +49,7 @@
 
 ## 安装
 
-1. 下载 [`dist/iLayoutSettings-16.2.apk`](dist/iLayoutSettings-16.2.apk)，或到 [Releases · v16.2](https://github.com/abradanthawk-design/iLayoutSettings/releases/tag/v16.2) 下同名附件（236,593 B，SHA-256 `2D2F068C…EC3B`，与 `dist/` 同一份）；
+1. 下载 [`dist/iLayoutSettings-16.2.apk`](dist/iLayoutSettings-16.2.apk)，或到 [Releases · v16.2](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.2) 下同名附件（236,593 B，SHA-256 `2D2F068C…EC3B`，与 `dist/` 同一份）；
    **16.0 起包名是** `com.Remo.ilayoutsettings`，从 16.0 升级可直接覆盖（同一签名）；
 2. LSPosed 中启用 **iLayoutSettings**，作用域只勾选 **设置**（`com.android.settings`）；
 3. **强制停止「设置」**（或重启手机），再打开设置；

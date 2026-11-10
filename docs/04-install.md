@@ -6,7 +6,7 @@
 
 - 已 root / 已装 **LSPosed**（1.x 或 2.x，Zygisk 或 Riru 均可）；
 - 系统为澎湃 OS 3（HyperOS 3）；
-- 已安装 `dist/iLayoutSettings-16.2.apk`（与 [Release v16.2](https://github.com/abradanthawk-design/iLayoutSettings/releases/tag/v16.2) 的附件同一份；应用名 **iLayoutSettings**，包名 `com.Remo.ilayoutsettings`）。
+- 已安装 `dist/iLayoutSettings-16.2.apk`（与 [Release v16.2](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.2) 的附件同一份；应用名 **iLayoutSettings**，包名 `com.Remo.ilayoutsettings`）。
 
 ## 2. 16.0 迁移（从 15.x 升级才需要）
 
