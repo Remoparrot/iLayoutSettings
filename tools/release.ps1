@@ -85,6 +85,7 @@ Write-Host "apk     : $apk"
 if (-not $SkipBuild) {
     $jars = @(
         $AndroidJar,
+        'D:\Android\Sdk\platforms\android-37.0\android.jar',
         (Join-Path $root '.tools\platform36\android-36.1\android.jar'),
         (Join-Path $root '..\ios-settings-mod\.tools\platform36\android-36.1\android.jar')
     ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
@@ -105,12 +106,14 @@ $sha256 = (Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash
 
 $buildTools = @(
     $env:ANDROID_BUILD_TOOLS,
+    'D:\Android\Sdk\build-tools\37.0.0',
     'C:\Users\AbradantHawk\Documents\deepseek-harness\default-workspace\apk6ify\.downloads\bt\android-14'
 ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
 
 # apksigner.bat needs JAVA_HOME; build.ps1 sets it for its own child process only.
 $jdkHome = @(
     $env:JAVA_HOME,
+    'D:\Android\jdk21\jdk-21.0.2',
     'C:\Users\AbradantHawk\Documents\deepseek-harness\default-workspace\apk6ify\.downloads\jdk\jdk17.0.21_0'
 ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
 if ($jdkHome) {
@@ -204,16 +207,16 @@ $bodyTemplate = @'
 
 > 本机 MIUI 可能拦截 adb 安装新包（`INSTALL_FAILED_USER_RESTRICTED`），请把 APK 拷到手机手动安装。
 
-### 本版内容（16.3）
+### 本版内容（16.4）
 
-- **顶栏默认几乎全透明**：模糊默认 30% → **5%**（内部 8dp），透明度默认 45% → **2%**。
-  列表滚动后顶栏只剩极淡的模糊和底部一条发丝线，内容直接透上来；
-  两个滑杆范围仍是 0–100%，想回到 16.2 的淡磨砂自己拖回去即可
-  （已有安装存过的值继续生效，点「恢复默认值」才回到 5% / 2%）；
-- **深色模式发丝线改成灰色半透明**：16.2 的白 15% 压在近乎全透明的黑栏上几乎看不见，
-  现改为中性灰 30%（实拍 `(58,58,59)`），黑栏与亮模糊内容上都能读出一条灰线；
-  浅色模式仍是黑色 12%，线仍只在折叠顶栏出现后显示；
-- 版本 16.3 / versionCode 94。
+- **设置内切换深浅色，顶栏发丝线不再消失**：控制器改挂 `NestedHeaderLayout` 类钩子，
+  切主题重建视图后仍然跟踪滚动；线色每帧按当前深浅色取；
+- **顶栏第一次出现就带模糊**：折叠前把原生模糊半径预写好，不再从 0 起步
+  （默认仍是 5% 模糊 / 2% 透明度）；
+- **GUI 新增「高级设置」总开关**：关闭时只显示搜索栏玻璃滑杆，开启后才出现
+  顶栏模糊 / 透明度 / 显示顶栏分割线；
+- **启动图标换风格**：蓝紫渐变 + 半透明玻璃盘 + 白齿轮，五档 mipmap；
+- 版本 16.4 / versionCode 95。
 
 完整变更见 [docs/07-changelog.md](../blob/main/docs/07-changelog.md)。
 '@
