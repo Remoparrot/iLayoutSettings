@@ -3,10 +3,52 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前主线是 **15.4**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前主线是 **15.5**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
+
+---
+
+# iOS 设置布局 · LSPosed 模块（v15.5：相机 / 搜索入口）
+
+## v15.5 变更
+
+- **首页新增「相机」入口**（`HeaderData`）：
+  - 位置固定在「外观」正下方：墙纸 → 搜索 → 控制中心 → 外观 → **相机** → 主屏幕与 App 资源库，沿用同一个卡片；
+  - 点击打开小米相机自己的设置页 `com.android.camera/.CameraPreferenceActivity`（显式组件，不依赖 action）；
+  - 图标用设置自己的 `ic_settings_camera`（`com.android.settings:drawable/ic_settings_camera`），
+    随主题/深浅色解析；资源缺失时保留纯文字行。
+- **首页新增「搜索」入口**（`HeaderData`）：
+  - 位置固定在「墙纸」正下方：墙纸 → **搜索** → 控制中心；
+  - 点击打开小米搜索的设置页 `com.android.quicksearchbox/.preferences.SearchSettingsPreferenceActivity`；
+  - 图标用设置自己的 `ic_search_24dp`。
+- **合成行机制复用**：两行都由 `addIntentRow()` 生成，锚定在原行的槽位上（同 slot + 更大的 originalIndex
+  → 排在锚点之后），不需要重编号 `SLOT_IDS`；`apply()` 按显式组件去重（`isIntentRow()`），resume 不会重复累积。
+- **版本**：15.5 / versionCode **90**；APK `dist/IosSettingsLayout-15.5.apk`，207,753 B。
+
+## v15.5 校验
+
+```
+package: name='com.abradant.iossettings' versionCode='90' versionName='15.5'
+dex version : 039
+xposed_init : True
+module class: True
+reorder     : True
+size   : 207753 bytes
+sha256 : C8146210C872BB737C100FD57E598DCA73DD8F5C1134CE2AEF4C43CB6A05E535
+```
+
+真机 25053RT47C / HyperOS 3 / Android 16（2026-11-10 12:43）：
+
+- 日志 `camera_entry row added below slot 14`、`search_entry row added below slot 11`；
+  顺序为 墙纸 → 搜索 → 控制中心、外观 → 相机 → 主屏幕；
+- 点击「搜索」→ `topResumedActivity=com.android.quicksearchbox/.preferences.SearchSettingsPreferenceActivity`，
+  页面标题「搜索设置」；
+- 点击「相机」→ `topResumedActivity=com.android.camera/.CameraPreferenceActivity`，页面标题「相机设置」；
+- 从目标页返回后两行各只出现一次（`uiautomator dump` 里 `android:id/title` 节点数 = 1）；深色模式图标仍能解析；
+- 截图：`docs/assets/home-camera-search-15.5.png`、`home-camera-search-dark-15.5.png`、
+  `camera-settings-15.5.png`、`search-settings-15.5.png`。
 
 ---
 

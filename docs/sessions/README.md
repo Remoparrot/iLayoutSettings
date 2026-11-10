@@ -14,6 +14,7 @@
 
 | 日期 | 标题 | 一句话结论 | 状态 |
 | --- | --- | --- | --- |
+| 2026-11-10 | [首页「相机」「搜索」入口](2026-11-10-camera-and-search-entries.md) | 「相机」锚在「外观」下方、「搜索」锚在「墙纸」下方；显式组件分别打开相机设置/搜索设置，图标复用设置 `ic_settings_camera` / `ic_search_24dp` | 已完成 |
 | 2026-11-10 | [首页「专注模式」入口](2026-11-10-focus-mode-entry.md) | 「屏幕时间」上方合成一行专注模式，点击走 `ZEN_MODE_SETTINGS` 打开勿扰页；图标复用设置 `ic_do_not_disturb_mode_settings`，主题/深浅色自动跟随 | 已完成 |
 | 2026-11-10 | [主题飞行图标 + 搜索栏去色 + 顶栏模糊实时生效](2026-11-10-theme-icon-clear-glass-topbar.md) | 飞行图标改用 `ic_airplane_mode_settings`；搜索栏只去 shader 表面色、保留主题胶囊；顶栏模糊修 classloader 并实时刷新 | 已完成 |
 | 2026-11-10 | [参数界面 + 实心玻璃 + 原生开关归位](2026-11-10-gui-and-solid-glass.md) | 开关改为平移 `widget_frame`（HyperiOS 缓存的画随父移动）；玻璃去光边、折射 12/8、混 93% 表面色做实心；新增 GUI 与 `PrefsProvider` | 已完成（顶栏滑杆截图待补） |

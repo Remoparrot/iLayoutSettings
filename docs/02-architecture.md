@@ -1,6 +1,6 @@
 # 架构与 Hook 链路
 
-> 状态：**现行** · 对应版本：15.4 (89)
+> 状态：**现行** · 对应版本：15.5 (90)
 > 源码：`module/src/com/abradant/iossettings/`
 
 ## 1. 从加载到生效
@@ -57,10 +57,13 @@ LSPosed
 6. `addFocusModeRow()`：在「屏幕时间」正上方**合成**「专注模式」行（`android.settings.ZEN_MODE_SETTINGS`，
    图标取设置自己的 `ic_do_not_disturb_mode_settings`）；`apply()` 每次重排前用 `isSyntheticFocus()` 把上次合成的行删掉，
    避免 resume 越积越多；
-7. `ensureInterconnection()`：设备有 MiLink 服务但列表里没有对应 entry 时补一条；
-8. 按 `(group, slot, 原下标)` 排序；
-9. 给每个 header 写 `groupId = 101 + group`（`GROUP_ID_BASE`），让 miuix 画出卡片；
-10. 回写 `mHeaders`（不可变列表时改为替换字段 + `mHeaderAdapter.mHeaders`），再 `notifyDataSetChanged` / `updateGroupInfo` / `invalidateItemDecorations`。
+7. `addCameraRow()` / `addSearchRow()`：`addIntentRow()` 生成的两条合成行 —— 「相机」锚在「外观」（slot 14）之后、
+   「搜索」锚在「墙纸」（slot 11）之后。锚点写法是**共用锚点的 slot + `originalIndex = MAX_VALUE-4`**，
+   排序后自然落在锚点行下面，不需要重编号 `SLOT_IDS`；`apply()` 用显式组件（`isIntentRow()`）识别并清理；
+8. `ensureInterconnection()`：设备有 MiLink 服务但列表里没有对应 entry 时补一条；
+9. 按 `(group, slot, 原下标)` 排序；
+10. 给每个 header 写 `groupId = 101 + group`（`GROUP_ID_BASE`），让 miuix 画出卡片；
+11. 回写 `mHeaders`（不可变列表时改为替换字段 + `mHeaderAdapter.mHeaders`），再 `notifyDataSetChanged` / `updateGroupInfo` / `invalidateItemDecorations`。
 
 **为什么不用自绘**：卡片圆角、间距、按压反馈、深色模式全在 miuix 的 `CardItemDecoration` 里。改 `groupId` 就能白嫖这一整套，自绘反而要重写一遍且容易和系统动画打架。
 

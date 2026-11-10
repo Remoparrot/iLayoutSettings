@@ -25,6 +25,17 @@ final class HeaderData {
     private static final String FOCUS_TITLE = "专注模式";
     private static final String FOCUS_ACTION = "android.settings.ZEN_MODE_SETTINGS";
 
+    /** Synthetic row below 外观; opens the camera app's own settings page. */
+    private static final String CAMERA_TITLE = "相机";
+    private static final String CAMERA_PKG = "com.android.camera";
+    private static final String CAMERA_CLS = "com.android.camera.CameraPreferenceActivity";
+
+    /** Synthetic row below 墙纸; opens 小米搜索's settings page. */
+    private static final String SEARCH_TITLE = "搜索";
+    private static final String SEARCH_PKG = "com.android.quicksearchbox";
+    private static final String SEARCH_CLS =
+            "com.android.quicksearchbox.preferences.SearchSettingsPreferenceActivity";
+
     /**
      * iOS groups. Each slot is a list of header id aliases; the first alias that
      * exists in the live list wins. Group 0 keeps the native order
@@ -275,6 +286,8 @@ final class HeaderData {
         overrideSlots(items);
         addAirplaneRow(activity, items);
         addFocusModeRow(activity, items);
+        addCameraRow(activity, items);
+        addSearchRow(activity, items);
         removeSyntheticAdvanced(items);
         ensureInterconnection(activity, items);
         return items;
@@ -600,6 +613,98 @@ final class HeaderData {
         }
     }
 
+    private static boolean isIntentRow(Object header, String pkg, String cls) {
+        Object intent = field(header, "intent");
+        if (!(intent instanceof android.content.Intent)) {
+            return false;
+        }
+        android.content.ComponentName cn = ((android.content.Intent) intent).getComponent();
+        return cn != null && pkg.equals(cn.getPackageName()) && cls.equals(cn.getClassName());
+    }
+
+    private static boolean isSyntheticCamera(Object header) {
+        return isIntentRow(header, CAMERA_PKG, CAMERA_CLS);
+    }
+
+    private static boolean isSyntheticSearch(Object header) {
+        return isIntentRow(header, SEARCH_PKG, SEARCH_CLS);
+    }
+
+    /**
+     * Synthetic "相机" row directly below 外观. MIUI keeps the camera settings
+     * inside the camera app, so the row opens
+     * {@code com.android.camera/.CameraPreferenceActivity} with Settings' own
+     * {@code ic_settings_camera} artwork.
+     */
+    private static void addCameraRow(Activity activity, List<Item> items) {
+        addIntentRow(activity, items, CAMERA_TITLE, "camera_entry", CAMERA_PKG, CAMERA_CLS,
+                new String[]{"ic_settings_camera", "ic_camera_settings"}, 14);
+    }
+
+    /**
+     * Synthetic "搜索" row directly below 墙纸. 小米搜索 keeps its options in
+     * {@code com.android.quicksearchbox/.preferences.SearchSettingsPreferenceActivity};
+     * the icon is Settings' {@code ic_search_24dp}.
+     */
+    private static void addSearchRow(Activity activity, List<Item> items) {
+        addIntentRow(activity, items, SEARCH_TITLE, "search_entry", SEARCH_PKG, SEARCH_CLS,
+                new String[]{"ic_search_24dp", "ic_search"}, 11);
+    }
+
+    /**
+     * Adds a row that launches an activity of another package. The row takes
+     * {@code anchorSlot} (so it inherits the card) and a later original index
+     * than any native row, which puts it directly below that row without
+     * renumbering {@link #SLOT_IDS}.
+     */
+    private static void addIntentRow(Activity activity, List<Item> items, String title,
+                                     String idName, String pkg, String cls,
+                                     String[] iconNames, int anchorSlot) {
+        for (Item it : items) {
+            if (isIntentRow(it.header, pkg, cls)) {
+                return; // previous insert survived cleanup, do not duplicate
+            }
+        }
+        try {
+            android.content.Intent intent = new android.content.Intent();
+            intent.setClassName(pkg, cls);
+            if (activity.getPackageManager().resolveActivity(intent, 0) == null) {
+                XLog.i(idName + ": " + pkg + "/" + cls + " missing, skip row");
+                return;
+            }
+            android.content.res.Resources res = activity.getResources();
+            Class<?> headerClass = Class.forName(
+                    "com.android.settingslib.miuisettings.preference.PreferenceActivity$Header",
+                    false, activity.getClassLoader());
+            Object header = headerClass.getDeclaredConstructor().newInstance();
+            setField(header, "title", title);
+            setField(header, "intent", intent);
+            int iconId = 0;
+            for (String name : iconNames) {
+                iconId = res.getIdentifier(name, "drawable", "com.android.settings");
+                if (iconId != 0) {
+                    break;
+                }
+            }
+            if (iconId != 0) {
+                setField(header, "iconRes", iconId);
+            } else {
+                XLog.w(idName + ": no Settings drawable " + iconNames[0] + ", text-only row");
+            }
+            Item it = new Item();
+            it.header = header;
+            it.idName = idName;
+            it.title = title;
+            it.slot = anchorSlot;
+            it.group = SLOT_GROUP[anchorSlot];
+            it.originalIndex = Integer.MAX_VALUE - 4;
+            items.add(it);
+            XLog.i(idName + " row added below slot " + anchorSlot);
+        } catch (Throwable t) {
+            XLog.e(idName + " row failed", t);
+        }
+    }
+
     /** Index of a slot id in {@link #SLOT_IDS}, or -1 when the id is unknown. */
     private static int slotIndex(String id) {
         for (int i = 0; i < SLOT_IDS.length; i++) {
@@ -718,7 +823,8 @@ final class HeaderData {
             // time so they do not accumulate at the bottom of the list.
             for (int i = headers.size() - 1; i >= 0; i--) {
                 if (isSyntheticAirplane(headers.get(i)) || isSyntheticAdvanced(headers.get(i))
-                        || isSyntheticHyperios(headers.get(i)) || isSyntheticFocus(headers.get(i))) {
+                        || isSyntheticHyperios(headers.get(i)) || isSyntheticFocus(headers.get(i))
+                        || isSyntheticCamera(headers.get(i)) || isSyntheticSearch(headers.get(i))) {
                     headers.remove(i);
                 }
             }

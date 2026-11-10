@@ -1,12 +1,12 @@
 # 安装与调试
 
-> 状态：**现行** · 对应版本：15.4 (89)
+> 状态：**现行** · 对应版本：15.5 (90)
 
 ## 1. 前置
 
 - 已 root / 已装 **LSPosed**（1.x 或 2.x，Zygisk 或 Riru 均可）；
 - 系统为澎湃 OS 3（HyperOS 3）；
-- 已安装 `dist/IosSettingsLayout-15.4.apk`（应用名 **iLyayot**；从 14.8 升级要先卸载，签名不同；14.9~15.3 可直接覆盖）。
+- 已安装 `dist/IosSettingsLayout-15.5.apk`（应用名 **iLyayot**；从 14.8 升级要先卸载，签名不同；14.9~15.4 可直接覆盖）。
 
 ## 2. 三步装好
 
@@ -61,7 +61,7 @@ IosSettings: search glass draw fps=102 captureCostMs=5
 
 ## 4. 首次使用检查清单
 
-- [ ] 首页顺序：账号卡 → 关于设备 → 网络卡（飞行模式在最上）→ 通用卡 → 通知/声音/专注模式/屏幕时间 → 隐私卡 → 钱包/Game Center → App → 其他
+- [ ] 首页顺序：账号卡 → 关于设备 → 网络卡（飞行模式在最上）→ 通用卡（墙纸 → 搜索 → 控制中心 → 外观 → 相机 → 主屏幕）→ 通知/声音/专注模式/屏幕时间 → 隐私卡 → 钱包/Game Center → App → 其他
 - [ ] 控制中心行右侧有开关，点开关只切飞行模式，点行进入原「更多连接」页；装 HyperiOS 时开关也应与标题垂直居中对齐
 - [ ] 底部搜索条悬浮在导航栏上方，不被手势条遮挡，最后一张卡片不被挡
 - [ ] **滚动时玻璃里的模糊内容跟着列表一起动**（不是固定在某一帧的旧图）
@@ -83,7 +83,7 @@ IosSettings: search glass draw fps=102 captureCostMs=5
 ```powershell
 # 覆盖安装失败时
 adb uninstall com.abradant.iossettings
-adb install dist\IosSettingsLayout-15.4.apk
+adb install dist\IosSettingsLayout-15.5.apk
 ```
 
 卸载模块不会影响系统设置数据。
