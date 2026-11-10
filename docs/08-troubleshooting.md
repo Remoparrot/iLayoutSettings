@@ -1,6 +1,6 @@
 # 排错手册
 
-> 状态：**现行** · 对应版本：16.4 (95)
+> 状态：**现行** · 对应版本：16.5 (96)
 > 用法：先按「现象」定位，再看「下一步」。每个问题都给了判断依据，不要凭感觉重装。
 
 ## 0. 通用排查顺序
@@ -45,6 +45,8 @@
 | 顶栏发丝线在顶部就出现 | `isHeaderOpen()` 判断失败（返回 null / ROM 改语义） | 16.2 代码在取不到时回退到「滚动即显示」；看日志是否有 `top bar divider failed` |
 | 设置内切深浅色后发丝线消失 | 16.3 把滚动监听和线色都绑在 fragment 视图上，切主题 recreate 后监听失联 | 16.4 改挂 `NestedHeaderLayout` 类钩子、每帧按当前 `uiMode` 取色；切主题后滚动仍应有线，没有则看 `top bar hooks installed` 是否出现在新进程 |
 | 深色模式顶栏看不到线 | 16.2 的白 15% 线在近乎全透明的黑栏上只剩 `#262626`，接近黑色 | 16.3 深色改中性灰 30%（`0x4DAAAAAA`）；截图取栏底一行像素，应为 `(58,58,59)` 左右 |
+| **折叠时账户卡被栏切掉、没有模糊**（16.5 之后） | 栏的模糊/底色没常开，或 MIUI 给滚动容器设了 `clipBounds` 把内容裁在栏底 | 16.5 不再按 `scrolled` 开关模糊；确认 `unclip()` 在 `updateOverBgState` 之后执行（ROM 若换地方设 clip 会复发）。滑杆为 0% 时本来就没有模糊 |
+| 顶栏模糊比预期弱很多 | `setBackgroundBlur` 的半径单位是 px，传 dp 会弱 2.75 倍 | 16.5 起按 `density` 换算；仍弱则看 `MiuiBlurUtils` 是否返回 false（日志 `static miuix.core.util.MiuiBlurUtils.setBackgroundBlur: class not found` 之类） |
 | 耳机 / iCloud 图标不是指定图 | 旧包缓存或主题覆盖 | 16.2 日志应为 `card icon … <- module (supplied theme)`；若是 `<- settings`，说明模块资源没打进 APK |
 | 过渡动画期间玻璃有拖影 | 玻璃抓图层跟着移动 | 16.0 动画期间会隐藏 `SearchGlass`；如果还看到拖影说明动画没走 `animateBar` |
 | 玻璃里有重影 | `capturing` 没跳过自身 | 见 [坑 4](06-pitfalls.md#坑-4底部搜索栏把自己拍进玻璃里) |
@@ -111,7 +113,7 @@
 ```text
 机型：
 系统：HyperOS 3 / Android 15（设置版本：）
-模块版本：16.4 (95)
+模块版本：16.5 (96)
 现象：
 复现步骤：
 日志（adb logcat -s iLayoutSettings:V，从打开设置开始）：

@@ -1,6 +1,6 @@
 # 架构与 Hook 链路
 
-> 状态：**现行** · 对应版本：16.4 (95)
+> 状态：**现行** · 对应版本：16.5 (96)
 > 源码：`module/src/com/Remo/ilayoutsettings/`
 
 ## 1. 从加载到生效
@@ -11,7 +11,7 @@ LSPosed
        └─ Hook.install(classLoader)        // 只在 com.android.settings 进程里跑
             ├─ SettingsFragment            // 首页
             │    ├─ buildAdapter           → HeaderData.apply() + BottomSearch.install()
-            │    ├─ onViewCreated          → BottomSearch.install() + ForceBlur.forceHeaderBlur() + UiTweaks.attachScrollBlur()（顶栏透明度/发丝线/原生模糊半径）+ HeadsetWatcher.attach()
+            │    ├─ onViewCreated          → BottomSearch.install() + ForceBlur.forceHeaderBlur() + UiTweaks.refreshTopBar()（顶栏底色/模糊/发丝线）+ HeadsetWatcher.attach()
             │    ├─ onResume               → HeaderData.apply() + BottomSearch.install() + HeadsetWatcher.attach()
             │    └─ onPause / onDestroy    → HeadsetWatcher.detach()
             ├─ SubPageIcons.install()      → PreferenceFragmentCompat#onCreate/onViewCreated/onResume
@@ -159,9 +159,19 @@ LSPosed
   滚动源优先 `com.android.settings:id/scroll_headers` 的 RecyclerView；
   **不要用 `NestedHeaderLayout.mScrollableView`**——HyperOS 3 上它是 `SpringBackLayout` 包装层，
   `computeVerticalScrollOffset()` 恒 0（必要时对它的子级做一次解包兜底）；
-- 滚动超过 4dp：顶栏底色按 `topbar_alpha`（0–100%，16.3 默认 2）算半透明；
-  `MiuiBlurUtils.setBackgroundBlur(view, radius)` + `setBackgroundBlurRadius(view, radius)`；
-  回顶部恢复实色并 `clearBackgroundBlur`。底色只在数值变化时下发（`APPLIED_BG` 缓存）；
+- **16.5 起底色与模糊常开**：底色始终是按 `topbar_alpha`（0–100%，16.3 默认 2）算出的透明色，
+  模糊半径始终是 `topbar_blur`（默认 5%），不再按「是否滚动」切换。旧逻辑回到顶部会把底色写成
+  实色（不透明黑/白）、半径写 0，而头部折叠过程中列表还没开始滚动（offset=0），栏就是一层不透明
+  实色——账户卡滑到栏下时被硬切一刀，看起来「经过小米账户没有模糊」；
+- `MiuiBlurUtils.setBackgroundBlur(view, radiusPx)` 的第二个参数是**像素**（内部按 400px 截断），
+  按 `density` 从 dp 换算，`setBackgroundBlurRadius` 用同一个值；**底色变化时要重新下发一次模糊**
+  （`setBackgroundColor` 会盖掉 blur 层），`APPLIED_BG` / `APPLIED_APPBAR_BLUR` 两个缓存负责去重；
+- **允许内容画到栏下**：MIUI 自己的 over-bg 还没出现时会给滚动容器 `setClipBounds`，内容被裁在
+  栏底边。`refreshTopBar()` 与 `updateOverBgState()` 之后都把 `mScrollableView` / `scroll_headers`
+  的 clip 清掉，内容才会真的滑进栏底下被模糊（否则「透明栏」下面什么也没有）；
+- **只作用首页**：`refreshTopBar()` 先判断 `header.isAttachedToWindow() && header.isShown()`。
+  二级页在前台时首页 header 仍 attached 但不可见，而 `action_bar_container` 是 activity 共享的，
+  不拦住的话二级页的栏会被套上首页的透明底色 + 模糊；
 - **模糊真正可调**：可见的模糊来自 `NestedHeaderLayout.mOverBgView` 的 `MiuiBlurUiHelper`，
   半径由主题 token 固定。`ForceBlur` hook `MiuiBlurUiHelper.setBlurParams`，只对父级是
   `NestedHeaderLayout` 的 `mViewApplyBlur` 把半径换成 `topbar_blur`；16.4 还在
@@ -169,12 +179,14 @@ LSPosed
   `refreshBlur()` 会复用它，不预写就会第一帧没模糊。`topbar_blur` 是 **0–100%**，
   内部映射到 0–150dp（MIUI 在 400px 处截断，2.75x 屏约 145dp）；默认 **5% / 2% 透明度**；
   16.1 的旧值（>100）读取时按 150dp 折算，110dp → 73%，不会归零。
-- **发丝线**：在 `action_bar_container` 的**父级** `ActionBarOverlayLayout` 的 overlay 里放
-  0.5dp `ColorDrawable`（MIUI 的 `ActionBarContainer` 不画自己的 `ViewOverlay`，直接加在它上面
-  不可见；实测用洋红 8px 探针确认）。颜色每帧按当前 `uiMode` 取：浅色黑色 12%
-  （`0x1F000000`），深色中性灰 30%（`0x4DAAAAAA`，16.3 由白 15% 改来）；用
-  `NestedHeaderLayout.isHeaderOpen()` 判断大标题是否仍展开，只有折叠栏出现后才显示，
-  回到顶部隐藏。坐标用 `appBar.getLeft()/getTop()` 换算，仍贴在栏的最底边。
+- **发丝线跟着栏一起出现**：显示条件 = 列表滚动超过 4dp **或** 栏已从大标题高度收缩
+  （`OPEN_BAR_HEIGHT` 记下见过的最大栏高，当前高度比它小 1dp 即视为折叠中），
+  回到顶部、栏恢复原高后隐藏。这样折叠动画里「栏开始压住内容」的瞬间线就在，
+  不再等头部完全收起。线画在 `action_bar_container` 的**父级** `ActionBarOverlayLayout` 的
+  overlay 里（0.5dp `ColorDrawable`；MIUI 的 `ActionBarContainer` 不画自己的 `ViewOverlay`，
+  直接加在它上面不可见，实测用洋红 8px 探针确认）。颜色每帧按当前 `uiMode` 取：
+  浅色黑色 12%（`0x1F000000`），深色中性灰 30%（`0x4DAAAAAA`，16.3 由白 15% 改来）；
+  坐标用 `appBar.getLeft()/getTop()` 换算，仍贴在栏的最底边。
 - **高级设置（16.4，GUI 侧）**：`Prefs.ADVANCED`（`advanced_mode`，默认 false）只控制
   `MainActivity` 是否构建「顶栏」卡片；`Prefs.TOPBAR_DIVIDER`（`topbar_divider`，默认 true）
   控制发丝线是否绘制。关闭高级设置不会改写 divider 的值，避免「关一下开关线就永久没了」。

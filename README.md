@@ -3,7 +3,7 @@
 > 把澎湃 OS（HyperOS 3）「设置」首页改成 iOS 风格：入口重排、条件卡片（软件更新 / 耳机 / iCloud）、搜索栏沉底、卡片细节修正。
 > **全部复用 MIUI 原生控件与原生数据，模块不重绘任何页面。**
 
-[![Version](https://img.shields.io/badge/version-16.4-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
+[![Version](https://img.shields.io/badge/version-16.5-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-HyperOS%203%20%7C%20Android%2015%2B-green)](docs/01-overview.md)
 [![LSPosed](https://img.shields.io/badge/framework-LSPosed-orange)](docs/04-install.md)
@@ -33,7 +33,7 @@
 | 搜索栏过渡 | 进出搜索 220ms 滑动+缩放+淡入淡出；**退出时等 MIUI 收起顶部搜索框后再出现底部栏**，不再短暂出现两个搜索栏 |
 | 参数界面 | 应用内滑杆：搜索栏模糊（0.1dp）/ 折射 19dp / 厚度 12dp；**「高级设置」总开关**（默认关）开启后才出现顶栏模糊 0–100%、顶栏透明度 0–100%、显示顶栏分割线 |
 | 卡片细节修正 | 去掉每组最后一行的双层圆角/放大图标；外观页预览加卡片底 |
-| 顶部模糊 / 发丝线 | 默认 5% 模糊 + 2% 透明度，滚动后顶栏近乎全透明、只留底部发丝线（浅色黑 12%，深色中性灰 30%）；**设置内切换深浅色后线不消失**；折叠栏第一次出现就带模糊 |
+| 顶部模糊 / 发丝线 | 默认 5% 模糊 + 2% 透明度，**顶栏始终带模糊**——账户卡等内容滑到栏下面就是糊的，不再被不透明栏切掉；发丝线跟着栏一起出现（浅色黑 12%，深色中性灰 30%）；**设置内切换深浅色后线不消失**，折叠栏第一次出现就带模糊 |
 | 应用图标 | 蓝紫渐变 + 半透明玻璃盘 + 白齿轮（[预览](docs/assets/icon-16.4.png)）；`tools/make_launcher_icon.py` 生成五档 mipmap，脚本内另有两套候选（[并排对比](docs/assets/icon-candidates-16.4.png)） |
 
 ## 截图
@@ -50,7 +50,7 @@
 
 ## 安装
 
-1. 下载 [`dist/iLayoutSettings-16.4.apk`](dist/iLayoutSettings-16.4.apk)，或到 [Releases · v16.4](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.4) 下同名附件（286,069 B，SHA-256 `EE68C55D…B3C0`，与 `dist/` 同一份）；
+1. 下载 [`dist/iLayoutSettings-16.5.apk`](dist/iLayoutSettings-16.5.apk)，或到 [Releases · v16.5](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.5) 下同名附件（286,069 B，SHA-256 `84493529…B566`，与 `dist/` 同一份）；
    **16.0 起包名是** `com.Remo.ilayoutsettings`，从 16.0 升级可直接覆盖（同一签名）；
 2. LSPosed 中启用 **iLayoutSettings**，作用域只勾选 **设置**（`com.android.settings`）；
 3. **强制停止「设置」**（或重启手机），再打开设置；
@@ -89,7 +89,7 @@ pwsh -File module/build.ps1 `
 ```
 
 输出 `dist/iLayoutSettings-<versionName>.apk`。
-发版用 `tools/release.ps1 -Version 16.4`：构建 → 校验 → 自动提交/推送 → 打 tag → 建 Release → 上传 APK，一条命令完成。
+发版用 `tools/release.ps1 -Version 16.5`：构建 → 校验 → 自动提交/推送 → 打 tag → 建 Release → 上传 APK，一条命令完成。
 完整工具链版本、可复现性说明见 [构建指南](docs/03-build.md)。
 
 ## 文档

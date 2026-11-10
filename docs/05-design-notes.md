@@ -71,14 +71,18 @@ MIUI 在 miuix 卡片装饰之上又给每行叠了一层「卡片形状」的 9
 
 - **方案 A（选中）**：hook `MiuiBlurUiHelper.setBlurParams`，只替换
   `NestedHeaderLayout.mOverBgView` 的半径；`UiTweaks` 同步写 `mBlurEffect` 并 `refreshBlur()`。
-- **方案 B（否决）**：继续在 `ActionBarContainer` 上 `setBackgroundBlur`。返回 true，但可见层是
-  `NestedHeaderLayout` 自己画的，用户拖动滑杆看不出变化——16.1 的「调不了」就是这么来的。
+- **方案 B（16.1 否决，16.5 重新启用）**：在 `ActionBarContainer` 上 `setBackgroundBlur`。
+  16.1 否决的原因很具体——那时光靠它，可见的模糊层是 `NestedHeaderLayout` 自己画的 over-bg，
+  用户拖滑杆看不出变化。16.5 的需求变了：**折叠过程中 over-bg 还没出现**，需要栏自己就带模糊，
+  于是两个一起用——helper 管原生 over-bg，action bar 管「任何时候都在」的背板模糊。
+  重启用时顺手修了单位（`setBackgroundBlur` 收像素，旧代码传的是 dp）。
 - **方案 C（否决）**：直接改 `BlurConfig` 对象。它可能被 `MaterialDayNightConfig` 复用，
   改一个 header 会顺带改到别的模糊面。
 
 滑杆用 **0–100%** 而不是 dp：MIUI 在 400px 处截断（2.75x 屏约 145dp），
 旧 0–300dp 有一半行程在饱和区，看起来像滑杆坏了。16.3 默认 **5% / 2% 透明度**
-（约 8dp，近乎全透明），滚动后的顶栏只剩极淡模糊和一条发丝线——iOS 的滚动栏本来就是这样；
+（约 8dp，近乎全透明），16.5 起这个模糊**常开**：平时栏只是几乎透明的一层，
+内容滑到它下面（折叠中、滚动中）立刻被糊掉，栏底再压一条发丝线——iOS 的滚动栏本来就是这样；
 16.2 的 30% / 45% 淡磨砂仍可用滑杆选回；旧 110dp 会迁移成 73%，不会突然归零。
 
 发丝线的颜色按底色选：浅色用黑色 12%（深色栏上改黑线反而消失），深色模式不能用黑色，

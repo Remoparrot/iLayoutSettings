@@ -3,10 +3,62 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前主线是 **16.4（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前主线是 **16.5（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
+
+---
+
+# iLayoutSettings · LSPosed 模块（v16.5：顶栏始终模糊 + 发丝线随栏出现）
+
+## v16.5 变更
+
+- **顶栏不再是「滚动后才有模糊」**：旧逻辑 `radius = scrolled ? topbar_blur : 0`，回顶部还会把
+  栏底色写成不透明的实色。头部折叠过程中列表还没开始滚动（offset=0、`scrolled=false`），
+  栏就是一层不透明实色 + 0 模糊——小米账户卡片滑到栏下时被硬切一刀，
+  用户在 22:00 的截图里看到的正是这个状态。现在栏底色始终是 `topbar_alpha` 的透明色、
+  模糊半径始终是 `topbar_blur`，内容滑进栏下就是模糊的（iOS 滚动导航栏的观感）。
+- **模糊半径单位修正**：`MiuiBlurUtils.setBackgroundBlur(view, px)` 收的是**像素**，
+  旧代码直接把 dp 值传进去（5% ≈ 7.5dp 按 7.5px 生效，实际只有配置值的 1/2.75）。
+  现在按 `density` 换算、与 `MiuiBlurUiHelper` 内部一致（上限仍是 400px）。
+- **让内容真的能画到栏下面**：MIUI 自己的 over-bg 没出现时会给滚动容器设 `setClipBounds`，
+  内容被裁在栏底边。模块在每次刷新和 `updateOverBgState()` 之后清掉 clip，
+  否则「透明栏」下面什么也没有，依旧是硬切。
+- **发丝线跟着栏一起出现**：显示条件从「`scrolled` 且头部已收起」改成
+  「列表已滚动 **或** 栏已从大标题高度收缩（折叠过程中）」，栏开始压住内容时线就在；
+  回到顶部、栏恢复大标题高度后消失，仍受「高级设置 → 显示顶栏分割线」控制。
+- **二级页保护**：只在首页 `NestedHeaderLayout` 满足 `isAttachedToWindow() && isShown()`
+  时才改那个共享的 `action_bar_container`，避免二级页的栏被套上首页的透明底色和模糊。
+- **版本**：16.5 / versionCode **96**；APK `dist/iLayoutSettings-16.5.apk`，286,069 B。
+
+## v16.5 校验
+
+```
+package: name='com.Remo.ilayoutsettings' versionCode='96' versionName='16.5'
+sdkVersion:'29'
+targetSdkVersion:'36'
+launchable-activity: name='com.Remo.ilayoutsettings.MainActivity'  label='iLayoutSettings'
+dex version : 039
+xposed_init : True
+module class: True
+reorder     : True
+size   : 286069 bytes
+sha256 : 8449352927AD053BD49FDDF3505AADE4532F909E680CDF94AE72257854B566
+```
+
+真机 25053RT47C / HyperOS 3 / Android 16（2026-11-10 22:20–22:27）：
+
+- 深色静止（首页顶部）：`y=495–510` 全为 `(0,0,0)`，没有发丝线；大标题和账户卡与 16.4 一致；
+- 深色滚动：`y=330` 为 `(58,58,59)`，栏底 `(10,10,11)`、下方卡片 `(28,28,30)`——线色未变；
+- 浅色滚动：`y=330` 为 `(222,222,223)`，栏底 `(253,253,254)`、下方 `(255,255,255)`；
+  浅色静止 `(243,242,247)`、无线；
+- **折叠动画（0.4s 慢拖抓帧）**：账户卡滑进栏底时，栏内能看到被模糊的头像和文字，
+  不再是黑块硬切；发丝线此时压在栏底边上；
+- 二级页（勿扰模式 `ModesSettingsActivity`）：栏保持 MIUI 原生实色，没有被套上模糊；
+- 回归：首页条件卡片、底部搜索栏、二级页跳转均无变化。
+
+> 这一版只改了 `UiTweaks.refreshTopBar()` 与 `updateOverBgState()` 的钩子，没有新增权限或资源。
 
 ---
 

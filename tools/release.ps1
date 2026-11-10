@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     iLayoutSettings 自动发版：构建 → 校验 → 打 tag → 建 GitHub Release → 上传 APK。
@@ -207,16 +207,16 @@ $bodyTemplate = @'
 
 > 本机 MIUI 可能拦截 adb 安装新包（`INSTALL_FAILED_USER_RESTRICTED`），请把 APK 拷到手机手动安装。
 
-### 本版内容（16.4）
+### 本版内容（16.5）
 
-- **设置内切换深浅色，顶栏发丝线不再消失**：控制器改挂 `NestedHeaderLayout` 类钩子，
-  切主题重建视图后仍然跟踪滚动；线色每帧按当前深浅色取；
-- **顶栏第一次出现就带模糊**：折叠前把原生模糊半径预写好，不再从 0 起步
-  （默认仍是 5% 模糊 / 2% 透明度）；
-- **GUI 新增「高级设置」总开关**：关闭时只显示搜索栏玻璃滑杆，开启后才出现
-  顶栏模糊 / 透明度 / 显示顶栏分割线；
-- **启动图标换风格**：蓝紫渐变 + 半透明玻璃盘 + 白齿轮，五档 mipmap；
-- 版本 16.4 / versionCode 95。
+- **顶栏始终模糊**：模糊半径和透明底色不再按「是否滚动」开关，头部折叠、账户卡滑到栏下时
+  就是模糊的，不再被不透明栏硬切一刀；
+- **模糊强度修正**：`setBackgroundBlur` 的半径改按像素下发（旧代码把 dp 当 px，实际只有
+  配置值的 1/2.75）；
+- **内容能画到栏下面**：清掉 MIUI 在 over-bg 出现前给滚动容器设的 `clipBounds`；
+- **发丝线跟着栏一起出现**：列表滚动或栏从大标题高度收缩时就画线，回到顶部隐藏；
+- **二级页不受影响**：只有首页 header 可见时才改共享的 action bar；
+- 版本 16.5 / versionCode 96。
 
 完整变更见 [docs/07-changelog.md](../blob/main/docs/07-changelog.md)。
 '@

@@ -1,6 +1,6 @@
 # 项目概览
 
-> 状态：**现行** · 对应版本：16.4 (95)
+> 状态：**现行** · 对应版本：16.5 (96)
 
 ## 1. 一句话定位
 
@@ -35,7 +35,7 @@
 
 ## 4. 版本线（重要，别被 changelog 绕晕）
 
-- **主线 = 16.4（iLayoutSettings）**：本仓库源码对应 16.4，发布为 [Release v16.4](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.4)（附件与 `dist/iLayoutSettings-16.4.apk` 同一份）；旧包 14.8–16.3 只在各自 Release。功能是「重排 + 条件卡片（更新/耳机/iCloud）+ 底部搜索（液态玻璃 + 过渡动画）+ 耳机卡即时刷新/详情页 + 卡片修正 + 高级设置参数界面（顶栏透明度与百分比模糊，默认 5% 模糊 / 2% 透明度）+ 顶栏发丝线（深色为灰色半透明，切深浅色不消失）+ 专注模式/相机/搜索入口 + 新启动图标」。
+- **主线 = 16.5（iLayoutSettings）**：本仓库源码对应 16.5，发布为 [Release v16.5](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.5)（附件与 `dist/iLayoutSettings-16.5.apk` 同一份）；旧包 14.8–16.4 只在各自 Release。功能是「重排 + 条件卡片（更新/耳机/iCloud）+ 底部搜索（液态玻璃 + 过渡动画）+ 耳机卡即时刷新/详情页 + 卡片修正 + 高级设置参数界面（顶栏透明度与百分比模糊，默认 5% 模糊 / 2% 透明度，**顶栏始终带模糊**）+ 顶栏发丝线（深色为灰色半透明，切深浅色不消失，随折叠一起出现）+ 专注模式/相机/搜索入口 + 新启动图标」。
 - **16.0 是破坏性改动**：应用名 iLayoutSettings、包名 `com.Remo.ilayoutsettings`、仓库改名 iLayoutSettings；旧包必须卸载，新包要在 LSPosed 重新启用。
 - **历史 15.x ~ 17.x 是已放弃的实验分支**：液态玻璃（kyant / lattice shader）、GUI 参数页、动态折射等，记录保留在 [版本记录](07-changelog.md) 里；14.9 之后重新起的 15.x 主线以 15.5 收尾，16.0 在其上继续。
 - 但源码里**残留了少量后续版本的类**（`GlassToggle`、`IntroCard`、`AboutIos` 等），它们没有被 `Hook` 调用，属于死代码。这件事写在 [状态](00-status.md#已知问题) 与 [踩坑](06-pitfalls.md) 里，清理前不要误以为它们是现行功能。

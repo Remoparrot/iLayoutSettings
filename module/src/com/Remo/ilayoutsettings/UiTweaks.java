@@ -20,7 +20,8 @@ import de.robv.android.xposed.XposedHelpers;
  *   <li>bigger Xiaomi account avatar on the home page (like the iOS reference)</li>
  *   <li>iOS style title on second-level pages: hide MIUI's large (expand) title
  *       and show the collapsed title centred</li>
- *   <li>top bar blur that only appears while the list is scrolled</li>
+ *   <li>top bar that keeps a native blur, tint and hairline at every scroll
+ *       position, so content sliding under it is blurred instead of cut</li>
  * </ul>
  */
 final class UiTweaks {
@@ -34,12 +35,35 @@ final class UiTweaks {
     /** Last background colour pushed into an action bar, so idle polls are free. */
     private static final java.util.Map<View, Integer> APPLIED_BG =
             new java.util.WeakHashMap<>();
+    /** Tallest bar height seen per action bar: the open (large title) state. */
+    private static final java.util.Map<View, Integer> OPEN_BAR_HEIGHT =
+            new java.util.WeakHashMap<>();
     /** Last radius pushed through {@code MiuiBlurUtils.setBackgroundBlur}. */
     private static final java.util.Map<View, Integer> APPLIED_APPBAR_BLUR =
             new java.util.WeakHashMap<>();
     /** Header layouts that already have the slow pref poll running. */
     private static final java.util.Map<View, Boolean> POLLING =
             new java.util.WeakHashMap<>();
+
+    /**
+     * Removes the clip MIUI puts on the scrolling container while its own
+     * over-background is hidden, so scrolled rows can be drawn (and blurred)
+     * under the action bar instead of being cut off at its lower edge.
+     */
+    private static void unclip(View header, Context context) {
+        try {
+            Object shell = HeaderData.field(header, "mScrollableView");
+            if (shell instanceof View && ((View) shell).getClipBounds() != null) {
+                ((View) shell).setClipBounds(null);
+            }
+            Object list = context == null ? null : scrollList(header, context);
+            if (list instanceof View && ((View) list).getClipBounds() != null) {
+                ((View) list).setClipBounds(null);
+            }
+        } catch (Throwable t) {
+            XLog.w("top bar unclip failed: " + t);
+        }
+    }
 
     /** {@code com.android.settings:id/action_bar_container}, resolved once. */
     private static int sAppBarId;
@@ -341,6 +365,20 @@ final class UiTweaks {
             XposedBridge.hookAllMethods(nested, "onScrollingProgressUpdated", refresh);
             XposedBridge.hookAllMethods(nested, "onAttachedToWindow", refresh);
             XposedBridge.hookAllMethods(nested, "onConfigurationChanged", refresh);
+            // MIUI sets / clears the list clip in here; re-open it right after so
+            // the blur surface keeps seeing the content it is supposed to blur.
+            XposedBridge.hookAllMethods(nested, "updateOverBgState", new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) {
+                    if (!isHeaderLayout(param.thisObject)) {
+                        return;
+                    }
+                    View self = (View) param.thisObject;
+                    if (self.isShown()) {
+                        unclip(self, self.getContext());
+                    }
+                }
+            });
             XLog.i("top bar hooks installed");
         } catch (Throwable t) {
             XLog.e("top bar hooks failed", t);
@@ -368,7 +406,9 @@ final class UiTweaks {
     private static void refreshTopBar(View header) {
         try {
             Context context = header.getContext();
-            if (context == null) {
+            if (context == null || !header.isAttachedToWindow() || !header.isShown()) {
+                // A sub page is on top (the home header is still attached but
+                // hidden); its action bar is shared, so leave it alone.
                 return;
             }
             View appBar = appBarOf(header, context);
@@ -376,36 +416,51 @@ final class UiTweaks {
                 return;
             }
             boolean scrolled = isScrolled(scrollList(header, context), dp(context, 4));
-            boolean headerOpen = Boolean.TRUE.equals(call(header, "isHeaderOpen"));
-            boolean compact = scrolled && !headerOpen;
             boolean dark = isDark(context);
+
+            // The bar shrinks from the large-title height to the condensed one as
+            // the header collapses; remember the tallest height as "open".
+            int barHeight = appBar.getHeight();
+            Integer openHeight = OPEN_BAR_HEIGHT.get(appBar);
+            if (openHeight == null || (!scrolled && barHeight > openHeight)) {
+                openHeight = barHeight;
+                OPEN_BAR_HEIGHT.put(appBar, openHeight);
+            }
+            boolean condensed = barHeight > 0 && barHeight < openHeight - dp(context, 1);
+            // The hairline belongs to the blurred bar: it shows up as soon as the
+            // bar is over content (header collapsing or list scrolled), not only
+            // once the header finished closing.
+            boolean barActive = scrolled || condensed;
 
             int alphaPercent = Math.max(0, Math.min(100, Prefs.getInt(
                     context, Prefs.TOPBAR_ALPHA, Prefs.DEFAULT_TOPBAR_ALPHA)));
             int alpha = Math.round(255f * alphaPercent / 100f);
             int base = dark ? 0x000000 : 0xF2F2F7;
-            int solid = dark ? 0xFF000000 : 0xFFF2F2F7;
-            int background = scrolled ? ((alpha << 24) | base) : solid;
+            // Always the same translucent tint: an opaque bar at rest ("solid")
+            // was what cut the account card in half while the header collapsed.
+            int background = (alpha << 24) | base;
 
             // Re-read the theme every pass: toggling dark mode inside Settings
             // is a configuration change, not a new scroll, so a colour captured
             // once in attachScrollBlur() went stale (black hairline on a black
             // bar = "the divider disappeared").
             applyDivider(appBar, dark ? 0x4DAAAAAA : 0x1F000000,
-                    compact && Prefs.topBarDivider(context));
+                    barActive && Prefs.topBarDivider(context));
 
             Integer lastBackground = APPLIED_BG.get(appBar);
-            if (lastBackground == null || lastBackground.intValue() != background) {
+            boolean tintChanged = lastBackground == null
+                    || lastBackground.intValue() != background;
+            if (tintChanged) {
                 appBar.setBackgroundColor(background);
                 APPLIED_BG.put(appBar, background);
             }
 
-            // Only touch the helper's radius while the bar is actually visible.
-            // Writing 0 when idle would fight the refreshBlur() hook (which
-            // always primes the pref radius) and re-run refreshBlur forever.
-            int radius = scrolled ? Prefs.topBarBlurRadius(context) : 0;
+            // The bar keeps its blur at every scroll position. Gating it on
+            // "scrolled" meant the collapsing header slid under an opaque,
+            // unblurred bar until MIUI's own over-background finally appeared.
+            int radius = Prefs.topBarBlurRadius(context);
             Object helper = HeaderData.field(header, "mBlurUiHelper");
-            if (scrolled && helper != null) {
+            if (helper != null) {
                 Object current = HeaderData.field(helper, "mBlurEffect");
                 int applied = current instanceof Integer ? (Integer) current : Integer.MIN_VALUE;
                 if (applied != radius) {
@@ -413,17 +468,26 @@ final class UiTweaks {
                     call(helper, "refreshBlur");
                 }
             }
+            // Let the list draw under the bar at every scroll position. MIUI
+            // only drops this clip once its own over-background appears, so the
+            // account card used to be cut off at the bar's lower edge instead
+            // of sliding under a blurred bar.
+            unclip(header, context);
             // Keep the action bar's own background blur in sync too. It sits
             // behind the native over-bg layer, but some themes show it alone.
+            // The radius is in pixels: MiuiBlurUtils caps it at 400 px.
+            int radiusPx = Math.max(0, Math.round(radius
+                    * context.getResources().getDisplayMetrics().density));
             Integer lastAppBarBlur = APPLIED_APPBAR_BLUR.get(appBar);
-            if (lastAppBarBlur == null || lastAppBarBlur.intValue() != radius) {
-                APPLIED_APPBAR_BLUR.put(appBar, radius);
+            if (tintChanged
+                    || lastAppBarBlur == null || lastAppBarBlur.intValue() != radiusPx) {
+                APPLIED_APPBAR_BLUR.put(appBar, radiusPx);
                 ClassLoader hostLoader = context.getClassLoader();
-                if (radius > 0) {
+                if (radiusPx > 0) {
                     callStatic(hostLoader, BLUR, "setBackgroundBlur", appBar,
-                            Integer.valueOf(radius));
+                            Integer.valueOf(radiusPx));
                     callStatic(hostLoader, BLUR, "setBackgroundBlurRadius", appBar,
-                            Integer.valueOf(radius));
+                            Integer.valueOf(radiusPx));
                 } else {
                     callStatic(hostLoader, BLUR, "clearBackgroundBlur", appBar);
                 }

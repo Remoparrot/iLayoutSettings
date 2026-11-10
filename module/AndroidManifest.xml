@@ -7,8 +7,8 @@
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.Remo.ilayoutsettings"
-    android:versionCode="95"
-    android:versionName="16.4">
+    android:versionCode="96"
+    android:versionName="16.5">
 
     <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="36" />
 

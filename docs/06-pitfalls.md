@@ -71,6 +71,11 @@
 | **设置内切换深浅色后发丝线消失**（16.4 修） | 控制器把 `appBar`/`list` 抓在 fragment 视图上；切主题会 recreate 视图，旧的 `OnScrollChangedListener` 不再触发，永远认为「没滚动」 | 控制器改挂 `NestedHeaderLayout` 类钩子（`onScrollingProgressUpdated` / `onAttachedToWindow` / `onConfigurationChanged`），每次 fresh 解析视图；颜色每帧从当前 `uiMode` 取 |
 | 控制器一直认为列表在顶部 | `NestedHeaderLayout.mScrollableView` 在 HyperOS 3 上是 `SpringBackLayout` 包装层，`computeVerticalScrollOffset()` 恒 0 | 优先按 `com.android.settings:id/scroll_headers` 找 RecyclerView；必要时解包 ViewGroup 的 RecyclerView 子级 |
 | 冷启动后第一次折叠顶栏没有模糊 | 启动时把 `mBlurEffect` 写成 0；首次 `applyBlur(true)` → `refreshBlur()` 复用了它 | 在 `MiuiBlurUiHelper.refreshBlur()` 的 before hook 里按 prefs 预写半径（只匹配父级为 `NestedHeaderLayout` 的 helper） |
+| **头部折叠时账户卡被栏「切一刀」，没有模糊**（16.5） | 模糊只在 `scrolled` 时下发、静止时栏底色写成不透明实色；折叠过程中列表还没滚动（offset=0，`scrolled=false`），所以栏是不透明 + 0 模糊 | 底色始终用 `topbar_alpha` 的透明色，模糊半径始终用 `topbar_blur`（不按滚动开关）；另外 MIUI 在 over-bg 未出现时会 `setClipBounds` 把内容裁在栏底，要在 `refreshTopBar()` / `updateOverBgState()` 之后清 clip，内容才滑得进栏下 |
+| **`setBackgroundBlur` 传 dp，模糊比配置值弱 2.75 倍**（16.5 修） | `MiuiBlurUtils.setBackgroundBlur(View, int)` 的 int 是**像素**（内部 400px 截断），旧代码把 `topbar_blur` 的 dp 值直接传进去 | 按 `density` 换算成 px 再传，`setBackgroundBlurRadius` 用同一个值；改完实测 5%（≈22px）可见明显模糊 |
+| **改了栏底色后模糊消失** | `setBackgroundColor()` 会换掉 view 的背景层，把之前挂上的 blur 一起盖掉 | 底色变化时重新下发一次 `setBackgroundBlur`；用 `APPLIED_BG` 判断「底色变了」，别只看半径缓存 |
+| **二级页的栏也被套上透明底色 + 模糊**（16.5 防范） | `action_bar_container` 是 activity 共享的；二级页在前台时首页 `NestedHeaderLayout` 仍 attached，轮询还会改它 | `refreshTopBar()` 先判断 `header.isAttachedToWindow() && header.isShown()`，不可见就跳过 |
+| 发丝线要等头部完全收起才出现 | 显示条件写死 `scrolled && !isHeaderOpen()`，折叠动画期间 `scrolled` 还是 false | 16.5：条件改为「`scrolled` **或** 栏已从大标题高度收缩」——用 `OPEN_BAR_HEIGHT` 记住见过的最大栏高，当前高度小 1dp 就算折叠中 |
 | 耳机 / iCloud 图标被第三方主题换掉 | 16.1 的 `cardDrawable` 是 settings 优先，主题同名 `ic_*` 会赢 | 16.2 改为模块内置优先，settings 只作兜底 |
 | `R.string.*` 编译报「找不到符号 R」 | `build.ps1` 只把 `module/src` 传给 javac，aapt2 生成的 `build/gen/**/R.java` 从未参与编译 | 避免在 Java 引用 `R`；标题用 `loadLabel()`，版本用 `getPackageInfo().versionName` |
 | 搜索栏去色后完全消失 | 把 `miuix_appcompat_search_mode_edit_text_bg_light/dark` 的 fill 清掉了；它才是可见胶囊 | 保留主题胶囊；只把 shader 的 `surfaceAlpha` 置 0，不再叠 shader 表面色 |

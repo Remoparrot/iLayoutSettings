@@ -7,19 +7,20 @@
 
 | 项 | 值 |
 | --- | --- |
-| versionName / versionCode | **16.4 / 95**（唯一来源：`module/AndroidManifest.xml`） |
+| versionName / versionCode | **16.5 / 96**（唯一来源：`module/AndroidManifest.xml`） |
 | 包名 | **`com.Remo.ilayoutsettings`**（16.0 由 `com.abradant.iossettings` 改名，属于破坏性变更） |
 | 应用名 / 仓库名 | **iLayoutSettings**（GitHub 仓库同步改名，旧地址会 301 跳转） |
 | minSdk / targetSdk | 29 / 36 |
 | 作用域 | `com.android.settings` |
-| 当前包 | `dist/iLayoutSettings-16.4.apk`（286,069 B，SHA-256 `EE68C55D…B3C0`；**已在 25053RT47C 上覆盖安装并实测**） |
-| 旧包 | `dist/` 只保留当前包；16.3 / 16.2 / 16.1 / 16.0 / 15.x / 14.8 在各自 GitHub Release |
+| 当前包 | `dist/iLayoutSettings-16.5.apk`（286,069 B，SHA-256 `84493529…B566`；**已在 25053RT47C 上覆盖安装并实测**） |
+| 旧包 | `dist/` 只保留当前包；16.4 / 16.3 / 16.2 / 16.1 / 16.0 / 15.x / 14.8 在各自 GitHub Release |
 
 ## 发布物指纹
 
 | 包 | 大小 | SHA-256 | 签名证书 SHA-256 |
 | --- | --- | --- | --- |
-| `iLayoutSettings-16.4.apk`（**当前**） | 286,069 B | `EE68C55D05E9567831C3DE3327544A3D9AB2EBAD426B907EEC9C17329368B3C0` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-16.5.apk`（**当前**） | 286,069 B | `8449352927AD053BD49FDDF3505AADE4532F90933E680CDF94AE72257854B566` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-16.4.apk`（历史，Release） | 286,069 B | `EE68C55D05E9567831C3DE3327544A3D9AB2EBAD426B907EEC9C17329368B3C0` | 同上 |
 | `iLayoutSettings-16.3.apk`（历史，Release） | 236,593 B | `ED0C383E5A91DC4F054ED3C362AAF4AAE3F44506CE80F4078CD3C36439402873` | 同上 |
 | `iLayoutSettings-16.2.apk`（历史，Release） | 236,593 B | `2D2F068C8DEC1A5D5B982F6347F71580F6C4800B8BE89F4286C2836E945AEC3B` | 同上 |
 | `iLayoutSettings-16.1.apk`（历史，Release） | 224,305 B | `83BE73357A1AD29DCB57EC8BCF217127BEA7B7461A18DF70E0189EC83571F77F` | 同上 |
@@ -35,9 +36,9 @@
 | --- | --- |
 | 仓库 | https://github.com/Remoparrot/iLayoutSettings （旧 `iLyayot` 自动跳转） |
 | 默认分支 | `main` |
-| 最新 Release | [v16.4](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.4)（附件 `iLayoutSettings-16.4.apk`，286,069 B，SHA-256 `EE68C55D…B3C0`） |
+| 最新 Release | [v16.5](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.5)（附件 `iLayoutSettings-16.5.apk`，286,069 B，SHA-256 `84493529…B566`） |
 | 自动发版 | `tools/release.ps1`：构建 → 校验 → **自动 add/commit/push 当前分支** → 打 tag → 建 Release → 上传附件 |
-| 旧 Release | v16.3、16.2、16.1、16.0、15.5、14.8 保留（本地 `dist/` 不再保留旧包） |
+| 旧 Release | v16.4、16.3、16.2、16.1、16.0、15.5、14.8 保留（本地 `dist/` 不再保留旧包） |
 
 ## 现在能做什么
 
@@ -65,17 +66,20 @@
   退出时底部栏保持隐藏，等 MIUI 收起顶部搜索框（`ActionModeAnimationListener#onStop(open=false)`）
   后才出现，不再短暂同时显示两个搜索栏
 - ✅ 控制中心行右侧飞行模式开关（`AirplaneSwitch`）
-- ✅ **顶栏透明度（16.2）**：参数页「顶栏 · 透明度」0–100%，只作用于滚动后的半透明底色；
-  16.3 起默认 **2%**
-- ✅ **顶栏发丝线（16.2，16.3 改深色色值，16.4 修主题切换）**：折叠顶栏出现时，在
-  `ActionBarOverlayLayout` 的 overlay 上画 0.5dp 半透明线——浅色模式黑色 12%，深色模式
-  **中性灰 30%（`0x4DAAAAAA`）**；大标题展开/回到顶部时隐藏。
-  16.4 起颜色每帧按当前 `uiMode` 取，**设置界面内切深浅色后线不再消失**
-  （旧实现把颜色和滚动监听都绑在会被 recreate 的 fragment 视图上）。
-- ✅ **顶栏模糊可调（16.2 修，16.3 改默认，16.4 修首发）**：`topbar_blur` 0–100%，默认 **5%**
-  （内部 8dp），透明度默认 **2%**——滚动后顶栏近乎全透明，只留极淡模糊 + 发丝线；
-  直接改 `NestedHeaderLayout` 原生 `mBlurEffect`。16.4 在 `refreshBlur()` 前预写半径，
-  折叠栏第一次出现就带模糊，不再从 0 起步。旧 110dp 读取时折算为 73%
+- ✅ **顶栏透明度（16.2）**：参数页「顶栏 · 透明度」0–100%；16.3 起默认 **2%**，
+  16.5 起**任何滚动位置都用这个半透明底色**（不再在顶部恢复实色）
+- ✅ **顶栏发丝线（16.2，16.3 改深色色值，16.4 修主题切换，16.5 跟随折叠）**：
+  在 `ActionBarOverlayLayout` 的 overlay 上画 0.5dp 半透明线——浅色模式黑色 12%，深色模式
+  **中性灰 30%（`0x4DAAAAAA`）**。16.4 起颜色每帧按当前 `uiMode` 取，设置界面内切深浅色后
+  线不再消失；16.5 起显示条件改为「列表已滚动 **或** 栏已从大标题高度收缩」，
+  折叠动画中栏开始压住内容时线就出现，回到顶部（栏恢复大标题高度）后隐藏。
+- ✅ **顶栏始终模糊（16.2 修，16.3 改默认，16.4 修首发，16.5 改常开）**：`topbar_blur` 0–100%，
+  默认 **5%**（约 7.5dp ≈ 22px），透明度默认 **2%**。直接改 `NestedHeaderLayout` 原生
+  `mBlurEffect`，并给 `action_bar_container` 自己下发 `MiuiBlurUtils.setBackgroundBlur`
+  （参数是像素，按 density 换算）。16.4 在 `refreshBlur()` 前预写半径，折叠栏第一次出现
+  就带模糊；**16.5 起不再按「是否滚动」开关模糊和底色，并且清掉 MIUI 给滚动容器的
+  `clipBounds`**——账户卡等内容滑进栏下就是模糊的，不再被不透明栏硬切。
+  旧 110dp 读取时折算为 73%
 - ✅ **高级设置开关（16.4，GUI）**：模块应用内「高级设置」总开关（默认关）。关闭时只显示
   搜索栏玻璃滑杆；开启后才出现「顶栏」卡片（模糊 / 透明度 / 显示顶栏分割线）。
   发丝线默认仍绘制，开关只控制是否显示/隐藏
@@ -95,10 +99,12 @@
    和 `android.bluetooth.device.extra.DEVICE`（或 `bluetoothaddress`）；ROM 升级改语义时要重新抓。
 3. **图标优先级（16.2 起）**：耳机 / iCloud 以模块内置 PNG（用户提供的主题资源）为准，
    `com.android.settings` 同名 drawable 只在模块内置资源缺失时兜底；主题不能再覆盖这两张图。
-4. **顶栏发丝线只在滚动后显示**：`NestedHeaderLayout.isHeaderOpen()` 在部分主题/ROM 上语义变化时，
-   可能出现过早/过晚显示；线宿主是 `action_bar_container` 的父级（当前 `ActionBarOverlayLayout`），
-   换 ROM 若父级也不画 overlay，线会再次不可见（实测 `ActionBarContainer` 自己的 overlay 不绘制）。
-   深浅色线色 16.3 已实拍确认（浅色 `(222,222,223)`、深色 `(58,58,59)`），16.4 切主题后复测一致。
+4. **顶栏发丝线/模糊依赖栏高与 clip**：16.5 用 `OPEN_BAR_HEIGHT` 记录见过的最大栏高来判断
+   「折叠中」；若某些主题下 action bar 高度本身就会随模式变化（如搜索模式），线可能在那些
+   模式下也显示。清 `clipBounds` 依赖 `updateOverBgState()` 仍被调用；换 ROM 若改成别处设 clip，
+   内容会重新被裁在栏底。线宿主仍是 `action_bar_container` 的父级（当前 `ActionBarOverlayLayout`），
+   若父级也不画 overlay，线会不可见（实测 `ActionBarContainer` 自己的 overlay 不绘制）。
+   深浅色线色 16.3 已实拍确认（浅色 `(222,222,223)`、深色 `(58,58,59)`），16.5 复测一致。
 5. **顶栏模糊依赖 MIUI 私有 API**：`MiuiBlurUiHelper.setBlurParams` / `mBlurEffect` /
    `refreshBlur` 在 ROM 升级改名时 hook 会软失败，表现回到「模糊固定、不可调」。
 6. **仅在默认主题 / 默认图标包上验证**；第三方主题替换 `ic_*` / 分割线颜色时需要再确认
@@ -110,7 +116,8 @@
 
 ## 下一步（优先级从高到低）
 
-1. 观察顶栏发丝线在「设置内反复切深浅色 + 进搜索再退出」后的表现，必要时把宿主换成根 content overlay；
+1. 观察 16.5 的「常开模糊」在**搜索模式**、第三方主题、平板/横屏下的表现（栏高变化会不会
+   让线提前出现）；必要时把发丝线的显示条件收紧到「折叠进度 > 阈值」；
 2. 图标如需跟随系统主题，补 `mipmap-anydpi-v26` adaptive icon（前景 = 齿轮+玻璃盘，背景 = 渐变）；
 3. 观察耳机卡在真实「开盖自动连」场景下的出现时机，必要时把防抖从 350ms 调到 200ms；
 4. 接 GitHub Actions：tag 触发 `tools/release.ps1` 的只读版本（构建 + 上传）；
