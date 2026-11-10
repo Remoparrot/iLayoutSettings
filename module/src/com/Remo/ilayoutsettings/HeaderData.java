@@ -101,11 +101,12 @@ final class HeaderData {
             {"battery_settings_new", "battery_settings", "battery"},
             {"vpn_settings_multiple", "vpn_settings", "vpn_settings2"},
 
-            // 3: general / standby / wallpaper / control center / airplay / appearance / home / super xiaoai / siri
+            // 3: general / standby / control center / wallpaper / airplay / appearance / home / super xiaoai / siri
             {"other_advanced_settings", "advanced_settings"},
             {"screen_settings", "lock_screen_settings", "aod_and_lockscreen_settings"},
-            {"wallpaper_settings", "personalize_title"},
+            // 16.7: 控制中心 sits directly above 墙纸 (the native order is the other way round).
             {"wireless_settings"},
+            {"wallpaper_settings", "personalize_title"},
             {"interconnection_settings", "interconnection", "milink_settings", "mi_link_settings"},
             {"display_settings"},
             {"launcher_settings"},
@@ -156,8 +157,8 @@ final class HeaderData {
             {"VPN"},
             {"通用", "更多设置", "高级设置"},
             {"待机显示", "锁屏", "息屏"},
-            {"墙纸", "壁纸", "主题壁纸"},
             {"控制中心"},
+            {"墙纸", "壁纸", "主题壁纸"},
             {"隔空播放", "连续互通", "互传", "MiLink", "投屏"},
             {"外观", "显示", "显示与亮度"},
             {"主屏幕", "桌面"},
@@ -692,10 +693,13 @@ final class HeaderData {
      * Synthetic "搜索" row directly below 墙纸. 小米搜索 keeps its options in
      * {@code com.android.quicksearchbox/.preferences.SearchSettingsPreferenceActivity};
      * the icon is Settings' {@code ic_search_24dp}.
+     *
+     * <p>16.7: 墙纸 moved from slot 11 to slot 12 (控制中心 now takes 11 and sits
+     * above it), so the anchor follows it — the row must stay under 墙纸.</p>
      */
     private static void addSearchRow(Activity activity, List<Item> items) {
         addIntentRow(activity, items, SEARCH_TITLE, "search_entry", SEARCH_PKG, SEARCH_CLS,
-                new String[]{"ic_search_24dp", "ic_search"}, 11);
+                new String[]{"ic_search_24dp", "ic_search"}, 12);
     }
 
     /**

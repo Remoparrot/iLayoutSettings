@@ -598,7 +598,7 @@ final class UiTweaks {
      * The overlay is drawn after the bar's content, so the divider stays visible
      * above the native header and the blur surface.</p>
      */
-    private static void applyDivider(View appBar, int color, boolean visible) {
+    static void applyDivider(View appBar, int color, boolean visible) {
         try {
             int width = appBar.getWidth();
             int height = appBar.getHeight();
@@ -705,8 +705,8 @@ final class UiTweaks {
         return null;
     }
 
-    private static Object callStatic(ClassLoader loader, String className, String name,
-                                     Object... args) {
+    static Object callStatic(ClassLoader loader, String className, String name,
+                             Object... args) {
         try {
             Class<?> c;
             try {

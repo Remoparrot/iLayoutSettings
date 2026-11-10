@@ -3,7 +3,7 @@
 > 把澎湃 OS（HyperOS 3）「设置」首页改成 iOS 风格：入口重排、条件卡片（软件更新 / 耳机 / iCloud）、搜索栏沉底、卡片细节修正。
 > **全部复用 MIUI 原生控件与原生数据，模块不重绘任何页面。**
 
-[![Version](https://img.shields.io/badge/version-16.6-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
+[![Version](https://img.shields.io/badge/version-16.7-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-HyperOS%203%20%7C%20Android%2015%2B-green)](docs/01-overview.md)
 [![LSPosed](https://img.shields.io/badge/framework-LSPosed-orange)](docs/04-install.md)
@@ -22,7 +22,7 @@
 
 | 能力 | 说明 |
 | --- | --- |
-| 首页重排 / 分组 | iOS 顺序 + 独立卡片，卡片圆角与间距仍由 miuix `CardItemDecoration` 绘制 |
+| 首页重排 / 分组 | iOS 顺序 + 独立卡片，卡片圆角与间距仍由 miuix `CardItemDecoration` 绘制；**16.7「控制中心」移到「墙纸」上方** |
 | 软件更新卡（条件） | 读 `Settings.Global.miui_new_version`，非空才显示「有软件更新可用」+ 红色「1」角标，点击进系统更新；**16.6 起「通用」行的蓝 1 也换成同一颗红角标**，两行都带系统自带的箭头 |
 | 耳机卡（条件） | 检测已连接的蓝牙/有线/USB 耳机，标题 = 设备别名；**连上/断开后即时刷新，不用重启设置**；没连耳机整张卡不出现，点击进 MIUI 耳机详情页（电量/改名/EQ） |
 | iCloud 入口 | 固定在「Game Center」下方，点击打开小米云服务 |
@@ -35,6 +35,7 @@
 | 参数界面 | 应用内滑杆：搜索栏模糊（0.1dp）/ 折射 19dp / 厚度 12dp；顶栏模糊 0–100%、顶栏透明度 0–100%、显示顶栏分割线（16.6 删除「高级设置」总开关，全部常显） |
 | 卡片细节修正 | 去掉每组最后一行的双层圆角/放大图标；外观页预览加卡片底 |
 | 顶部模糊 / 发丝线 | 默认 5% 模糊 + 2% 透明度，**顶栏始终带模糊**——账户卡等内容滑到栏下面就是糊的，不再被不透明栏切掉；发丝线跟着栏一起出现（浅色黑 12%，深色中性灰 30%）；**设置内切换深浅色后线不消失**，折叠栏第一次出现就带模糊 |
+| 二级页顶栏（16.7） | 二级页顶栏与首页同一套参数：半透明底色 + 原生模糊 + 内容滑进栏下；0.5dp 半透明发丝线只在滚动时出现，回顶部即隐藏 |
 | 应用图标 | 蓝紫渐变 + 半透明玻璃盘 + 白齿轮（[预览](docs/assets/icon-16.4.png)）；`tools/make_launcher_icon.py` 生成五档 mipmap，脚本内另有两套候选（[并排对比](docs/assets/icon-candidates-16.4.png)） |
 
 ## 截图
@@ -49,9 +50,19 @@
 | --- | --- | --- |
 | ![首页](docs/assets/home-15.3-light.png) | ![搜索栏 · 浅色](docs/assets/search-glass-16.6-light.png) | ![搜索栏 · 深色](docs/assets/search-glass-16.6-dark.png) |
 
+16.7：控制中心移到墙纸上方，二级页顶栏半透明 + 模糊 + 发丝线：
+
+| 首页 · 浅色 | 首页 · 深色 |
+| --- | --- |
+| ![首页 · 浅色 16.7](docs/assets/home-16.7-light.png) | ![首页 · 深色 16.7](docs/assets/home-16.7-dark.png) |
+
+| 二级页顶栏 · 浅色（滚动后出现发丝线） | 二级页顶栏 · 深色 |
+| --- | --- |
+| ![二级页顶栏 · 浅色](docs/assets/subpage-topbar-16.7-light.png) | ![二级页顶栏 · 深色](docs/assets/subpage-topbar-16.7-dark.png) |
+
 ## 安装
 
-1. 下载 [`dist/iLayoutSettings-16.6.apk`](dist/iLayoutSettings-16.6.apk)，或到 [Releases · v16.6](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.6) 下同名附件（294,434 B，SHA-256 `48BF9927…1FEA`，与 `dist/` 同一份）；
+1. 下载 [`dist/iLayoutSettings-16.7.apk`](dist/iLayoutSettings-16.7.apk)，或到 [Releases · v16.7](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.7) 下同名附件（298,530 B，SHA-256 `25E0FCA8…D973`，与 `dist/` 同一份）；
    **16.0 起包名是** `com.Remo.ilayoutsettings`，从 16.0 升级可直接覆盖（同一签名）；
 2. LSPosed 中启用 **iLayoutSettings**，作用域只勾选 **设置**（`com.android.settings`）；
 3. **强制停止「设置」**（或重启手机），再打开设置；
@@ -62,7 +73,8 @@
 > 旧版本 15.5 / 14.8 仍在各自 Release 里（14.8 证书不同）。
 
 日志过滤 `iLayoutSettings` 应能看到 `hooks installed`、`top bar hooks installed`、
-`hooked MiuiBlurUiHelper (header radius + refreshBlur)`、`icloud row added below Game Center`、
+`hooked MiuiBlurUiHelper (header radius + refreshBlur)`、`hooked sub-page activity bases`、
+`sub-page action bar overlay mode on`、`icloud row added below Game Center`、
 按条件出现的 `update card added: …` / `airpods card added: …`、`headset devices changed, refresh cards`，
 以及 `card icon … <- module (supplied theme)`、`liquid glass shader compiled`、
 `search glass mask=...`、`airplane icon set: ...`。
@@ -90,7 +102,7 @@ pwsh -File module/build.ps1 `
 ```
 
 输出 `dist/iLayoutSettings-<versionName>.apk`。
-发版用 `tools/release.ps1 -Version 16.6`：构建 → 校验 → 自动提交/推送 → 打 tag → 建 Release → 上传 APK，一条命令完成。
+发版用 `tools/release.ps1 -Version 16.7`：构建 → 校验 → 自动提交/推送 → 打 tag → 建 Release → 上传 APK，一条命令完成。
 完整工具链版本、可复现性说明见 [构建指南](docs/03-build.md)。
 
 ## 文档

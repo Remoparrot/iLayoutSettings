@@ -123,6 +123,9 @@ final class Hook {
         AppearanceTweak.install(cl);
         // Title restyling removed: sub pages keep MIUI's native title behaviour.
         ForceBlur.install(cl);
+        // 16.7: second-level pages get the same translucent + blurred top bar
+        // as the home page (the action bar there never asked for the blur).
+        SubPageTopBar.install(cl);
         // Top-bar overlays (blur / opacity / hairline) are driven from the
         // NestedHeaderLayout class so they survive uiMode recreation.
         UiTweaks.installTopBar(cl);

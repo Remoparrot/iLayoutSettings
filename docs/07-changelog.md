@@ -3,10 +3,29 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前主线是 **16.6（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前主线是 **16.7（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
+
+---
+
+# iLayoutSettings · LSPosed 模块（v16.7：二级页顶栏 + 控制中心上移）
+
+## v16.7 变更
+
+- **二级页顶栏（新）**：二级页（`Settings$XxxActivity`）的 `action_bar_container` 现在和首页同一套参数——
+  底色按 `topbar_alpha` 半透明、模糊按 `topbar_blur`（原生 `MiuiBlurUtils.setBackgroundBlur`）。
+  二级页原本是普通列布局（列表在栏下方），要把 `ActionBarOverlayLayout` 切到 overlay 模式并给列表
+  加 `bar 高度` 的 padding，行才会滑进栏下被模糊；同时清掉 MIUI 折叠时设的 `clipBounds`。
+- **二级页发丝线（新）**：复用首页的 `applyDivider`——0.5dp `ColorDrawable` 画在栏父级的
+  `ViewOverlay`；显示条件 = 列表 `canScrollVertically(-1)`（第一行已滑到栏下），回到顶部自动消失；
+  颜色每帧按 `uiMode` 取（浅色黑 12%，深色中性灰 30%），并受「显示顶栏分割线」开关控制。
+- **控制中心上移**：首页「控制中心」行从「墙纸」下方移到「墙纸」上方（`HeaderData.SLOT_IDS` 组 4 内调槽位）。
+- **浅色搜索栏高光回退（16.7 试验）**：先给浅色加了灰色描边 + 内移的白色高光，真机上看起来是
+  「灰环 + 白环」两条线、比 16.6 重，按反馈整段回退到 16.6 的上下白高光（`SearchGlass` 与 HEAD 相同）。
+  「浅色纯白页高光不明显」仍是已知问题（见 00-status 已知问题 12）。
+- **版本**：16.7 / versionCode **98**；APK `dist/iLayoutSettings-16.7.apk`，298,530 B。
 
 ---
 

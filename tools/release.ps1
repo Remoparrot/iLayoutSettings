@@ -216,20 +216,20 @@ $bodyTemplate = @'
 
 > 本机 MIUI 可能拦截 adb 安装新包（`INSTALL_FAILED_USER_RESTRICTED`），请把 APK 拷到手机手动安装。
 
-### 本版内容（16.6）
+### 本版内容（16.7）
 
-- **搜索栏玻璃重做**：不再在 `miuix_appcompat_search_mode_edit_text_bg_light/dark` 9-patch 上叠加，
-  改为模块自绘的 Kyant 液态玻璃（折射 + 模糊 + 半透明底色）；
-- **iOS 27 圆角**：轮廓改用 Kyant Shapes 的 G2 连续曲率胶囊，不再是普通 stadium 圆角；
-- **上下光边**：高光只保留在上下边缘、两端不亮，左右对称且亮度一致；内阴影已移除；
-- **图标**：搜索/麦克风换成指定 iOS 27 图标，随深浅色自动变色，并整体缩小、向栏内收；
-- **麦克风唤醒小爱**：点麦克风走和电源键长按相同的 `VoiceService` 入口，唤起小爱同学；
-- **GUI**：删除「高级设置」总开关，顶栏模糊/透明度/分割线选项常显；
-- **「红 1」角标统一**：「通用」行的蓝色「1」也换成和更新卡同一颗红角标（24dp、白粗体），
-  两行都与右侧箭头垂直居中；
-- **带角标的行补箭头**：复用该行原生 `arrow_right` 的 drawable，形状与系统箭头完全一致；
-- **更新卡标题左移**：标题移到 16dp 内边距，与右侧箭头留白对称；
-- 版本 16.6 / versionCode 97。
+- **二级页顶栏（新）**：无线局域网、应用等二级页的顶栏与首页同一套——半透明底色 + 原生模糊，
+  列表内容滑进栏下就是糊的；离开顶部时出现 0.5dp 半透明发丝线（浅色黑 12%、深色中性灰 30%），
+  回到顶部自动隐藏；
+- **控制中心上移**：首页「控制中心」行移到「墙纸」上方；
+- **搜索栏**：浅色高光保持 16.6 的效果（本版试过加灰色描边，真机读成双线、偏重，已回退）；
+- 版本 16.7 / versionCode 98。
+
+### 截图
+
+| 首页 · 16.7（控制中心在墙纸上方） | 二级页顶栏 · 浅色 | 二级页顶栏 · 深色 |
+| --- | --- | --- |
+| ![首页](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/main/docs/assets/home-16.7-light.png) | ![二级页顶栏 · 浅色](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/main/docs/assets/subpage-topbar-16.7-light.png) | ![二级页顶栏 · 深色](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/main/docs/assets/subpage-topbar-16.7-dark.png) |
 
 完整变更见 [docs/07-changelog.md](../blob/main/docs/07-changelog.md)。
 '@

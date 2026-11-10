@@ -1,6 +1,6 @@
 # 架构与 Hook 链路
 
-> 状态：**现行** · 对应版本：16.6 (97)
+> 状态：**现行** · 对应版本：16.7 (98)
 > 源码：`module/src/com/Remo/ilayoutsettings/`
 
 ## 1. 从加载到生效
@@ -22,6 +22,7 @@ LSPosed
             ├─ WirelessPage.install()      → MiuiWirelessSettings#onViewCreated/onResume
             ├─ AccountTextFix.install()    → TextView#setText
             ├─ AppearanceTweak.install()   → MiuiDisplaySettings#onViewCreated/onResume
+            ├─ SubPageTopBar.install()     → SettingsActivity / SettingsBaseActivity#onResume/onDestroy（二级页顶栏 + 发丝线）
             └─ ForceBlur.install()         → HyperMaterialUtils / MiuiBlurUtils
 ```
 
@@ -43,6 +44,7 @@ LSPosed
 | `MiuiWirelessSettings` | `onViewCreated` / `onResume` | 删飞行模式行、补「隔空播放与连续互通」 | `WirelessPage` |
 | `android.widget.TextView` | `setText` | 账号副标题兜底改成 iOS 文案 | `AccountTextFix` |
 | `MiuiDisplaySettings` | `onViewCreated` / `onResume` | 外观页预览加卡片底 | `AppearanceTweak` |
+| `com.android.settings.SettingsActivity` / `core.SettingsBaseActivity` | `onResume` / `onDestroy` | 二级页顶栏：同款半透明底色 + 原生模糊、`ActionBarOverlayLayout` overlay 模式、列表 padding、发丝线 | `SubPageTopBar` |
 | `HyperMaterialUtils` / `MiuiBlurUtils` | 多个开关方法 | 强制开启原生模糊 | `ForceBlur` |
 | `MiuiBlurUiHelper` | `setBlurParams(int[],int[],int)` | 把顶栏原生模糊半径换成 `topbar_blur`（只匹配 `NestedHeaderLayout` 的 over-bg view） | `ForceBlur` |
 
@@ -213,6 +215,30 @@ LSPosed
   之前的 `UiTweaks.class.getClassLoader()` 会 `ClassNotFoundException`，所以滑杆写进去了但从未生效；
 - 16.4 仍保留 700ms 的空闲轮询（`ensurePoll`，`attach` 时启动、detach 时停），
   让 GUI 滑杆改完回到设置后即使不滚动也能重新套用新值；滚动过程中则完全由类钩子驱动。
+
+### 4.3 二级页顶栏（`SubPageTopBar`，16.7）
+
+二级页（`Settings$WifiSettingsActivity` 这类）是普通 `ActionBar` Activity，不走 `NestedHeaderLayout`，
+所以首页那套顶栏逻辑完全够不着它。`SubPageTopBar.install(cl)` 在 `SettingsActivity` /
+`SettingsBaseActivity` 的 `onResume` 上挂钩，对 `com.android.settings:id/action_bar_container` 做四件事：
+
+1. **半透明底色**：与首页同一公式 `(alpha << 24) | (dark ? 0x000000 : 0xF2F2F7)`，
+   alpha 来自 `topbar_alpha`；`APPLIED_BG` 去重，滚动帧里只做比较；
+2. **原生模糊**：`MiuiBlurUtils.setBackgroundBlur(bar, px)` + `setBackgroundBlurRadius`，
+   半径 = `topbar_blur` 按 density 换算的像素（该 API 收的是 px，不是 dp）；底色变了必须重发一次
+   （`setBackgroundColor` 会盖掉 blur 层），`APPLIED_BLUR` 记上次值；
+3. **让内容滑进栏下**：二级页本来 `list.top == bar.bottom`，只清 clip 没用。反射调
+   `ActionBarOverlayLayout.setOverlayMode(true)` 让内容铺到窗口顶部，再给列表 `paddingTop = 栏高`
+   并 `setClipToPadding(false)`；`padListUnderBar` 只做一次（`LIST_PADDING` 记录），
+   否则滚动中栏高变化会把 padding 越加越大；
+4. **发丝线**：直接复用 `UiTweaks.applyDivider(appBar, color, visible)`（16.7 起包内可见）。
+   显示条件 = 列表 `canScrollVertically(-1)`（第一行已经滑到栏下）；**不要用
+   `computeVerticalScrollOffset()`**——部分 MIUI 列表恒 0。线宿主是栏的父级
+   `ActionBarOverlayLayout` 的 `ViewOverlay`（`ActionBarContainer` 自己的 overlay 不绘制），
+   颜色每帧按 `uiMode` 取：浅色黑 12%、深色中性灰 30%，并受 `topbar_divider` 开关控制。
+
+视图在 `onResume` 后 post 两次（activity 自己的 resume 工作、MIUI 重建折叠标题都在其后），
+滚动回调只重算发丝线（`clearListClip` + `applyDivider`），不做整套 refresh。
 
 ## 5. 二级页图标（`SubPageIcons`）
 

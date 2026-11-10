@@ -1,25 +1,26 @@
 # 项目状态快照
 
-> 状态：**现行** · 最后更新：2026-11-10
+> 状态：**现行** · 最后更新：2026-11-11
 > 每次会话结束必须更新本文件。只写「现在是什么样」，历史过程放 `sessions/`。
 
 ## 当前版本
 
 | 项 | 值 |
 | --- | --- |
-| versionName / versionCode | **16.6 / 97**（唯一来源：`module/AndroidManifest.xml`） |
+| versionName / versionCode | **16.7 / 98**（唯一来源：`module/AndroidManifest.xml`） |
 | 包名 | **`com.Remo.ilayoutsettings`**（16.0 由 `com.abradant.iossettings` 改名，属于破坏性变更） |
 | 应用名 / 仓库名 | **iLayoutSettings**（GitHub 仓库同步改名，旧地址会 301 跳转） |
 | minSdk / targetSdk | 29 / 36 |
 | 作用域 | `com.android.settings` |
-| 当前包 | `dist/iLayoutSettings-16.6.apk`（294,434 B，SHA-256 `F167D382…B6FE`；**已在 25053RT47C 上覆盖安装并实测**） |
-| 旧包 | `dist/` 只保留当前包；16.5 / 16.4 / 16.3 / 16.2 / 16.1 / 16.0 / 15.x / 14.8 在各自 GitHub Release |
+| 当前包 | `dist/iLayoutSettings-16.7.apk`（298,530 B，SHA-256 `25E0FCA8…D973`；**已在 25053RT47C 上覆盖安装并实测**） |
+| 旧包 | `dist/` 只保留当前包；16.6 / 16.5 / 16.4 / 16.3 / 16.2 / 16.1 / 16.0 / 15.x / 14.8 在各自 GitHub Release |
 
 ## 发布物指纹
 
 | 包 | 大小 | SHA-256 | 签名证书 SHA-256 |
 | --- | --- | --- | --- |
-| `iLayoutSettings-16.6.apk`（**当前**） | 294,434 B | `F167D3820FEEAF83FED1B8C7FFDF8CD006BF9ADB38EFE4C24E4E9116076BE6FE` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-16.7.apk`（**当前**） | 298,530 B | `25E0FCA8A39256DFCEC726DCEEC50CB8B268427CDE27A0C18F61589E11CDD973` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-16.6.apk`（历史，Release） | 294,434 B | `F167D3820FEEAF83FED1B8C7FFDF8CD006BF9ADB38EFE4C24E4E9116076BE6FE` | 同上 |
 | `iLayoutSettings-16.5.apk`（历史，Release） | 286,069 B | `8449352927AD053BD49FDDF3505AADE4532F90933E680CDF94AE72257854B566` | 同上 |
 | `iLayoutSettings-16.4.apk`（历史，Release） | 286,069 B | `EE68C55D05E9567831C3DE3327544A3D9AB2EBAD426B907EEC9C17329368B3C0` | 同上 |
 | `iLayoutSettings-16.3.apk`（历史，Release） | 236,593 B | `ED0C383E5A91DC4F054ED3C362AAF4AAE3F44506CE80F4078CD3C36439402873` | 同上 |
@@ -37,13 +38,14 @@
 | --- | --- |
 | 仓库 | https://github.com/Remoparrot/iLayoutSettings （旧 `iLyayot` 自动跳转） |
 | 默认分支 | `main` |
-| 最新 Release | [v16.6](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.6)（附件 `iLayoutSettings-16.6.apk`，294,434 B，SHA-256 `F167D382…B6FE`） |
+| 最新 Release | [v16.7](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.7)（附件 `iLayoutSettings-16.7.apk`，298,530 B，SHA-256 `25E0FCA8…D973`） |
 | 自动发版 | `tools/release.ps1`：构建 → 校验 → **自动 add/commit/push 当前分支** → 打 tag → 建 Release → 上传附件；脚本必须是 UTF-8 **带 BOM**，且在发 POST 前自检正文（中文丢失 / 占位符残留即中止） |
 | 旧 Release | v16.5、16.4、16.3、16.2、16.1、16.0、15.5、14.8 保留（本地 `dist/` 不再保留旧包） |
 
 ## 现在能做什么
 
 - ✅ 首页入口按 iOS 分组重排（`HeaderData`），卡片仍由 miuix 绘制
+- ✅ **控制中心上移（16.7）**：首页「控制中心」行移到「墙纸」上方（组 4 内调槽位，卡片不变）
 - ✅ 首页「专注模式」「相机」「搜索」合成入口（15.4 / 15.5 起）
 - ✅ **iCloud 入口（16.0，16.2 图标更新）**：固定在「Game Center」下方、同一张卡片；
   点击打开小米云服务 `com.miui.cloudservice/.ui.MiCloudMainActivity`；
@@ -87,6 +89,11 @@
   就带模糊；**16.5 起不再按「是否滚动」开关模糊和底色，并且清掉 MIUI 给滚动容器的
   `clipBounds`**——账户卡等内容滑进栏下就是模糊的，不再被不透明栏硬切。
   旧 110dp 读取时折算为 73%
+- ✅ **二级页顶栏（16.7 新增，`SubPageTopBar`）**：二级页的 `action_bar_container` 与首页同一套参数——
+  底色按 `topbar_alpha`、模糊按 `topbar_blur`（像素换算后走 `MiuiBlurUtils.setBackgroundBlur`）。
+  二级页是普通列布局，需把 `ActionBarOverlayLayout` 切到 overlay 模式并给列表加**栏高 padding**，
+  内容才滑得进栏下；发丝线复用首页的 `applyDivider`（宿主是栏父级的 `ViewOverlay`），
+  显示条件 = 列表 `canScrollVertically(-1)`，回顶部即消失。实测无线局域网 / 所有应用两页均生效。
 - ✅ **GUI（16.6 简化）**：删除「高级设置」总开关，搜索栏玻璃与顶栏两组滑杆直接显示；
   发丝线开关只控制是否显示/隐藏。搜索栏玻璃滑杆仍支持 0.1dp 步进
 - ✅ **应用图标（16.4 换风格）**：蓝紫渐变 + 半透明玻璃盘 + 白齿轮，`tools/make_launcher_icon.py`
@@ -127,13 +134,18 @@
     `voice_assist_root`；ROM 升级若改 action/加权限，`wakeXiaoAi` 会走 `ACTION_ASSIST` 兜底
     （可能弹 Resolver）。
 12. **光边在浅色纯白页上几乎不可见**：白色加法高光叠在浅灰胶囊上，白底环境没有对比；深色
-    模式实测上下峰值 `#63`/`#62`（等亮），浅色只在彩色内容上明显。
+    模式实测上下峰值 `#63`/`#62`（等亮），浅色只在彩色内容上明显。**16.7 试过「灰色描边 + 内移白高光」，
+    真机是灰环 + 白环两条线、偏重，按反馈已整段回退 16.6**；这个问题仍是已知问题，不要再自动加灰边。
 13. **G2 轮廓只对宽 ≥ 2×高 的胶囊生效**；其他比例退回普通圆角矩形（`buildShape` 分支）。
+14. **二级页顶栏依赖 MIUI 的 `ActionBarOverlayLayout` overlay 模式**：`SubPageTopBar` 用
+    `setOverlayMode(true)` + 列表 padding 让内容滑进栏下；若 ROM 改名/去掉该模式，或二级页不是
+    `SettingsActivity` / `SettingsBaseActivity` 子类，表现退回「栏有半透明底色，但内容不会滑到栏下、
+    也不会出现发丝线」。线宿主仍是栏父级 overlay，宿主不绘制时线不可见（同第 4 条）。
 
 ## 下一步（优先级从高到低）
 
-1. 观察 16.6 搜索栏在**第三方主题/彩色壁纸/浅色纯白页**下的光边与折射；必要时给浅色加
-   1px 灰色轮廓（先确认不违反「不要阴影」）；
+1. 观察 16.6 搜索栏在**第三方主题/彩色壁纸/浅色纯白页**下的光边与折射。16.7 已试过给浅色加
+   1px 灰色轮廓 + 内移白高光，实测偏重（灰环 + 白环），按反馈回退——**要再动先让用户看对比图**；
 2. 观察小爱入口在 ROM 升级后的可用性；必要时把 `VoiceService` 的 `ComponentName` 做成
    可配置，或改走 `ACTION_ASSIST`；
 3. 观察 16.5 的「常开模糊」在**搜索模式**、第三方主题、平板/横屏下的表现（栏高变化会不会

@@ -1,6 +1,6 @@
 # 踩坑记录
 
-> 状态：**现行** · 对应版本：16.6 (97)
+> 状态：**现行** · 对应版本：16.7 (98)
 > 规则：每踩一个新坑就追加一条，写清 **现象 → 根因 → 解法 → 如何避免**。旧结论被推翻时保留原文并标「已过时」。
 
 ## 最贵的五个坑（先看这五条）
@@ -94,6 +94,10 @@
 | 耳机连上后卡片不出现，必须强制停止设置 | `HeaderData.apply()` 只在 `buildAdapter` / `onResume` 跑，音频设备变化不会触发页面重建 | 16.1：`HeadsetWatcher` 注册 `AudioManager.registerAudioDeviceCallback`，350ms 防抖后 `HeaderData.refresh()`；refresh 必须先 `LAST_ORDER.remove(fragment)` 绕过早退分支 |
 | 耳机卡点了只进蓝牙列表，不进电量/功能页 | 16.0 的 intent 是 `ACTION_BLUETOOTH_SETTINGS` | 16.1：`miui.bluetooth.action.HEADSET_SETTINGS` + `DEVICE` + `COME_FROM=MIUI_BLUETOOTH_SETTINGS` → `MiuiHeadsetActivity` |
 | 详情页 intent 里的 MAC 是 `00:00:00:00:00:00` | MIUI 音频策略有时给 A2DP 输出占位地址；SCO 条目也没有真实 MAC | A2DP 优先（`headsetPriority`），地址无效时读 `AudioDeviceInfo.mAddress` / `toString()` 的 `addr:` 兜底，仍无效则退回蓝牙设置 |
+
+| **二级页顶栏半透明了，但内容不会滑到栏下**（16.7） | 二级页是普通列布局（`list.top == bar.bottom`），只清 `clipBounds` 也没东西可模糊；`setBackgroundBlur` 不改变布局 | 反射 `ActionBarOverlayLayout.setOverlayMode(true)` 让内容铺到窗口顶部，再给列表加**栏高** `paddingTop` + `clipToPadding=false`；padding 只加一次（`LIST_PADDING`），滚动中栏高变化不能重复加，否则越滚越空 |
+| **二级页顶栏没有发丝线**（16.7） | 首页的线挂在 `NestedHeaderLayout` 上；二级页不走这个类，而 `UiTweaks.refreshTopBar()` 在首页不可见时会主动跳过 | `SubPageTopBar` 直接复用 `UiTweaks.applyDivider()`：滚动回调里按 `canScrollVertically(-1)` 更新显隐，宿主仍是栏父级 `ActionBarOverlayLayout` 的 `ViewOverlay`；别用 `computeVerticalScrollOffset()`（部分 MIUI 列表恒 0） |
+| **16.7 给浅色搜索栏加灰边后变成「两条线」** | 灰色描边 + 内移的白色高光叠在浅灰胶囊上，白底上读成灰环 + 白环，比 16.6 重 | 按用户反馈整段回退 16.6（`SearchGlass` 与 HEAD 一致）。「浅色纯白页高光不明显」属 16.6 已知问题，未看图确认前不要再自动加灰边 |
 
 ### C. 版本与回退（本仓库特有）
 
