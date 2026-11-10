@@ -3,10 +3,66 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前主线是 **16.0（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前主线是 **16.1（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
+
+---
+
+# iLayoutSettings · LSPosed 模块（v16.1：耳机卡即时刷新 + 详情页 + 搜索退出时序）
+
+## v16.1 变更
+
+- **耳机卡即时刷新**（`HeadsetWatcher`，新）：设置首页打开期间注册
+  `AudioManager.registerAudioDeviceCallback`，A2DP / SCO / BLE / 有线 / USB 设备增减时
+  350ms 防抖后调 `HeaderData.refresh()` 重建条件卡。以前只在 `buildAdapter` / `onResume`
+  跑 `apply()`，耳机在首页打开时连上必须强制停止设置才会出现卡片。`onPause` / `onDestroy` 注销回调。
+- **耳机卡点击进耳机详情页**（`HeaderData.headsetIntent`）：优先
+  `miui.bluetooth.action.HEADSET_SETTINGS` + `android.bluetooth.device.extra.DEVICE` +
+  `COME_FROM=MIUI_BLUETOOTH_SETTINGS`（落到 `com.android.settings.bluetooth.MiuiHeadsetActivity`，
+  即 MIUI 自己的电量 / 改名 / 检查更新 / 功能开关页）；解析不到再按类名打开，最后才退回蓝牙设置。
+  地址从 `AudioDeviceInfo.getAddress()` 取，A2DP 优先，遇到 MIUI 的 `00:00:00:00:00:00`
+  占位地址时读 `mAddress` / `toString()` 兜底。
+- **图标优先用设置自己的**（`HeaderData.cardDrawable`）：iCloud 行 / 耳机行先按名字查
+  `com.android.settings` 的 `ic_cloud` / `ic_sub_airpods`，查不到才用模块内置图标
+  （`HeaderOverlay` 同步走这条路径）。本机 Settings 两个资源都不存在，日志为
+  `card icon … <- module`，行为与 16.0 一致。
+- **退出搜索不再短暂出现两个搜索栏**（`BottomSearch`）：
+  - `onDestroyActionMode` 只隐藏底部栏，不再立刻显示——那一刻 MIUI 的顶部搜索框还在收起，
+    两个栏会同时出现约 200ms；
+  - 给 `miuix.view.SearchActionMode` 动态挂一个 `ActionModeAnimationListener` 代理，
+    在 `onStop(open=false)`（收起动画结束）后再播底部栏进场；700ms 兜底；
+  - `isSearching()` 改读 `SettingsFragment.mIsInActionMode`（原来探测 `search_result_ll`，
+    它在首次布局后一直有高度，导致从二级页返回时底部栏被误隐藏）。
+- **版本**：16.1 / versionCode **92**；APK `dist/iLayoutSettings-16.1.apk`，224,305 B。
+
+## v16.1 校验
+
+```
+package: name='com.Remo.ilayoutsettings' versionCode='92' versionName='16.1'
+sdkVersion:'29'
+targetSdkVersion:'36'
+launchable-activity: name='com.Remo.ilayoutsettings.MainActivity'  label='iLayoutSettings'
+dex version : 039
+xposed_init : True
+module class: True
+reorder     : True
+size   : 224305 bytes
+sha256 : 83BE73357A1AD29DCB57EC8BCF217127BEA7B7461A18DF70E0189EC83571F77F
+```
+
+真机 25053RT47C / HyperOS 3 / Android 16（2026-11-10 13:52~14:02，**正式包直接 `adb install -r` 覆盖**）：
+
+- 耳机卡：连上 REDMI Buds 8 Pro 后日志 `airpods card added: Remo的REDMI Buds 8 Pro`，
+  点击 → `com.android.settings/.bluetooth.MiuiHeadsetActivity`（电量 100%/100%/30% 页面）；
+  `adb shell cmd bluetooth_manager disable` 后在首页直接看到卡片消失
+  （`headset devices changed, refresh cards` → `airpods card: no headset connected, skip` → 31 headers），
+  断开/连回都不需要重启设置；
+- 图标：`card icon ic_cloud <- module` / `card icon ic_sub_airpods <- module`（Settings 无同名资源）；
+- 搜索退出：`action mode onStop opening=false inMode=false` 之后底部栏才进场，
+  截图确认收起过程中只有顶部搜索框、收起后只有底部栏；
+- 二级页返回：底部栏仍在（`search_mode_stub` 在 UI 层级里），不再消失。
 
 ---
 

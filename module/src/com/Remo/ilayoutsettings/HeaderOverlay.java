@@ -111,7 +111,7 @@ final class HeaderOverlay {
         View icon = itemView.findViewById(android.R.id.icon);
         if (icon instanceof ImageView) {
             android.graphics.drawable.Drawable drawable =
-                    HeaderData.moduleDrawable(itemView.getContext(), name);
+                    HeaderData.cardDrawable(itemView.getContext(), name);
             if (drawable != null) {
                 ((ImageView) icon).setImageDrawable(drawable);
                 icon.setVisibility(View.VISIBLE);

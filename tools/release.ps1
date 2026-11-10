@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     iLayoutSettings 自动发版：构建 → 校验 → 打 tag → 建 GitHub Release → 上传 APK。
@@ -163,19 +163,27 @@ $bodyTemplate = @'
 
 ### 安装
 
-1. 先卸载旧模块（包名已改为 `com.Remo.ilayoutsettings`，不能覆盖安装旧包）；
+1. 16.0 起包名是 `com.Remo.ilayoutsettings`：从 16.0 升级可直接覆盖（同一签名）；
+   从 15.x 升级必须先卸载旧包 `com.abradant.iossettings`；
 2. 安装本附件，然后在 LSPosed 里启用 **iLayoutSettings**，作用域只勾 **设置**（`com.android.settings`）；
 3. 强制停止「设置」后重新打开。
 
 > 本机 MIUI 可能拦截 adb 安装新包（`INSTALL_FAILED_USER_RESTRICTED`），请把 APK 拷到手机手动安装。
 
-### 本版内容
+### 本版内容（16.1）
 
-- 应用 / 仓库改名 **iLayoutSettings**，包名 `com.Remo.ilayoutsettings`；
-- 新增 **iCloud** 行（Game Center 下方，打开小米云服务）；
-- 新增 **软件更新** 卡片（仅在系统更新发现新版本时显示，带红色「1」角标）；
-- 新增 **耳机** 卡片（仅在连接耳机时显示，标题为设备名）；
-- 底部搜索栏进出场过渡动画（220ms，进出搜索不再瞬移）。
+- **耳机卡即时刷新**：设置首页打开时连上/断开耳机，卡片立刻出现/消失，不用再强制停止设置
+  （`HeadsetWatcher` 监听 `AudioDeviceCallback`，350ms 防抖）；
+- **耳机卡点击进耳机详情页**：`miui.bluetooth.action.HEADSET_SETTINGS` →
+  `MiuiHeadsetActivity`（电量 / 改名 / 检查更新 / 功能开关），不再只跳蓝牙列表；
+  地址从音频设备取，带 MIUI 占位地址时用私有字段兜底，A2DP 优先；
+- **图标优先用设置自己的**：iCloud / 耳机行先找 `com.android.settings` 里的
+  `ic_cloud` / `ic_sub_airpods`，没有才用模块内置图标；
+- **退出搜索不再短暂出现两个搜索栏**：底部栏等 MIUI 收起顶部搜索框（
+  `ActionModeAnimationListener#onStop(open=false)`）后再出现，并带 700ms 兜底；
+- **修搜索栏从二级页回来消失**：`isSearching()` 改读 `mIsInActionMode`，不再被
+  `search_result_ll` 的残留高度误判；
+- 版本 16.1 / versionCode 92。
 
 完整变更见 [docs/07-changelog.md](../blob/main/docs/07-changelog.md)。
 '@

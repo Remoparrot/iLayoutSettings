@@ -1,6 +1,9 @@
 package com.Remo.ilayoutsettings;
 
 import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.drawable.Drawable;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -50,8 +53,22 @@ final class HeaderData {
 
     /** AirPods card; only while a headset is connected, title = device name. */
     private static final String AIRPODS_ICON = "ic_sub_airpods";
+    /** iCloud row icon name, looked up in Settings first and in the module second. */
+    private static final String ICLOUD_ICON = "ic_cloud";
     /** Debug override so the conditional card can be previewed without earbuds. */
     private static final String FAKE_HEADSET_KEY = "ilayout_fake_headset";
+    /** Debug override for the headset address used by the detail-page intent. */
+    private static final String FAKE_HEADSET_ADDRESS_KEY = "ilayout_fake_headset_address";
+
+    /** MIUI's headset settings page (battery / EQ / gesture detail), not the BT list. */
+    private static final String HEADSET_ACTION = "miui.bluetooth.action.HEADSET_SETTINGS";
+    private static final String HEADSET_CLS =
+            "com.android.settings.bluetooth.MiuiHeadsetActivity";
+    private static final String HEADSET_COME_FROM = "MIUI_BLUETOOTH_SETTINGS";
+    /** Intent extras read by MiuiHeadsetActivity. */
+    private static final String EXTRA_HEADSET_DEVICE = "android.bluetooth.device.extra.DEVICE";
+    private static final String EXTRA_HEADSET_ADDRESS = "bluetoothaddress";
+    private static final String EXTRA_HEADSET_FROM = "COME_FROM";
 
     /** Card groups 1 and 2 are unused by {@link #SLOT_GROUP}; 0 is the account card. */
     private static final int GROUP_UPDATE = 1;
@@ -778,6 +795,30 @@ final class HeaderData {
         return isMarked(header, "icloud");
     }
 
+    /**
+     * Drawable for a synthetic card icon. Settings wins over the module: a theme
+     * or a newer ROM may ship {@code ic_cloud} / {@code ic_sub_airpods} itself,
+     * and then that copy already matches the rest of the page. The bundled icon
+     * is only the fallback.
+     */
+    static Drawable cardDrawable(Context context, String name) {
+        try {
+            int id = context.getResources().getIdentifier(name, "drawable", "com.android.settings");
+            if (id != 0) {
+                Drawable drawable = context.getDrawable(id);
+                if (drawable != null) {
+                    XLog.i("card icon " + name + " <- settings");
+                    return drawable;
+                }
+            }
+        } catch (Throwable t) {
+            XLog.w("settings icon " + name + " unavailable: " + t);
+        }
+        Drawable fallback = moduleDrawable(context, name);
+        XLog.i("card icon " + name + (fallback != null ? " <- module" : " missing"));
+        return fallback;
+    }
+
     /** Loads one of the module's own drawables (ic_cloud, ic_sub_airpods, ...). */
     static android.graphics.drawable.Drawable moduleDrawable(android.content.Context context,
                                                             String name) {
@@ -845,7 +886,8 @@ final class HeaderData {
     /**
      * "我的 AirPods" card. Only exists while a headset is connected; the row
      * title is the device name so it matches what iOS shows above the network
-     * card. Tapping it opens Bluetooth settings.
+     * card. Tapping it opens MIUI's own headset detail page (battery, rename,
+     * noise control, ...), not the Bluetooth list.
      */
     private static void addAirpodsRow(Activity activity, List<Item> items) {
         for (Item it : items) {
@@ -859,11 +901,10 @@ final class HeaderData {
                 XLog.i("airpods card: no headset connected, skip");
                 return;
             }
+            android.bluetooth.BluetoothDevice device = connectedHeadsetDevice(activity);
             Object header = newHeader(activity, name);
-            setField(header, "intent",
-                    new android.content.Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS));
-            android.graphics.drawable.Drawable icon =
-                    moduleDrawable(activity, AIRPODS_ICON);
+            setField(header, "intent", headsetIntent(activity, device));
+            android.graphics.drawable.Drawable icon = cardDrawable(activity, AIRPODS_ICON);
             if (icon != null) {
                 setField(header, "icon", icon);
             } else {
@@ -882,6 +923,36 @@ final class HeaderData {
         } catch (Throwable t) {
             XLog.e("airpods card failed", t);
         }
+    }
+
+    /**
+     * Intent behind the headset card: MIUI's headset page when it can be
+     * resolved, otherwise the Bluetooth list so the row always does something.
+     */
+    private static Intent headsetIntent(Activity activity, android.bluetooth.BluetoothDevice device) {
+        if (device != null) {
+            Intent detail = new Intent(HEADSET_ACTION);
+            detail.putExtra(EXTRA_HEADSET_DEVICE, device);
+            detail.putExtra(EXTRA_HEADSET_ADDRESS, device.getAddress());
+            detail.putExtra(EXTRA_HEADSET_FROM, HEADSET_COME_FROM);
+            detail.addCategory(Intent.CATEGORY_DEFAULT);
+            try {
+                if (activity.getPackageManager().resolveActivity(detail, 0) != null) {
+                    XLog.i("headset card -> headset detail " + device.getAddress());
+                    return detail;
+                }
+                detail.setClassName("com.android.settings", HEADSET_CLS);
+                if (activity.getPackageManager().resolveActivity(detail, 0) != null) {
+                    XLog.i("headset card -> headset detail (by class)");
+                    return detail;
+                }
+            } catch (Throwable t) {
+                XLog.w("headset detail intent failed: " + t);
+            }
+        }
+        XLog.i("headset card -> bluetooth settings"
+                + (device == null ? " (no bluetooth device)" : ""));
+        return new Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS);
     }
 
     /**
@@ -906,7 +977,7 @@ final class HeaderData {
             }
             Object header = newHeader(activity, ICLOUD_TITLE);
             setField(header, "intent", intent);
-            android.graphics.drawable.Drawable icon = moduleDrawable(activity, "ic_cloud");
+            android.graphics.drawable.Drawable icon = cardDrawable(activity, ICLOUD_ICON);
             if (icon != null) {
                 setField(header, "icon", icon);
             } else {
@@ -929,14 +1000,8 @@ final class HeaderData {
         }
     }
 
-    /**
-     * Name of the currently connected headset, or {@code null} when none.
-     *
-     * <p>Bluetooth A2DP/SCO/BLE headsets carry their address, so the alias the
-     * user gave the device is available; wired and USB headsets fall back to
-     * the product name reported by audio policy.</p>
-     */
-    static String connectedHeadsetName(Activity activity) {
+    /** Test hook: fake headset name, or {@code null} when unset. */
+    private static String fakeHeadsetName(Activity activity) {
         try {
             String fake = android.provider.Settings.Global.getString(
                     activity.getContentResolver(), FAKE_HEADSET_KEY);
@@ -945,35 +1010,120 @@ final class HeaderData {
             }
         } catch (Throwable ignored) {
         }
+        return null;
+    }
+
+    /**
+     * Name of the currently connected headset, or {@code null} when none.
+     *
+     * <p>Bluetooth A2DP/SCO/BLE headsets carry their address, so the alias the
+     * user gave the device is available; wired and USB headsets fall back to
+     * the product name reported by audio policy.</p>
+     */
+    static String connectedHeadsetName(Activity activity) {
+        String fake = fakeHeadsetName(activity);
+        if (fake != null) {
+            return fake;
+        }
         try {
-            android.media.AudioManager am = (android.media.AudioManager)
-                    activity.getSystemService(android.content.Context.AUDIO_SERVICE);
-            if (am == null) {
+            android.media.AudioDeviceInfo device = bestHeadsetOutput(activity);
+            if (device == null) {
                 return null;
             }
-            android.media.AudioDeviceInfo[] devices =
-                    am.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS);
-            for (android.media.AudioDeviceInfo device : devices) {
-                if (!isHeadsetType(device.getType())) {
-                    continue;
-                }
-                String name = bluetoothDeviceName(device);
-                if (name == null || name.trim().length() == 0) {
-                    CharSequence product = device.getProductName();
-                    name = product == null ? null : product.toString();
-                }
-                if (name == null || name.trim().length() == 0) {
-                    name = "耳机";
-                }
-                return name.trim();
+            String name = bluetoothDeviceName(device);
+            if (name == null || name.trim().length() == 0) {
+                CharSequence product = device.getProductName();
+                name = product == null ? null : product.toString();
             }
+            if (name == null || name.trim().length() == 0) {
+                name = "耳机";
+            }
+            return name.trim();
         } catch (Throwable t) {
             XLog.e("headset detection failed", t);
         }
         return null;
     }
 
-    private static boolean isHeadsetType(int type) {
+    /**
+     * Bluetooth device behind the connected headset, or {@code null} for wired
+     * and USB headsets (and when nothing is connected). The headset detail page
+     * needs it; the visible card only needs the name.
+     */
+    static android.bluetooth.BluetoothDevice connectedHeadsetDevice(Activity activity) {
+        try {
+            String fakeAddress = android.provider.Settings.Global.getString(
+                    activity.getContentResolver(), FAKE_HEADSET_ADDRESS_KEY);
+            if (fakeAddress != null && fakeAddress.trim().length() > 0) {
+                return remoteDevice(fakeAddress.trim());
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            android.media.AudioDeviceInfo device = bestHeadsetOutput(activity);
+            if (device == null) {
+                return null;
+            }
+            android.bluetooth.BluetoothDevice remote = remoteDevice(device);
+            if (remote == null) {
+                XLog.i("headset audio device has no usable address: type="
+                        + device.getType() + " addr=" + device.getAddress());
+            }
+            return remote;
+        } catch (Throwable t) {
+            XLog.e("headset device detection failed", t);
+        }
+        return null;
+    }
+
+    /**
+     * Best connected headset output. A2DP wins over SCO/BLE: only the A2DP
+     * device carries the real MAC, and some stacks also expose an SCO entry
+     * with an all-zero address while the headset is connected.
+     */
+    private static android.media.AudioDeviceInfo bestHeadsetOutput(Activity activity) {
+        android.media.AudioManager am = (android.media.AudioManager)
+                activity.getSystemService(android.content.Context.AUDIO_SERVICE);
+        if (am == null) {
+            return null;
+        }
+        android.media.AudioDeviceInfo[] devices =
+                am.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS);
+        android.media.AudioDeviceInfo best = null;
+        int bestScore = -1;
+        for (android.media.AudioDeviceInfo device : devices) {
+            int type = device.getType();
+            if (!isHeadsetType(type)) {
+                continue;
+            }
+            int score = headsetPriority(type);
+            if (score > bestScore) {
+                best = device;
+                bestScore = score;
+            }
+        }
+        return best;
+    }
+
+    private static int headsetPriority(int type) {
+        switch (type) {
+            case android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP:
+                return 50;
+            case android.media.AudioDeviceInfo.TYPE_BLE_HEADSET:
+                return 40;
+            case android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO:
+                return 30;
+            case android.media.AudioDeviceInfo.TYPE_HEARING_AID:
+                return 20;
+            case android.media.AudioDeviceInfo.TYPE_USB_HEADSET:
+            case android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET:
+                return 10;
+            default:
+                return 0;
+        }
+    }
+
+    static boolean isHeadsetType(int type) {
         switch (type) {
             case android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP:
             case android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO:
@@ -988,18 +1138,74 @@ final class HeaderData {
                 && type == android.media.AudioDeviceInfo.TYPE_BLE_HEADSET;
     }
 
-    private static String bluetoothDeviceName(android.media.AudioDeviceInfo device) {
+    private static android.bluetooth.BluetoothDevice remoteDevice(
+            android.media.AudioDeviceInfo device) {
+        if (device == null) {
+            return null;
+        }
+        String address = device.getAddress();
+        if (!isUsableBluetoothAddress(address)) {
+            // MIUI's audio policy sometimes exposes the placeholder address for
+            // the A2DP output; the real one is still on the device object.
+            address = hiddenAddress(device);
+        }
+        return remoteDevice(address);
+    }
+
+    private static boolean isUsableBluetoothAddress(String address) {
+        if (address == null) {
+            return false;
+        }
+        String value = address.trim().toUpperCase(java.util.Locale.ROOT);
+        return value.length() == 17
+                && !"00:00:00:00:00:00".equals(value)
+                && !"FF:FF:FF:FF:FF:FF".equals(value);
+    }
+
+    private static String hiddenAddress(android.media.AudioDeviceInfo device) {
         try {
-            String address = device.getAddress();
-            if (address == null || address.length() == 0) {
-                return null;
+            Object value = de.robv.android.xposed.XposedHelpers.getObjectField(device, "mAddress");
+            if (value instanceof String && isUsableBluetoothAddress((String) value)) {
+                return (String) value;
             }
+        } catch (Throwable ignored) {
+        }
+        try {
+            String text = device.toString();
+            int at = text.indexOf("addr:");
+            if (at >= 0 && text.length() >= at + 22) {
+                String candidate = text.substring(at + 5, at + 22);
+                if (isUsableBluetoothAddress(candidate)) {
+                    return candidate;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    private static android.bluetooth.BluetoothDevice remoteDevice(String address) {
+        if (!isUsableBluetoothAddress(address)) {
+            return null;
+        }
+        try {
             android.bluetooth.BluetoothAdapter adapter =
                     android.bluetooth.BluetoothAdapter.getDefaultAdapter();
-            if (adapter == null) {
+            return adapter == null ? null : adapter.getRemoteDevice(address.trim());
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static String bluetoothDeviceName(android.media.AudioDeviceInfo device) {
+        return bluetoothDeviceName(remoteDevice(device));
+    }
+
+    private static String bluetoothDeviceName(android.bluetooth.BluetoothDevice remote) {
+        try {
+            if (remote == null) {
                 return null;
             }
-            android.bluetooth.BluetoothDevice remote = adapter.getRemoteDevice(address);
             if (android.os.Build.VERSION.SDK_INT >= 30) {
                 String alias = remote.getAlias();
                 if (alias != null && alias.length() > 0) {
@@ -1107,6 +1313,19 @@ final class HeaderData {
     }
 
     /* -------------------------------- reorder ------------------------------- */
+
+    /**
+     * Forces a rebuild of the synthetic cards (used when a headset connects or
+     * disconnects while the page is open). Drops the memoised order first,
+     * otherwise {@link #apply} would return early for an unchanged native list.
+     */
+    static void refresh(Object fragment) {
+        if (fragment == null) {
+            return;
+        }
+        LAST_ORDER.remove(fragment);
+        apply(fragment);
+    }
 
     /**
      * Rewrites the live list order and Header.groupId, then asks the miuix card
@@ -1284,7 +1503,7 @@ final class HeaderData {
         return null;
     }
 
-    private static Activity activity(Object fragment) {
+    static Activity activity(Object fragment) {
         try {
             java.lang.reflect.Method m = fragment.getClass().getMethod("getActivity");
             Object r = m.invoke(fragment);

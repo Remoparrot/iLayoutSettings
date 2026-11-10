@@ -1,6 +1,6 @@
 # 排错手册
 
-> 状态：**现行** · 对应版本：16.0 (91)
+> 状态：**现行** · 对应版本：16.1 (92)
 > 用法：先按「现象」定位，再看「下一步」。每个问题都给了判断依据，不要凭感觉重装。
 
 ## 0. 通用排查顺序
@@ -39,10 +39,12 @@
 | 点它没反应 | anchor 为空（未进搜索态） | 日志看 `bottom bar: vis=...`；确认 `mAnchorView` 已赋值 |
 | 搜索时还显示 | ActionMode hook 没生效 | 日志看 `onCreateActionMode` 相关行 |
 | 进出搜索时出现两个搜索栏 | 旧胶囊没被复用（16.0 之前） | 16.0 的 `install()` 在同一个 fragment / 同一夜间模式下会复用胶囊；仍有则看日志是否反复 `bottom search installed` |
+| 退出搜索时顶部搜索框和底部栏短暂同屏 | 底部栏在 MIUI 收起动画开始时就进场（16.1 之前） | 16.1 等 `action mode onStop opening=false` 后才进场；日志里没有这行则说明监听没挂上（`search exit listener failed`） |
+| 从二级页返回后底部栏消失 | `isSearching()` 被 `search_result_ll` 误判（16.1 之前） | 16.1 读 `mIsInActionMode`；仍消失则看 `bottom bar: vis=` 与 `mIsInActionMode` 字段是否存在 |
 | 过渡动画期间玻璃有拖影 | 玻璃抓图层跟着移动 | 16.0 动画期间会隐藏 `SearchGlass`；如果还看到拖影说明动画没走 `animateBar` |
 | 玻璃里有重影 | `capturing` 没跳过自身 | 见 [坑 4](06-pitfalls.md#坑-4底部搜索栏把自己拍进玻璃里) |
 
-## 3.1 条件卡片（16.0）
+## 3.1 条件卡片（16.0 起，16.1 增强）
 
 | 现象 | 可能原因 | 处理 |
 | --- | --- | --- |
@@ -51,7 +53,10 @@
 | 更新卡有但没红色角标 | `HeaderOverlay` 没 hook 上 | 日志看 `hooked HeaderAdapter.onBindViewHolder (badge / airpods icon)` |
 | 连着耳机但没耳机卡 | 输出设备是 `TYPE_BLE_SPEAKER`（不是耳机）/ 耳机只做输入 | 日志看 `airpods card:` 那行；必要时补 `isHeadsetType` |
 | 耳机卡名称不对 | 蓝牙别名为空，退回了产品名 | 正常兜底；可在蓝牙设置里重新命名设备 |
-| iCloud 行没有图标 | 模块资源没加载（旧包名 / 未装模块） | 日志看 `module drawable ic_cloud unavailable` |
+| 连上/断开耳机后卡片不刷新 | `HeadsetWatcher` 没 attach（页面没 resume）/ 回调被注销 | 日志看 `headset watcher attached` 与 `headset devices changed, refresh cards`；没有则看 `onPause` 后是否回到首页 |
+| 点耳机卡进的是蓝牙列表 | 详情页 intent 没解析到（`MiuiHeadsetActivity` 缺失 / 没有蓝牙设备） | 日志看 `headset card -> headset detail <MAC>` 还是 `-> bluetooth settings`；有线耳机属正常兜底 |
+| 详情页打不开或是空白 | MAC 是 `00:00:00:00:00:00` / 设备未配对 | 日志看 intent 那行的地址；A2DP 优先 + `mAddress` 兜底，仍不行就是设备本身没有可用的 `BluetoothDevice` |
+| iCloud / 耳机行没有图标 | 设置和模块都没有该图标 | 日志看 `card icon ic_cloud <- module|settings|missing`；`missing` 说明两个来源都失败 |
 
 ## 4. 控制中心行没有开关
 
@@ -101,7 +106,7 @@
 ```text
 机型：
 系统：HyperOS 3 / Android 15（设置版本：）
-模块版本：16.0 (91)
+模块版本：16.1 (92)
 现象：
 复现步骤：
 日志（adb logcat -s iLayoutSettings:V，从打开设置开始）：

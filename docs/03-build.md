@@ -1,6 +1,6 @@
 # 构建指南
 
-> 状态：**现行** · 对应版本：16.0 (91)
+> 状态：**现行** · 对应版本：16.1 (92)
 
 ## 1. 为什么不走 Gradle
 
@@ -78,7 +78,7 @@ python tools\check_agsl.py
 ## 5. 成功判据
 
 ```
-package: name='com.Remo.ilayoutsettings' versionCode='91' versionName='16.0'
+package: name='com.Remo.ilayoutsettings' versionCode='92' versionName='16.1'
 sdkVersion:'29'
 targetSdkVersion:'36'
 dex version : 039

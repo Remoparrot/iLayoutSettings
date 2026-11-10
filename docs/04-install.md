@@ -1,20 +1,20 @@
 # 安装与调试
 
-> 状态：**现行** · 对应版本：16.0 (91)
+> 状态：**现行** · 对应版本：16.1 (92)
 
 ## 1. 前置
 
 - 已 root / 已装 **LSPosed**（1.x 或 2.x，Zygisk 或 Riru 均可）；
 - 系统为澎湃 OS 3（HyperOS 3）；
-- 已安装 `dist/iLayoutSettings-16.0.apk`（与 [Release v16.0](https://github.com/abradanthawk-design/iLayoutSettings/releases/tag/v16.0) 的附件同一份；应用名 **iLayoutSettings**，包名 `com.Remo.ilayoutsettings`）。
+- 已安装 `dist/iLayoutSettings-16.1.apk`（与 [Release v16.1](https://github.com/abradanthawk-design/iLayoutSettings/releases/tag/v16.1) 的附件同一份；应用名 **iLayoutSettings**，包名 `com.Remo.ilayoutsettings`）。
 
-## 2. 16.0 迁移（必须做）
+## 2. 16.0 迁移（从 15.x 升级才需要）
 
-16.0 改了包名，**不能覆盖安装**：
+16.0 改了包名，**不能覆盖安装**（16.0 → 16.1 同包名同签名，直接覆盖即可）：
 
 1. 先卸载旧模块：设置 → 应用管理 → `com.abradant.iossettings`（旧名 iLyayot）→ 卸载；
    （或 `adb uninstall com.abradant.iossettings`）
-2. 安装 16.0 的 APK；
+2. 安装 16.x 的 APK；
 3. LSPosed → 模块 → 启用 **iLayoutSettings**（旧模块的勾选不会继承），作用域勾 **设置**；
 4. 强制停止设置再打开。
 
@@ -120,7 +120,7 @@ iLayoutSettings: icloud row added below Game Center
 ```powershell
 # 覆盖安装失败时
 adb uninstall com.Remo.ilayoutsettings
-adb install dist\iLayoutSettings-16.0.apk
+adb install dist\iLayoutSettings-16.1.apk
 ```
 
 卸载模块不会影响系统设置数据。

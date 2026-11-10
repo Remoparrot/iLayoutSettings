@@ -343,6 +343,10 @@ final class BottomSearch {
 
     private static final java.util.Set<Object> HOOKED_CALLBACKS =
             java.util.Collections.newSetFromMap(new java.util.WeakHashMap<Object, Boolean>());
+    private static final java.util.Set<Object> HOOKED_MODES =
+            java.util.Collections.newSetFromMap(new java.util.WeakHashMap<Object, Boolean>());
+    private static final android.os.Handler MAIN =
+            new android.os.Handler(android.os.Looper.getMainLooper());
 
     /** Hide the bottom bar while the native search action mode is alive. */
     private static void hookCallback(final Object fragment) {
@@ -361,8 +365,16 @@ final class BottomSearch {
                 String name = param.method.getName();
                 if (name.contains("onCreateActionMode")) {
                     setBarVisible(fragment, false);
+                    // Our own animation listener is the only reliable "MIUI has
+                    // finished collapsing" signal; the callback's onDestroy
+                    // fires while the search field is still animating out.
+                    addExitListener(fragment, param.args[0]);
                 } else if (name.contains("onDestroyActionMode")) {
-                    setBarVisible(fragment, true);
+                    // Keep the bar hidden while MIUI collapses its search field,
+                    // otherwise the screen shows the top search bar and the
+                    // bottom pill at the same time for ~200ms.
+                    setBarVisible(fragment, false);
+                    scheduleFallbackShow(fragment);
                 }
             }
         };
@@ -372,6 +384,112 @@ final class BottomSearch {
             XLog.i("hooked search action mode callback");
         } catch (Throwable t) {
             XLog.e("hook search callback failed", t);
+        }
+    }
+
+    /**
+     * Adds a listener to the live {@code miuix.view.SearchActionMode} so the
+     * bottom bar can return exactly when the exit animation ends (the callback
+     * instance itself is anonymous, so a dynamic proxy keeps this ROM-agnostic).
+     */
+    private static void addExitListener(final Object fragment, Object actionMode) {
+        if (actionMode == null) {
+            return;
+        }
+        synchronized (HOOKED_MODES) {
+            if (!HOOKED_MODES.add(actionMode)) {
+                return;
+            }
+        }
+        try {
+            ClassLoader cl = actionMode.getClass().getClassLoader();
+            Class<?> listener = de.robv.android.xposed.XposedHelpers.findClassIfExists(
+                    "miuix.view.ActionModeAnimationListener", cl);
+            if (listener == null) {
+                return;
+            }
+            Object proxy = java.lang.reflect.Proxy.newProxyInstance(cl, new Class<?>[]{listener},
+                    new java.lang.reflect.InvocationHandler() {
+                        @Override
+                        public Object invoke(Object self, java.lang.reflect.Method method,
+                                             Object[] args) {
+                            String methodName = method.getName();
+                            if ("onStop".equals(methodName)) {
+                                // miuix reports the animation that just ended:
+                                // true = opening, false = closing. Only the
+                                // closing pass may bring the bar back.
+                                boolean opening = args != null && args.length == 1
+                                        && Boolean.TRUE.equals(args[0]);
+                                XLog.i("action mode onStop opening=" + opening
+                                        + " inMode=" + HeaderData.field(fragment, "mIsInActionMode"));
+                                if (opening) {
+                                    return null;
+                                }
+                                MAIN.post(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        if (!isInActionMode(fragment) && isResumed(fragment)) {
+                                            setBarVisible(fragment, true);
+                                        }
+                                    }
+                                });
+                                return null;
+                            }
+                            if ("equals".equals(methodName)) {
+                                return self == (args == null ? null : args[0]);
+                            }
+                            if ("hashCode".equals(methodName)) {
+                                return System.identityHashCode(self);
+                            }
+                            if ("toString".equals(methodName)) {
+                                return "iLayoutSettings-search-animation";
+                            }
+                            return null;
+                        }
+                    });
+            java.lang.reflect.Method add = actionMode.getClass()
+                    .getMethod("addAnimationListener", listener);
+            add.setAccessible(true);
+            add.invoke(actionMode, proxy);
+            XLog.i("search exit listener installed");
+        } catch (Throwable t) {
+            XLog.w("search exit listener failed: " + t);
+        }
+    }
+
+    /** Safety net: if the animation listener never fires, bring the bar back. */
+    private static void scheduleFallbackShow(final Object fragment) {
+        try {
+            Activity activity = activity(fragment);
+            View root = activity == null ? null : activity.findViewById(android.R.id.content);
+            if (root == null) {
+                return;
+            }
+            root.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    if (!isInActionMode(fragment) && isResumed(fragment)) {
+                        setBarVisible(fragment, true);
+                    }
+                }
+            }, 700);
+        } catch (Throwable t) {
+            XLog.w("search exit fallback failed: " + t);
+        }
+    }
+
+    private static boolean isInActionMode(Object fragment) {
+        Object value = HeaderData.field(fragment, "mIsInActionMode");
+        return value instanceof Boolean && (Boolean) value;
+    }
+
+    private static boolean isResumed(Object fragment) {
+        try {
+            java.lang.reflect.Method m = fragment.getClass().getMethod("isResumed");
+            Object result = m.invoke(fragment);
+            return !(result instanceof Boolean) || (Boolean) result;
+        } catch (Throwable t) {
+            return true;
         }
     }
 
@@ -486,7 +604,20 @@ final class BottomSearch {
         }
     }
 
+    /**
+     * True while MIUI's search action mode is alive.
+     *
+     * <p>The view probe alone was unreliable: {@code search_result_ll} is a
+     * full-screen container that keeps a non-zero height after the first layout
+     * pass, so every later resume looked like "search is open" and the bottom
+     * bar was hidden for good. SettingsFragment keeps the authoritative flag in
+     * {@code mIsInActionMode}; the probe is only the fallback.</p>
+     */
     private static boolean isSearching(Object fragment) {
+        Object inActionMode = HeaderData.field(fragment, "mIsInActionMode");
+        if (inActionMode instanceof Boolean) {
+            return (Boolean) inActionMode;
+        }
         try {
             View root = rootView(fragment);
             if (root == null) {

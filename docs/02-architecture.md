@@ -1,6 +1,6 @@
 # 架构与 Hook 链路
 
-> 状态：**现行** · 对应版本：16.0 (91)
+> 状态：**现行** · 对应版本：16.1 (92)
 > 源码：`module/src/com/Remo/ilayoutsettings/`
 
 ## 1. 从加载到生效
@@ -11,8 +11,9 @@ LSPosed
        └─ Hook.install(classLoader)        // 只在 com.android.settings 进程里跑
             ├─ SettingsFragment            // 首页
             │    ├─ buildAdapter           → HeaderData.apply() + BottomSearch.install()
-            │    ├─ onViewCreated          → BottomSearch.install() + ForceBlur.forceHeaderBlur() + UiTweaks.attachScrollBlur()
-            │    └─ onResume               → HeaderData.apply() + BottomSearch.install()
+            │    ├─ onViewCreated          → BottomSearch.install() + ForceBlur.forceHeaderBlur() + UiTweaks.attachScrollBlur() + HeadsetWatcher.attach()
+            │    ├─ onResume               → HeaderData.apply() + BottomSearch.install() + HeadsetWatcher.attach()
+            │    └─ onPause / onDestroy    → HeadsetWatcher.detach()
             ├─ SubPageIcons.install()      → PreferenceFragmentCompat#onCreate/onViewCreated/onResume
             ├─ AirplaneSwitch.install()    → MiuiSettings$HeaderAdapter#onBindViewHolder
             ├─ HeaderOverlay.install()     → HeaderAdapter#onBindViewHolder（更新卡角标 / 耳机/iCloud 图标）
@@ -33,6 +34,7 @@ LSPosed
 | `com.android.settings.SettingsFragment` | `buildAdapter` | 首页 header 列表建好后立刻重排/重分组 | `HeaderData` |
 | 同上 | `onViewCreated` | 原生搜索条 `mAnchorView` 此时才赋值，之后再装底部栏 | `BottomSearch` |
 | 同上 | `onResume` | MIUI 可能刷新 header，回来后再排一次 | `HeaderData` |
+| 同上 | `onPause` / `onDestroy` | 注销 `AudioDeviceCallback` | `HeadsetWatcher` |
 | `androidx.preference.PreferenceFragmentCompat` | `onCreate` / `onViewCreated` / `onResume` | 二级页每次进入都补图标 | `SubPageIcons` |
 | `MiuiSettings$HeaderAdapter` | `onBindViewHolder(HeaderViewHolder,int)` | 控制中心行塞开关（HyperiOS 时用自有 `GlassToggle`）；末行清理主题 drawable | `AirplaneSwitch` / `CardFix` |
 | 同上 | `onBindViewHolder` | 更新卡右侧红色「1」角标；耳机 / iCloud 行强制设置模块图标 | `HeaderOverlay` |
@@ -64,8 +66,11 @@ LSPosed
    排序后自然落在锚点行下面，不需要重编号 `SLOT_IDS`；`apply()` 用显式组件（`isIntentRow()`）识别并清理；
 7.1 `addUpdateRow()`（16.0，条件）：`Settings.Global.miui_new_version` 非空才合成「有软件更新可用」行，
   单独占 group 1（账号卡之后、网络卡之前），点击打开系统更新 `com.android.updater/.MainActivity`；
-7.2 `addAirpodsRow()`（16.0，条件）：`AudioManager.getDevices(GET_DEVICES_OUTPUTS)` 找到耳机类输出设备才合成，
-  标题 = 蓝牙别名 / 产品名，占 group 2；点击打开 `android.settings.BLUETOOTH_SETTINGS`；
+7.2 `addAirpodsRow()`（16.0 / 16.1 增强，条件）：`bestHeadsetOutput()` 找耳机类输出设备
+  （A2DP 50 > BLE 40 > SCO 30 > 助听器 20 > 有线/USB 10，A2DP 才有真实 MAC），
+  标题 = 蓝牙别名 / 产品名，占 group 2；点击用 `headsetIntent()` 打开 MIUI 耳机详情页
+  （`miui.bluetooth.action.HEADSET_SETTINGS` + `android.bluetooth.device.extra.DEVICE` +
+  `COME_FROM=MIUI_BLUETOOTH_SETTINGS` → `MiuiHeadsetActivity`），没有蓝牙设备时退回蓝牙设置；
 7.3 `addICloudRow()`（16.0）：直接排在「Game Center」之后（同 group 7、slot 28），
   跳 `com.xiaomi.action.MICLOUD_MAIN`（失败退回显式 `MiCloudMainActivity`）；
   这三条都用 `mark(header, tag)` 往 `Header.extras` 写标记，`apply()` 靠 `isMarked()` 识别并清理；
@@ -89,8 +94,16 @@ LSPosed
   行被回收成普通行时按 tag 把角标摘掉。
 - 耳机 / iCloud 的图标除了写 `Header.icon` 之外，还会在 bind 之后直接 `setImageDrawable`：
   MIUI 的 adapter 有时优先读 `iconRes`，只写 `icon` 会渲染成空行。
-- 调试用：`settings put global ilayout_fake_headset "Test Buds"` 可以在没有耳机时预览耳机卡，
-  `settings delete global ilayout_fake_headset` 恢复真实检测。
+- **图标来源（16.1）**：`HeaderData.cardDrawable()` 先按名字查 `com.android.settings` 的
+  `ic_cloud` / `ic_sub_airpods`（主题或新 ROM 可能提供同名资源），取不到才用模块 `res/drawable-xxhdpi/` 里的内置图标；
+  日志 `card icon <name> <- settings|module` 直接标出来源。本机 Settings 两个资源都不存在，所以目前走 `module`。
+- **即时刷新（16.1）**：`HeadsetWatcher` 在 `onResume`/`onViewCreated` 注册
+  `AudioManager.registerAudioDeviceCallback`，耳机类设备增减时 350ms 防抖，然后
+  `HeaderData.refresh(fragment)`（先 `LAST_ORDER.remove(fragment)` 再 `apply()`，
+  否则「列表没变」的早退分支会让新卡永远加不进来）。`onPause`/`onDestroy` 注销。
+- 调试用：`settings put global ilayout_fake_headset "Test Buds"` 可以在没有耳机时预览耳机卡
+  （只影响标题，不产生蓝牙设备）；`settings put global ilayout_fake_headset_address <MAC>`
+  可以指定详情页要打开的耳机；`settings delete global …` 恢复真实检测。
 
 ## 4. 底部搜索栏（`BottomSearch` / `SearchGlass` / `SearchHost`）
 
@@ -100,6 +113,11 @@ LSPosed
 4. 列表底部 padding 同步加上 `搜索栏高 + nav + 24dp`，避免最后一张卡片被挡；
 5. 点击浮层 → 先播 120ms 出场动画，再调原生 anchor 的 `performClick()` → 走 MIUI 自己的搜索 ActionMode；
    搜索界面出现时浮层隐藏；退出搜索时同一路径反向播放（`animateBar`，220ms 滑动 + 缩放 + 淡入淡出）；
+   **16.1 时序**：`onDestroyActionMode` 只隐藏底部栏，不给它出场——那一刻 MIUI 的顶部搜索框还在收起；
+   给 `miuix.view.SearchActionMode` 挂一个 `ActionModeAnimationListener` 动态代理，
+   收到 `onStop(open=false)`（收起动画结束、`mIsInActionMode` 已为 false）后才播底部栏进场，
+   另有 700ms 兜底。`isSearching()` 也改成优先读 `mIsInActionMode`：原来的
+   `search_result_ll` 探测在首次布局后永远为真，害得从二级页返回时底部栏被误隐藏；
 6. `SearchGlass` 负责视觉层：抓窗口（跳过自身子树）→ **1dp 模糊**（`RenderEffect`）→
    圆角矩形折射（`RuntimeShader` + AGSL，默认 **12dp 厚度 / 8dp 力度**）→ 深色保留底部内阴影、浅色关闭；
    **不再往 shader 里混表面色**，原生 `miuix_appcompat_search_mode_edit_text_bg_light/dark` 胶囊保持主题原样；

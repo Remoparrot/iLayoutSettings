@@ -1,6 +1,6 @@
 # 踩坑记录
 
-> 状态：**现行** · 对应版本：16.0 (91)
+> 状态：**现行** · 对应版本：16.1 (92)
 > 规则：每踩一个新坑就追加一条，写清 **现象 → 根因 → 解法 → 如何避免**。旧结论被推翻时保留原文并标「已过时」。
 
 ## 最贵的五个坑（先看这五条）
@@ -67,6 +67,11 @@
 | 合成行的图标是空的（耳机/iCloud） | MIUI 的 `HeaderAdapter` 在有些版本优先读 `iconRes`，只给 `Header.icon` 不生效 | `HeaderOverlay` 在 `onBindViewHolder` 之后直接 `icon.setImageDrawable(...)` 兜底 |
 | 更新卡右侧没有红色角标 | 原生 header 行没有「角标」这个位置 | 自己在 `android.R.id.widget_frame` 里加一个 20dp 圆形 `TextView`（`HeaderOverlay`），按 tag 清理 |
 | 搜索栏进出场时出现两个胶囊 | `install()` 每次 resume 都删旧建新，旧胶囊还在播动画 | 16.0 改为同 fragment / 同夜间模式复用现有胶囊；动画状态用 `animUntil` 互斥 |
+| 退出搜索时短暂同时出现顶部搜索框和底部搜索栏 | `onDestroyActionMode` 在 MIUI 收起动画**开始**时就回调，底部栏立刻进场；等顶部框收完（约 200ms）才不重叠 | 16.1：`onDestroyActionMode` 只隐藏；给 `SearchActionMode` 挂 `ActionModeAnimationListener` 代理，`onStop(open=false)` 后进场，700ms 兜底 |
+| 从二级页返回后底部搜索栏消失 | `isSearching()` 探测 `search_result_ll`，它首次布局后一直有高度/可见，被误判成「还在搜索」 | 16.1：优先读 `SettingsFragment.mIsInActionMode`（`onPrepareActionMode` 置 true、`onDestroyActionMode` 置 false），视图探测只作兜底 |
+| 耳机连上后卡片不出现，必须强制停止设置 | `HeaderData.apply()` 只在 `buildAdapter` / `onResume` 跑，音频设备变化不会触发页面重建 | 16.1：`HeadsetWatcher` 注册 `AudioManager.registerAudioDeviceCallback`，350ms 防抖后 `HeaderData.refresh()`；refresh 必须先 `LAST_ORDER.remove(fragment)` 绕过早退分支 |
+| 耳机卡点了只进蓝牙列表，不进电量/功能页 | 16.0 的 intent 是 `ACTION_BLUETOOTH_SETTINGS` | 16.1：`miui.bluetooth.action.HEADSET_SETTINGS` + `DEVICE` + `COME_FROM=MIUI_BLUETOOTH_SETTINGS` → `MiuiHeadsetActivity` |
+| 详情页 intent 里的 MAC 是 `00:00:00:00:00:00` | MIUI 音频策略有时给 A2DP 输出占位地址；SCO 条目也没有真实 MAC | A2DP 优先（`headsetPriority`），地址无效时读 `AudioDeviceInfo.mAddress` / `toString()` 的 `addr:` 兜底，仍无效则退回蓝牙设置 |
 
 ### C. 版本与回退（本仓库特有）
 
@@ -99,7 +104,7 @@
 - **根因**：① LSPosed 的启用状态与作用域按包名存储，新包默认是**未启用**；
   ② 旧包如果没卸载，仍然在 hook 设置（两份模块同时生效还会重复插行）。
 - **解法**：先卸载旧包，再安装新包，然后在 LSPosed 里重新启用 + 勾作用域，最后强制停止设置。
-- **如何避免**：包名变更按「破坏性升级」处理，写进 [安装 · 16.0 迁移](04-install.md#2-160-迁移必须做) 与 Release 说明。
+- **如何避免**：包名变更按「破坏性升级」处理，写进 [安装 · 16.0 迁移](04-install.md#2-160-迁移从-15x-升级才需要) 与 Release 说明。
 
 #### 坑 C5：`miui_new_version` 会被系统更新自己清掉
 

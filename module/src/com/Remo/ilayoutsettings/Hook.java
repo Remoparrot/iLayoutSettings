@@ -60,6 +60,9 @@ final class Hook {
                     BottomSearch.install(param.thisObject);
                     ForceBlur.forceHeaderBlur(param.thisObject);
                     UiTweaks.attachScrollBlur(param.thisObject);
+                    // Watch audio outputs so a headset connected while this page
+                    // is open adds the conditional card without a restart.
+                    HeadsetWatcher.attach(param.thisObject);
                 } catch (Throwable t) {
                     XLog.e("after onViewCreated", t);
                 }
@@ -73,8 +76,31 @@ final class Hook {
                     Object self = param.thisObject;
                     HeaderData.apply(self);
                     BottomSearch.install(self);
+                    HeadsetWatcher.attach(self);
                 } catch (Throwable t) {
                     XLog.e("after onResume", t);
+                }
+            }
+        });
+
+        XposedBridge.hookAllMethods(fragment, "onPause", new XC_MethodHook() {
+            @Override
+            protected void afterHookedMethod(MethodHookParam param) {
+                try {
+                    HeadsetWatcher.detach(param.thisObject);
+                } catch (Throwable t) {
+                    XLog.e("after onPause", t);
+                }
+            }
+        });
+
+        XposedBridge.hookAllMethods(fragment, "onDestroy", new XC_MethodHook() {
+            @Override
+            protected void afterHookedMethod(MethodHookParam param) {
+                try {
+                    HeadsetWatcher.detach(param.thisObject);
+                } catch (Throwable t) {
+                    XLog.e("after onDestroy", t);
                 }
             }
         });
