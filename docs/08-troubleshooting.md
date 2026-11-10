@@ -1,6 +1,6 @@
 # 排错手册
 
-> 状态：**现行** · 对应版本：16.1 (92)
+> 状态：**现行** · 对应版本：16.2 (93)
 > 用法：先按「现象」定位，再看「下一步」。每个问题都给了判断依据，不要凭感觉重装。
 
 ## 0. 通用排查顺序
@@ -41,6 +41,9 @@
 | 进出搜索时出现两个搜索栏 | 旧胶囊没被复用（16.0 之前） | 16.0 的 `install()` 在同一个 fragment / 同一夜间模式下会复用胶囊；仍有则看日志是否反复 `bottom search installed` |
 | 退出搜索时顶部搜索框和底部栏短暂同屏 | 底部栏在 MIUI 收起动画开始时就进场（16.1 之前） | 16.1 等 `action mode onStop opening=false` 后才进场；日志里没有这行则说明监听没挂上（`search exit listener failed`） |
 | 从二级页返回后底部栏消失 | `isSearching()` 被 `search_result_ll` 误判（16.1 之前） | 16.1 读 `mIsInActionMode`；仍消失则看 `bottom bar: vis=` 与 `mIsInActionMode` 字段是否存在 |
+| 顶栏模糊滑杆拖了没变化 | 16.1 只改了 `ActionBarContainer` 背景，真正可见的是 `NestedHeaderLayout` 的原生模糊 | 16.2 应出现 `native header blur applied: … dp` 和 `blur=…% radius=…dp`；没有则看 `hooked MiuiBlurUiHelper.setBlurParams` 是否打印 |
+| 顶栏发丝线在顶部就出现 | `isHeaderOpen()` 判断失败（返回 null / ROM 改语义） | 16.2 代码在取不到时回退到「滚动即显示」；看日志是否有 `top bar divider failed` |
+| 耳机 / iCloud 图标不是指定图 | 旧包缓存或主题覆盖 | 16.2 日志应为 `card icon … <- module (supplied theme)`；若是 `<- settings`，说明模块资源没打进 APK |
 | 过渡动画期间玻璃有拖影 | 玻璃抓图层跟着移动 | 16.0 动画期间会隐藏 `SearchGlass`；如果还看到拖影说明动画没走 `animateBar` |
 | 玻璃里有重影 | `capturing` 没跳过自身 | 见 [坑 4](06-pitfalls.md#坑-4底部搜索栏把自己拍进玻璃里) |
 
@@ -106,7 +109,7 @@
 ```text
 机型：
 系统：HyperOS 3 / Android 15（设置版本：）
-模块版本：16.1 (92)
+模块版本：16.2 (93)
 现象：
 复现步骤：
 日志（adb logcat -s iLayoutSettings:V，从打开设置开始）：

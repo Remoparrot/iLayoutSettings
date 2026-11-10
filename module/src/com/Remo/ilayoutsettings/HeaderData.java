@@ -796,27 +796,36 @@ final class HeaderData {
     }
 
     /**
-     * Drawable for a synthetic card icon. Settings wins over the module: a theme
-     * or a newer ROM may ship {@code ic_cloud} / {@code ic_sub_airpods} itself,
-     * and then that copy already matches the rest of the page. The bundled icon
-     * is only the fallback.
+     * Drawable for a synthetic card icon.
+     *
+     * <p>16.2: the module copy wins. Both bundled PNGs were taken from the
+     * supplied Settings resource archive ({@code D:\下载\com.android.settings}:
+     * the iOS-style grey AirPods squircle and the white iCloud squircle), so the
+     * headset / iCloud rows use exactly those files. A same-named drawable in
+     * {@code com.android.settings} is only the fallback for a broken module
+     * install; the previous order let a third-party theme override the icons the
+     * user explicitly asked for.</p>
      */
     static Drawable cardDrawable(Context context, String name) {
+        Drawable bundled = moduleDrawable(context, name);
+        if (bundled != null) {
+            XLog.i("card icon " + name + " <- module (supplied theme)");
+            return bundled;
+        }
         try {
             int id = context.getResources().getIdentifier(name, "drawable", "com.android.settings");
             if (id != 0) {
                 Drawable drawable = context.getDrawable(id);
                 if (drawable != null) {
-                    XLog.i("card icon " + name + " <- settings");
+                    XLog.i("card icon " + name + " <- settings (module copy unavailable)");
                     return drawable;
                 }
             }
         } catch (Throwable t) {
             XLog.w("settings icon " + name + " unavailable: " + t);
         }
-        Drawable fallback = moduleDrawable(context, name);
-        XLog.i("card icon " + name + (fallback != null ? " <- module" : " missing"));
-        return fallback;
+        XLog.w("card icon " + name + " missing");
+        return null;
     }
 
     /** Loads one of the module's own drawables (ic_cloud, ic_sub_airpods, ...). */

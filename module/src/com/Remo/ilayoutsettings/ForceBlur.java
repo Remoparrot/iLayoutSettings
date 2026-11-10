@@ -1,5 +1,7 @@
 package com.Remo.ilayoutsettings;
 
+import android.view.View;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
@@ -50,8 +52,54 @@ final class ForceBlur {
         forceTrue(material, "isFeatureEnable");
         if (blur != null) {
             forceTrue(blur, "isEffectEnable");
+            // The action bar's own background blur was not what the header shows:
+            // NestedHeaderLayout paints a separate over-background view, and its
+            // MiuiBlurUiHelper reads a fixed theme radius (Blur.ExtraHeavy). The
+            // old slider therefore changed a layer hidden behind the native blur.
+            // Replacing the radius on its way into the native helper makes the
+            // slider control the blur the user actually sees.
+            hookNestedHeaderRadius(cl);
         }
         XLog.i("forced MIUI material blur on");
+    }
+
+    /** Makes {@code topbar_blur} the radius of NestedHeaderLayout's native blur. */
+    private static void hookNestedHeaderRadius(ClassLoader cl) {
+        Class<?> helper = XposedHelpers.findClassIfExists("miuix.view.MiuiBlurUiHelper", cl);
+        if (helper == null) {
+            XLog.w("MiuiBlurUiHelper not found, native header radius stays fixed");
+            return;
+        }
+        try {
+            XposedBridge.hookAllMethods(helper, "setBlurParams", new XC_MethodHook() {
+                @Override
+                protected void beforeHookedMethod(MethodHookParam param) {
+                    try {
+                        if (param.args == null || param.args.length != 3) {
+                            return;
+                        }
+                        Object target = HeaderData.field(param.thisObject, "mViewApplyBlur");
+                        if (!(target instanceof View)) {
+                            return;
+                        }
+                        View view = (View) target;
+                        Object parent = view.getParent();
+                        // Only the top bar: other blur helpers (search bar, bottom
+                        // sheets) keep their own radius.
+                        if (parent == null || !parent.getClass().getName()
+                                .endsWith("NestedHeaderLayout")) {
+                            return;
+                        }
+                        param.args[2] = Prefs.topBarBlurRadius(view.getContext());
+                    } catch (Throwable t) {
+                        XLog.w("header blur radius hook failed: " + t);
+                    }
+                }
+            });
+            XLog.i("hooked MiuiBlurUiHelper.setBlurParams (header radius)");
+        } catch (Throwable t) {
+            XLog.e("header blur radius hook failed", t);
+        }
     }
 
     /** Turns on NestedHeaderLayout blur/overlay for the home fragment. */

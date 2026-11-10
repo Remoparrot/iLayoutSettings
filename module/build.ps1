@@ -24,6 +24,11 @@
     Pass your own keystore for a release build: the shipped APK must be signed with
     the same key as the previous release, otherwise Android refuses to upgrade.
 
+.PARAMETER KeepOldVersions
+    Keep previous APKs in the output directory. By default a successful build prunes
+    every other *.apk / *.idsig there, so dist/ only contains the artifact just built
+    (old versions stay on GitHub Releases).
+
 .EXAMPLE
     pwsh -File module/build.ps1 -Jdk C:\jdk17 -BuildTools C:\android-sdk\build-tools\34.0.0 `
          -AndroidJar C:\android-sdk\platforms\android-36\android.jar
@@ -37,7 +42,8 @@ param(
     [string]$OutDir,
     [string]$KeyStore,
     [string]$KeyAlias = 'iossettings',
-    [string]$KeyPass = 'android'
+    [string]$KeyPass = 'android',
+    [switch]$KeepOldVersions
 )
 
 # Native tools (javac/aapt2/d8) write notes to stderr, so keep the preference
@@ -206,6 +212,26 @@ try {
 }
 
 $hash = (Get-FileHash -LiteralPath $out -Algorithm SHA256).Hash
+
+# dist/ is the download folder, not an archive: only the APK just built stays.
+# History lives in git tags / GitHub Releases, so a stale local copy only makes
+# "which file do I install?" ambiguous. Opt out with -KeepOldVersions.
+if (-not $KeepOldVersions) {
+    $current = @($out, "$out.idsig") | ForEach-Object { [System.IO.Path]::GetFullPath($_) }
+    $stale = Get-ChildItem -LiteralPath $OutDir -File | Where-Object {
+        ($_.Name -like '*.apk' -or $_.Name -like '*.idsig') -and
+        ($current -notcontains [System.IO.Path]::GetFullPath($_.FullName))
+    }
+    if ($stale) {
+        Write-Host ''
+        Write-Host ("[prune] removing " + $stale.Count + " old artifact(s) from " + $OutDir)
+        $stale | ForEach-Object {
+            Write-Host ("        - " + $_.Name)
+            Remove-Item -LiteralPath $_.FullName -Force
+        }
+    }
+}
+
 Write-Host ''
 Write-Host "OK -> $out"
 Write-Host ("size   : " + (Get-Item -LiteralPath $out).Length + " bytes")

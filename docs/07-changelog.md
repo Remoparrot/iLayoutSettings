@@ -3,10 +3,66 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前主线是 **16.1（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前主线是 **16.2（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
+
+---
+
+# iLayoutSettings · LSPosed 模块（v16.2：指定图标 + 顶栏透明度/发丝线 + 自动清理）
+
+## v16.2 变更
+
+- **耳机 / iCloud 换用指定图标**：使用用户提供的 `com.android.settings` 资源包里的
+  `ic_sub_airpods.png`（128×128 灰色 AirPods 圆角图标）和 `ic_cloud.png`（85×85 白底蓝云），
+  打进模块 `res/drawable-xxhdpi/`；`HeaderData.cardDrawable()` 改为**模块内置优先**，
+  设置包同名 drawable 只在模块资源缺失时兜底，第三方主题不能再覆盖这两张图。
+- **顶栏透明度滑杆**（`topbar_alpha`，0–100%，默认 45）：控制列表滚动后顶栏底色的
+  不透明度；日志 `alpha=…%`，和模糊一样 500ms 轮询即时生效。
+- **顶栏底部发丝线**：在 `ActionBarContainer` 底部 overlay 一条 0.5dp、黑色 12% 半透明线
+  （深色模式白色 15%）。只在 `NestedHeaderLayout` 的折叠栏出现后显示（`!isHeaderOpen()`），
+  大标题展开/回到顶部时隐藏。
+- **顶栏模糊真正可调**（`ForceBlur` / `UiTweaks`）：MIUI 原生模糊来自
+  `NestedHeaderLayout.mOverBgView` 的 `MiuiBlurUiHelper`，半径由主题 `Blur.ExtraHeavy` 固定，
+  旧实现改的是被它盖住的 `ActionBarContainer` 背景模糊。现在 hook
+  `MiuiBlurUiHelper.setBlurParams` 替换半径，并把 `topbar_blur` 写进 `mBlurEffect` 后
+  `refreshBlur()`；滑杆改为 **0–100%**（内部映射到 0–150dp），默认 **30% / 透明度 45%**，
+  对应参考图那种低模糊、低透明度的淡磨砂；旧 110dp 读取时折算为 73%。
+- **搜索栏玻璃默认值**：折射力度 8 → **19dp**，折射厚度 **12dp**；模糊滑杆改为 0.1dp 步进，
+  可以选 1.5dp（滑杆索引原来按 dp 直接算，小数会被压回整数）。
+- **构建 / 发版自动化**：`module/build.ps1` 成功后自动删除 `dist/` 里除本次 APK/idsig 外的
+  旧 `*.apk`、`*.idsig`（`-KeepOldVersions` 可关）；`tools/release.ps1` 默认
+  `git add -A` → commit → push 当前分支 → tag → Release，`-SkipCommit` 可关。
+- **版本**：16.2 / versionCode **93**；APK `dist/iLayoutSettings-16.2.apk`，236,593 B。
+
+## v16.2 校验
+
+```
+package: name='com.Remo.ilayoutsettings' versionCode='93' versionName='16.2'
+sdkVersion:'29'
+targetSdkVersion:'36'
+launchable-activity: name='com.Remo.ilayoutsettings.MainActivity'  label='iLayoutSettings'
+dex version : 039
+xposed_init : True
+module class: True
+reorder     : True
+size   : 236593 bytes
+sha256 : 2D2F068C8DEC1A5D5B982F6347F71580F6C4800B8BE89F4286C2836E945AEC3B
+```
+
+真机 25053RT47C / HyperOS 3 / Android 16（2026-11-10 19:14–19:27）：
+
+- 图标：`card icon ic_sub_airpods <- module (supplied theme)`、
+  `card icon ic_cloud <- module (supplied theme)`；截图确认耳机是灰色圆角 AirPods，iCloud 是白底蓝云；
+- 顶栏线：首页顶部 y≈300–339 全为 `(242,242,247)`（无线）；滚动后 y=329–330 为
+  `(213,213,218)`（有线）；折叠栏高度变化时线贴底；
+- 透明度：`topbar_alpha=17` → 日志 `alpha=17%`，顶栏明显透出内容；默认 45% 时呈淡磨砂；
+- 模糊：默认日志 `blur=30% radius=45dp alpha=45%` 与 `native header blur applied: 45 dp`；
+  `alpha=45%` 下顶栏是参考图那种低模糊淡磨砂；低于 20% 时能看见内容轮廓，高于 80% 逐渐均匀；
+- 参数页：顶栏「模糊 30%」「透明度 45%」；拖到 50% 后 provider 写入 `topbar_blur=50`，
+  「恢复默认值」回到 `30`；
+- 清理：手机测试目录为空，`ilayout_fake_headset` 已删除。
 
 ---
 

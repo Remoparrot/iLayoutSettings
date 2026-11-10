@@ -1,6 +1,6 @@
 # 架构与 Hook 链路
 
-> 状态：**现行** · 对应版本：16.1 (92)
+> 状态：**现行** · 对应版本：16.2 (93)
 > 源码：`module/src/com/Remo/ilayoutsettings/`
 
 ## 1. 从加载到生效
@@ -11,7 +11,7 @@ LSPosed
        └─ Hook.install(classLoader)        // 只在 com.android.settings 进程里跑
             ├─ SettingsFragment            // 首页
             │    ├─ buildAdapter           → HeaderData.apply() + BottomSearch.install()
-            │    ├─ onViewCreated          → BottomSearch.install() + ForceBlur.forceHeaderBlur() + UiTweaks.attachScrollBlur() + HeadsetWatcher.attach()
+            │    ├─ onViewCreated          → BottomSearch.install() + ForceBlur.forceHeaderBlur() + UiTweaks.attachScrollBlur()（顶栏透明度/发丝线/原生模糊半径）+ HeadsetWatcher.attach()
             │    ├─ onResume               → HeaderData.apply() + BottomSearch.install() + HeadsetWatcher.attach()
             │    └─ onPause / onDestroy    → HeadsetWatcher.detach()
             ├─ SubPageIcons.install()      → PreferenceFragmentCompat#onCreate/onViewCreated/onResume
@@ -44,6 +44,7 @@ LSPosed
 | `android.widget.TextView` | `setText` | 账号副标题兜底改成 iOS 文案 | `AccountTextFix` |
 | `MiuiDisplaySettings` | `onViewCreated` / `onResume` | 外观页预览加卡片底 | `AppearanceTweak` |
 | `HyperMaterialUtils` / `MiuiBlurUtils` | 多个开关方法 | 强制开启原生模糊 | `ForceBlur` |
+| `MiuiBlurUiHelper` | `setBlurParams(int[],int[],int)` | 把顶栏原生模糊半径换成 `topbar_blur`（只匹配 `NestedHeaderLayout` 的 over-bg view） | `ForceBlur` |
 
 > 类名或方法名随 MIUI 版本变化时，`findClassIfExists` 返回 null，只打一条日志；这是有意的「软失败」。
 
@@ -94,9 +95,11 @@ LSPosed
   行被回收成普通行时按 tag 把角标摘掉。
 - 耳机 / iCloud 的图标除了写 `Header.icon` 之外，还会在 bind 之后直接 `setImageDrawable`：
   MIUI 的 adapter 有时优先读 `iconRes`，只写 `icon` 会渲染成空行。
-- **图标来源（16.1）**：`HeaderData.cardDrawable()` 先按名字查 `com.android.settings` 的
-  `ic_cloud` / `ic_sub_airpods`（主题或新 ROM 可能提供同名资源），取不到才用模块 `res/drawable-xxhdpi/` 里的内置图标；
-  日志 `card icon <name> <- settings|module` 直接标出来源。本机 Settings 两个资源都不存在，所以目前走 `module`。
+- **图标来源（16.2）**：`HeaderData.cardDrawable()` **先取模块内置**的
+  `ic_cloud` / `ic_sub_airpods`（16.2 已替换为用户提供的主题资源包 PNG），
+  模块资源取不到才回退 `com.android.settings` 的同名 drawable；
+  日志 `card icon <name> <- module (supplied theme)` 或 `<- settings (module copy unavailable)`。
+  16.1 的顺序相反，第三方主题的同名资源会覆盖用户指定的图标，16.2 已反转。
 - **即时刷新（16.1）**：`HeadsetWatcher` 在 `onResume`/`onViewCreated` 注册
   `AudioManager.registerAudioDeviceCallback`，耳机类设备增减时 350ms 防抖，然后
   `HeaderData.refresh(fragment)`（先 `LAST_ORDER.remove(fragment)` 再 `apply()`，
@@ -146,16 +149,27 @@ LSPosed
   主题覆盖和深浅色由资源系统处理；资源缺失才回退模块 `ic_plane_dark/light`。行布局变化时按 `uiMode` 重新解析一次；
 - 行被回收成普通 header 时移除多出来的开关视图，并恢复 `widget_frame` 可见。
 
-### 4.2 顶栏滚动模糊（`UiTweaks` / `ForceBlur`）
+### 4.2 顶栏滚动模糊 / 透明度 / 发丝线（`UiTweaks` / `ForceBlur`）
 
 - 滚动源优先取 `com.android.settings:id/scroll_headers` 的 RecyclerView，取不到才回退 `fragment.mListView`；
   原因是部分 HyperOS 3 版本里 `mListView` 不一定是真正滚动的那个 View，`computeVerticalScrollOffset()` 会一直是 0；
-- 滚动超过 4dp：顶栏底色换半透明，`MiuiBlurUtils.setBackgroundBlur(view, radius)` +
-  `setBackgroundBlurRadius(view, radius)`；回顶部恢复实色并 `clearBackgroundBlur`；
+- 滚动超过 4dp：顶栏底色按 `topbar_alpha`（0–100%，默认 45）算半透明；
+  `MiuiBlurUtils.setBackgroundBlur(view, radius)` + `setBackgroundBlurRadius(view, radius)`；
+  回顶部恢复实色并 `clearBackgroundBlur`；
+- **16.2 模糊真正可调**：可见的模糊来自 `NestedHeaderLayout.mOverBgView` 的
+  `MiuiBlurUiHelper`，半径由主题 token 固定。`ForceBlur` hook `MiuiBlurUiHelper.setBlurParams`，
+  只对父级是 `NestedHeaderLayout` 的 `mViewApplyBlur` 把半径换成 `topbar_blur`；
+  `UiTweaks` 同时把同一值写进 helper 的 `mBlurEffect` 并 `refreshBlur()`，拖动滑杆即生效。
+  `topbar_blur` 是 **0–100%**，内部映射到 0–150dp（MIUI 在 400px 处截断，2.75x 屏约 145dp）；
+  默认 **30% / 45% 透明度**，即参考图的低模糊淡磨砂；16.1 的旧值（>100）读取时按 150dp 折算，
+  110dp → 73%，不会归零。
+- **发丝线**：`ActionBarContainer` 底部的 `ViewOverlay` 里放一个 0.5dp 黑色 12%
+  `ColorDrawable`（深色模式白色 15%）；用 `NestedHeaderLayout.isHeaderOpen()` 判断大标题是否仍展开，
+  只有折叠栏出现后才显示，回到顶部隐藏。用 overlay 而不是子 View，避免 padding / 布局 / 点击影响。
 - 15.3 用**设置进程的 classloader** 解析 `miuix.core.util.MiuiBlurUtils`。LSPosed 把模块类放在独立 loader 里，
   之前的 `UiTweaks.class.getClassLoader()` 会 `ClassNotFoundException`，所以滑杆写进去了但从未生效；
-- 同时跟踪「是否滚动 + 当前半径」两个状态，并每 500ms 轮询一次 prefs；滑杆改完回到设置，
-  即使不再滚动也会重新套用新半径。
+- 同时跟踪「是否滚动 + 半径 + 透明度」三个状态，并每 500ms 轮询一次 prefs；滑杆改完回到设置，
+  即使不再滚动也会重新套用新值。
 
 ## 5. 二级页图标（`SubPageIcons`）
 

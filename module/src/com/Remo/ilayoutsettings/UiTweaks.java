@@ -29,6 +29,9 @@ final class UiTweaks {
     /** app_bar containers that already have the scroll-blur listeners. */
     private static final java.util.Set<View> BLUR_ATTACHED =
             java.util.Collections.newSetFromMap(new java.util.WeakHashMap<View, Boolean>());
+    /** One bottom hairline drawable per action-bar container (drawn in its overlay). */
+    private static final java.util.Map<View, android.graphics.drawable.ColorDrawable> DIVIDERS =
+            new java.util.WeakHashMap<>();
 
     private UiTweaks() {
     }
@@ -315,6 +318,11 @@ final class UiTweaks {
                 XLog.w("scroll blur: no scrollable list (mListView=" + listObject + ")");
                 return;
             }
+            // The visible blur belongs to NestedHeaderLayout's own blur helper.
+            // Keep a reference so the slider can update that radius too.
+            final Object nestedHeader = HeaderData.field(fragment, "mNestedHeaderLayout");
+            final Object blurHelper = nestedHeader == null
+                    ? null : HeaderData.field(nestedHeader, "mBlurUiHelper");
             if (!BLUR_ATTACHED.add(appBar)) {
                 return;
             }
@@ -324,10 +332,15 @@ final class UiTweaks {
             // here, so the blur radius was never actually applied.
             final ClassLoader hostLoader = appBarView.getContext().getClassLoader();
             final boolean dark = isDark(activity);
+            final int base = dark ? 0x000000 : 0x00F2F2F7;
             final int solid = dark ? 0xFF000000 : 0xFFF2F2F7;
-            final int translucent = dark ? 0xCC000000 : 0xCCF2F2F7;
+            // iOS uses a hairline under the navigation bar: 12 % black on light,
+            // 15 % white on dark (a black line is invisible on a black bar).
+            final int dividerColor = dark ? 0x26FFFFFF : 0x1F000000;
             final int[] state = {-1};
             final int[] appliedRadius = {-1};
+            final int[] appliedAlpha = {-1};
+            final int[] appliedNativeRadius = {-1};
 
             final Runnable update = new Runnable() {
                 @Override
@@ -350,19 +363,43 @@ final class UiTweaks {
                                 scrolled = true;
                             }
                         }
-                        int blurRadius = scrolled
-                                ? Math.max(0, Prefs.getInt(appBarView.getContext(),
-                                        Prefs.TOPBAR_BLUR, Prefs.DEFAULT_TOPBAR_BLUR))
-                                : 0;
+                        int blurPercent = scrolled
+                                ? Prefs.topBarBlurPercent(appBarView.getContext()) : 0;
+                        int blurRadius = Math.round(
+                                blurPercent * Prefs.MAX_TOPBAR_BLUR_DP / 100f);
+                        int alphaPercent = Math.max(0, Math.min(100, Prefs.getInt(
+                                appBarView.getContext(), Prefs.TOPBAR_ALPHA,
+                                Prefs.DEFAULT_TOPBAR_ALPHA)));
+                        int alpha = Math.round(255f * alphaPercent / 100f);
+                        int translucent = (alpha << 24) | base;
                         int s = scrolled ? 1 : 0;
+                        // iOS only shows the hairline once the condensed bar is
+                        // there; at the top the large header has no separator.
+                        // isHeaderOpen() is true while the big title is still
+                        // expanded, so it is a better gate than the 4 dp scroll
+                        // threshold (which could show the line too early).
+                        boolean compactBar = scrolled;
+                        if (compactBar && nestedHeader != null) {
+                            Object open = call(nestedHeader, "isHeaderOpen");
+                            if (open instanceof Boolean && (Boolean) open) {
+                                compactBar = false;
+                            }
+                        }
+                        applyDivider(appBarView, dividerColor, compactBar);
+                        if (appliedNativeRadius[0] != blurRadius) {
+                            appliedNativeRadius[0] = blurRadius;
+                            applyNativeHeaderBlur(blurHelper, blurRadius);
+                        }
                         // The old code only reacted to "scrolled / not scrolled",
-                        // so moving the slider while already scrolled changed
-                        // nothing. Track the radius too, and poll below.
-                        if (state[0] == s && appliedRadius[0] == blurRadius) {
+                        // so moving a slider while already scrolled changed
+                        // nothing. Track radius + opacity too, and poll below.
+                        if (state[0] == s && appliedRadius[0] == blurRadius
+                                && appliedAlpha[0] == alpha) {
                             return;
                         }
                         state[0] = s;
                         appliedRadius[0] = blurRadius;
+                        appliedAlpha[0] = alpha;
                         if (scrolled) {
                             appBarView.setBackgroundColor(translucent);
                             if (blurRadius > 0) {
@@ -372,16 +409,18 @@ final class UiTweaks {
                                         "setBackgroundBlurRadius", appBarView,
                                         Integer.valueOf(blurRadius));
                                 XLog.i("top bar blur=true offset=" + offset
-                                        + " radius=" + blurRadius
-                                        + " set=" + set + " radiusResult=" + radius);
+                                        + " blur=" + blurPercent + "% radius=" + blurRadius
+                                        + "dp alpha=" + alphaPercent + "% set=" + set
+                                        + " radiusResult=" + radius);
                             } else {
                                 callStatic(hostLoader, BLUR, "clearBackgroundBlur", appBarView);
-                                XLog.i("top bar blur=true offset=" + offset + " radius=0 (off)");
+                                XLog.i("top bar blur=true offset=" + offset
+                                        + " blur=0% (off) alpha=" + alphaPercent + "%");
                             }
                         } else {
                             appBarView.setBackgroundColor(solid);
                             callStatic(hostLoader, BLUR, "clearBackgroundBlur", appBarView);
-                            XLog.i("top bar blur=false offset=" + offset + " radius=0");
+                            XLog.i("top bar blur=false offset=" + offset + " blur=0%");
                         }
                     } catch (Throwable t) {
                         // The list can be detached mid-poll; recompute next time.
@@ -432,6 +471,62 @@ final class UiTweaks {
                     + (hostLoader == null ? "null" : hostLoader.getClass().getName()) + ")");
         } catch (Throwable t) {
             XLog.e("attachScrollBlur failed", t);
+        }
+    }
+
+    /**
+     * Draws the iOS-style hairline at the very bottom of the action bar.
+     *
+     * <p>A {@link android.graphics.drawable.ColorDrawable} in the view overlay is
+     * used instead of a child view so the line sits on the real bottom edge even
+     * when the action bar has padding, and never takes part in layout / touch.
+     * The overlay is drawn after the bar's content, so the divider stays visible
+     * above the native header and the blur surface.</p>
+     */
+    private static void applyDivider(View appBar, int color, boolean visible) {
+        try {
+            int width = appBar.getWidth();
+            int height = appBar.getHeight();
+            if (width <= 0 || height <= 0) {
+                return;
+            }
+            android.graphics.drawable.ColorDrawable divider = DIVIDERS.get(appBar);
+            if (divider == null) {
+                divider = new android.graphics.drawable.ColorDrawable(color);
+                DIVIDERS.put(appBar, divider);
+                appBar.getOverlay().add(divider);
+            } else {
+                divider.setColor(color);
+            }
+            int thickness = Math.max(1, dp(appBar.getContext(), 0.5f));
+            int top = height - thickness;
+            android.graphics.Rect want = visible
+                    ? new android.graphics.Rect(0, top, width, height)
+                    : new android.graphics.Rect(0, 0, 0, 0);
+            if (!want.equals(divider.getBounds())) {
+                divider.setBounds(want);
+                appBar.invalidate();
+            }
+        } catch (Throwable t) {
+            XLog.w("top bar divider failed: " + t);
+        }
+    }
+
+    /**
+     * Pushes {@code topbar_blur} into NestedHeaderLayout's own blur helper.
+     * Setting the field alone is not enough: {@code refreshBlur()} is what
+     * re-applies the native background blur with the new radius.
+     */
+    private static void applyNativeHeaderBlur(Object helper, int radius) {
+        if (helper == null) {
+            return;
+        }
+        try {
+            HeaderData.setField(helper, "mBlurEffect", radius);
+            call(helper, "refreshBlur");
+            XLog.i("native header blur applied: " + radius + " dp");
+        } catch (Throwable t) {
+            XLog.w("native header blur failed: " + t);
         }
     }
 

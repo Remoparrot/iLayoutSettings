@@ -33,7 +33,7 @@
 
 ```
 接手确认
-- 当前版本：16.1 (92)
+- 当前版本：16.2 (93)
 - 本次目标：<一句话>
 - 受影响文件：<预估>
 - 主要风险：<例如：改 Header 顺序可能影响卡片分组>
@@ -168,14 +168,14 @@ $env:ANDROID_JAR         = "C:\path\to\platforms\android-36\android.jar"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File module\build.ps1
 
 # 3) 校验产物
-Get-FileHash dist\iLayoutSettings-16.1.apk -Algorithm SHA256
-& "$env:ANDROID_BUILD_TOOLS\aapt2.exe" dump badging dist\iLayoutSettings-16.1.apk |
+Get-FileHash dist\iLayoutSettings-16.2.apk -Algorithm SHA256
+& "$env:ANDROID_BUILD_TOOLS\aapt2.exe" dump badging dist\iLayoutSettings-16.2.apk |
   Select-String '^package:|^sdkVersion|^targetSdkVersion'
-& "$env:ANDROID_BUILD_TOOLS\apksigner.bat" verify --print-certs dist\iLayoutSettings-16.1.apk
+& "$env:ANDROID_BUILD_TOOLS\apksigner.bat" verify --print-certs dist\iLayoutSettings-16.2.apk
 ```
 
 构建成功的判定（缺一不可）：
-`package: name='com.Remo.ilayoutsettings' versionCode='92' versionName='16.1'`、
+`package: name='com.Remo.ilayoutsettings' versionCode='93' versionName='16.2'`、
 `xposed_init : True`、`module class: True`、`reorder : True`、apksigner `Verified`。
 
 **没有设备实测的改动，必须在记录第 6 节写「未上机验证」。**

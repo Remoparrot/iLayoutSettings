@@ -15,12 +15,15 @@ final class Prefs {
     static final String GLASS_BLUR = "glass_blur";
     static final String RIM_ALPHA = "rim_alpha";
     static final String RIM_WIDTH = "rim_width";
+    /** 16.2: percent (0..100). 16.1 stored a raw dp radius here; see below. */
     static final String TOPBAR_BLUR = "topbar_blur";
+    /** Opacity (0..100 %) of the scrolled top bar surface, 16.2. */
+    static final String TOPBAR_ALPHA = "topbar_alpha";
 
     /** Thickness of the refracted band at the capsule edge, in dp. */
     static final float DEFAULT_REFRACTION_HEIGHT = 12f;
-    /** How far the lens pulls the backdrop inwards at the rim, in dp. */
-    static final float DEFAULT_REFRACTION_AMOUNT = 8f;
+    /** How far the lens pulls the backdrop inwards at the rim, in dp (16.2: 19). */
+    static final float DEFAULT_REFRACTION_AMOUNT = 19f;
     /** Reserved for Kyant's dispersion shader; 0 keeps the single-sample lens. */
     static final float DEFAULT_CHROMATIC = 0f;
     /** Opacity of the dark band hugging the bottom edge. */
@@ -33,7 +36,14 @@ final class Prefs {
     static final float DEFAULT_RIM_ALPHA = 0f;
     /** Retired in 15.1 with {@link #DEFAULT_RIM_ALPHA}. */
     static final float DEFAULT_RIM_WIDTH = 0f;
-    static final int DEFAULT_TOPBAR_BLUR = 110;
+    /** Native blur is capped at 400 px, ~145 dp on a 2.75x screen. */
+    static final int MAX_TOPBAR_BLUR_DP = 150;
+    /**
+     * 16.2 default: the reference screenshot is a low-blur, low-opacity bar
+     * (soft colour blobs, no readable text), not the old 110 dp / 80 % slab.
+     */
+    static final int DEFAULT_TOPBAR_BLUR_PCT = 30;
+    static final int DEFAULT_TOPBAR_ALPHA = 45;
 
     private Prefs() {
     }
@@ -98,6 +108,30 @@ final class Prefs {
             }
         }
         return getInt(read(), key, fallback);
+    }
+
+    /**
+     * Top bar blur strength, now expressed as 0..100 %.
+     *
+     * <p>16.1 stored the radius in dp (default 110, slider went to 300). Values
+     * above 100 are therefore old radius values; convert them instead of clamping so
+     * an upgrading user keeps roughly the same look.</p>
+     */
+    static int topBarBlurPercent(android.content.Context context) {
+        int raw = getInt(context, TOPBAR_BLUR, -1);
+        if (raw < 0) {
+            return DEFAULT_TOPBAR_BLUR_PCT;
+        }
+        if (raw <= 100) {
+            return raw;
+        }
+        return Math.max(0, Math.min(100,
+                Math.round(raw * 100f / MAX_TOPBAR_BLUR_DP)));
+    }
+
+    /** 0..100 % → 0..150 dp, the range MIUI's native blur can actually show. */
+    static int topBarBlurRadius(android.content.Context context) {
+        return Math.round(topBarBlurPercent(context) * MAX_TOPBAR_BLUR_DP / 100f);
     }
 
     static float getFloat(XSharedPreferences prefs, String key, float fallback) {

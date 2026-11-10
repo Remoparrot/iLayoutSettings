@@ -1,6 +1,6 @@
 # 踩坑记录
 
-> 状态：**现行** · 对应版本：16.1 (92)
+> 状态：**现行** · 对应版本：16.2 (93)
 > 规则：每踩一个新坑就追加一条，写清 **现象 → 根因 → 解法 → 如何避免**。旧结论被推翻时保留原文并标「已过时」。
 
 ## 最贵的五个坑（先看这五条）
@@ -62,6 +62,12 @@
 | 顶栏模糊不出现 | 主题把 `background_blur_enable` 关了，`HyperMaterialUtils.isEnable()` 为 false | `ForceBlur` 同时改 `isEnable` / `isForceEnable` / `isFeatureEnable` 三个入口 |
 | 顶栏模糊滑杆完全没反应 | `Class.forName("miuix.core.util.MiuiBlurUtils", UiTweaks.class.getClassLoader())` 在 LSPosed 下抛 `ClassNotFoundException`（模块类与设置类不在同一 loader） | 改用 `appBar.getContext().getClassLoader()`，并以 `XposedHelpers.findClassIfExists(..., loader)` 兜底 |
 | 滚动后 `top bar blur` 只在 true/false 之间切、半径不更新 | 旧逻辑只比较「是否滚动」，且只在 `OnScrollChanged` 时读 prefs；滑杆变化被吞掉 | 同时跟踪半径并每 500ms 轮询 prefs；滚动源优先 `scroll_headers`，`mListView` 取不到时回退 |
+| **顶栏模糊滑杆拖了没反应**（16.1） | `setBackgroundBlur(actionBar, r)` 返回 true，但可见模糊来自 `NestedHeaderLayout.mOverBgView` 的 `MiuiBlurUiHelper`，半径被主题 `Blur.ExtraHeavy` 固定；改 action bar 等于在它下面加了一层看不见的 | 16.2 hook `MiuiBlurUiHelper.setBlurParams`，只替换 `NestedHeaderLayout` over-bg 的半径；同时写 `mBlurEffect` 并 `refreshBlur()` |
+| 顶栏模糊拖到后半段不变 | `MiuiBlurUtils` 把半径 cap 到 400px，2.75x 屏约 145dp；旧 0–300dp 后半段全饱和 | 滑杆改 0–100%，内部映射 0–150dp；默认 30%，旧 110dp 折算 73% |
+| 默认太实、不像参考图的淡磨砂 | 16.1 默认 110dp / 80% 透明度，白底上看起来就是一条实色栏 | 16.2 默认改为 30% 模糊 / 45% 透明度，低模糊+低透明度 |
+| 顶栏发丝线在大标题还没折叠时就出现 | 只看 `scroll offset > 4dp`，而大标题要滚过一段才收起 | 读 `NestedHeaderLayout.isHeaderOpen()`，为 true 时隐藏线；回到顶部也隐藏 |
+| 耳机 / iCloud 图标被第三方主题换掉 | 16.1 的 `cardDrawable` 是 settings 优先，主题同名 `ic_*` 会赢 | 16.2 改为模块内置优先，settings 只作兜底 |
+| `R.string.*` 编译报「找不到符号 R」 | `build.ps1` 只把 `module/src` 传给 javac，aapt2 生成的 `build/gen/**/R.java` 从未参与编译 | 避免在 Java 引用 `R`；标题用 `loadLabel()`，版本用 `getPackageInfo().versionName` |
 | 搜索栏去色后完全消失 | 把 `miuix_appcompat_search_mode_edit_text_bg_light/dark` 的 fill 清掉了；它才是可见胶囊 | 保留主题胶囊；只把 shader 的 `surfaceAlpha` 置 0，不再叠 shader 表面色 |
 | 外观页预览和卡片之间有空隙 | MIUI 自己加了 margin | 保留原间距，只在预览后补一层同色同圆角的卡片背景（`AppearanceTweak`） |
 | 合成行的图标是空的（耳机/iCloud） | MIUI 的 `HeaderAdapter` 在有些版本优先读 `iconRes`，只给 `Header.icon` 不生效 | `HeaderOverlay` 在 `onBindViewHolder` 之后直接 `icon.setImageDrawable(...)` 兜底 |

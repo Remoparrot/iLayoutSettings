@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  iLayoutSettings — LSPosed module for HyperOS 3 Settings (v16.1).
+  iLayoutSettings — LSPosed module for HyperOS 3 Settings (v16.2).
   Reorders the native header list, adds conditional iOS cards (software update,
   connected headset, iCloud) and swaps the app identity to iLayoutSettings.
   Nothing is redrawn by the module.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.Remo.ilayoutsettings"
-    android:versionCode="92"
-    android:versionName="16.1">
+    android:versionCode="93"
+    android:versionName="16.2">
 
     <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="36" />
 
@@ -38,7 +38,7 @@
         <meta-data android:name="xposedmodule" android:value="true" />
         <meta-data
             android:name="xposeddescription"
-            android:value="首页入口重排 + 条件卡片（软件更新/耳机/iCloud）+ 底部搜索栏与过渡动画；背景、行样式、点击全部保持澎湃原生。" />
+            android:value="首页入口重排 + 条件卡片（软件更新/耳机/iCloud）+ 底部搜索栏与过渡动画 + 顶栏透明度/发丝线；背景、行样式、点击全部保持澎湃原生。" />
         <meta-data android:name="xposedminversion" android:value="82" />
         <meta-data android:name="xposedscope" android:resource="@array/xposedscope" />
         <!-- Lets LSPosed serve the module's shared prefs to the hooked process,

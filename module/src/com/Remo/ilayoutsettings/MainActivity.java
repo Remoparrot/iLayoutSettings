@@ -17,15 +17,13 @@ import android.widget.TextView;
 /**
  * Module settings screen.
  *
- * <p>Three sliders that write {@code /data/data/com.Remo.ilayoutsettings/
+ * <p>Sliders that write {@code /data/data/com.Remo.ilayoutsettings/
  * shared_prefs/ios_settings.xml}, the file the hooked Settings process reads
- * through {@link Prefs}: the search glass blur, the search glass refraction
- * and the top-bar (NestedHeaderLayout) blur. Values are applied on the next
- * draw / scroll in Settings, no reboot needed.</p>
+ * through {@link Prefs}: the search glass blur / refraction, and the top-bar
+ * (NestedHeaderLayout) blur + opacity. Values are applied on the next draw /
+ * scroll in Settings, no reboot needed.</p>
  */
 public final class MainActivity extends Activity {
-
-    private static final String VERSION = "15.3";
 
     private SharedPreferences prefs;
     private boolean dark;
@@ -67,24 +65,29 @@ public final class MainActivity extends Activity {
         root.setPadding(dp(20), dp(28), dp(20), dp(40));
         scroll.addView(root);
 
-        TextView title = text("iLyayot", 30, Typeface.DEFAULT_BOLD, textPrimary);
+        TextView title = text(appLabel(), 30, Typeface.DEFAULT_BOLD, textPrimary);
         root.addView(title);
-        TextView sub = text("LSPosed 模块 · v" + VERSION, 13, Typeface.DEFAULT, textSecondary);
+        TextView sub = text("LSPosed 模块 · v" + versionName(), 13, Typeface.DEFAULT, textSecondary);
         LinearLayout.LayoutParams subLp = wrap();
         subLp.topMargin = dp(4);
         root.addView(sub, subLp);
 
         LinearLayout glass = card(root, "搜索栏玻璃");
-        addSlider(glass, "模糊", Prefs.GLASS_BLUR, 0, 20, 1f, Prefs.DEFAULT_GLASS_BLUR,
-                "dp，越大越糊；0 = 不模糊");
+        addSlider(glass, "模糊", Prefs.GLASS_BLUR, 0, 20, 0.1f, Prefs.DEFAULT_GLASS_BLUR,
+                "dp，支持小数（0.1 步进）；0 = 不模糊");
         addSlider(glass, "折射", Prefs.REFRACTION_AMOUNT, 0, 30, 1f,
                 Prefs.DEFAULT_REFRACTION_AMOUNT, "dp，边缘弯曲的力度；越小越平");
         addSlider(glass, "折射厚度", Prefs.REFRACTION_HEIGHT, 2, 40, 1f,
                 Prefs.DEFAULT_REFRACTION_HEIGHT, "dp，弯曲影响到的边缘宽度");
 
         LinearLayout top = card(root, "顶栏");
-        addSlider(top, "模糊", Prefs.TOPBAR_BLUR, 0, 300, 1, Prefs.DEFAULT_TOPBAR_BLUR,
-                "列表滚动后，设置标题后面的背景模糊；0 = 关闭");
+        // Percent instead of dp: MIUI's native blur saturates at 400 px, and a
+        // 0..300 dp slider spent half its travel in that dead zone.
+        addSlider(top, "模糊", Prefs.TOPBAR_BLUR, 0, 100, 1,
+                Prefs.DEFAULT_TOPBAR_BLUR_PCT,
+                "%，列表滚动后顶栏的背景模糊；0 = 关闭，100 = 最糊");
+        addSlider(top, "透明度", Prefs.TOPBAR_ALPHA, 0, 100, 1, Prefs.DEFAULT_TOPBAR_ALPHA,
+                "%，滚动后顶栏底色的不透明度；0 = 全透明，100 = 不透明");
 
         TextView reset = text("恢复默认值", 15, Typeface.DEFAULT_BOLD, 0xFF0A84FF);
         reset.setPadding(0, dp(22), 0, dp(10));
@@ -98,7 +101,8 @@ public final class MainActivity extends Activity {
                         .putFloat(Prefs.INNER_SHADOW, Prefs.DEFAULT_INNER_SHADOW)
                         .putFloat(Prefs.SHADOW_W, Prefs.DEFAULT_SHADOW_W)
                         .putFloat(Prefs.REFRACTION_HEIGHT, Prefs.DEFAULT_REFRACTION_HEIGHT)
-                        .putInt(Prefs.TOPBAR_BLUR, Prefs.DEFAULT_TOPBAR_BLUR)
+                        .putInt(Prefs.TOPBAR_BLUR, Prefs.DEFAULT_TOPBAR_BLUR_PCT)
+                        .putInt(Prefs.TOPBAR_ALPHA, Prefs.DEFAULT_TOPBAR_ALPHA)
                         .apply();
                 recreate();
             }
@@ -133,7 +137,7 @@ public final class MainActivity extends Activity {
 
     /**
      * One labelled slider. {@code step} scales stored values: floats are stored
-     * as-is (Prefs.getFloat), ints for the MIUI blur radius (Prefs.getInt).
+     * as-is (Prefs.getFloat), ints for blur / opacity percentages.
      */
     private void addSlider(LinearLayout card, String label, final String key,
                            final int min, final int max, final float step,
@@ -154,14 +158,26 @@ public final class MainActivity extends Activity {
         headerLp.topMargin = dp(16);
         card.addView(header, headerLp);
 
-        final boolean isInt = step == 1 && Prefs.TOPBAR_BLUR.equals(key);
-        float current = readNumber(key, fallback);
+        final boolean isInt = Prefs.TOPBAR_BLUR.equals(key)
+                || Prefs.TOPBAR_ALPHA.equals(key);
+        final boolean percent = Prefs.TOPBAR_BLUR.equals(key)
+                || Prefs.TOPBAR_ALPHA.equals(key);
+        // 16.1 stored dp here (default 110). Show the migrated percentage, not
+        // 110 %, while leaving the old value untouched until the user drags.
+        float current = Prefs.TOPBAR_BLUR.equals(key)
+                ? Prefs.topBarBlurPercent(this)
+                : readNumber(key, fallback);
 
         final SeekBar bar = new SeekBar(this);
-        bar.setMax(max - min);
-        bar.setProgress(Math.max(0, Math.min(max - min, Math.round(current / step) - min)));
-        value.setText(format(isInt ? bar.getProgress() + min : (bar.getProgress() + min) * step,
-                isInt));
+        // Progress is measured in steps, not dp: the glass blur uses 0.1 dp so
+        // the old Math.round(current / step) - min indexing collapsed to 0..20
+        // whole numbers and the slider could never select 1.5 dp.
+        final int stepCount = Math.max(1, Math.round((max - min) / step));
+        bar.setMax(stepCount);
+        int initial = Math.max(0, Math.min(stepCount,
+                Math.round((current - min) / step)));
+        bar.setProgress(initial);
+        value.setText(format(min + initial * step, isInt, percent));
         LinearLayout.LayoutParams barLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         barLp.topMargin = dp(2);
@@ -176,8 +192,10 @@ public final class MainActivity extends Activity {
         bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                float raw = (progress + min) * step;
-                value.setText(format(raw, isInt));
+                float raw = min + progress * step;
+                // Keep 0.1 dp precision in shared_prefs too, not 1.5000001.
+                raw = Math.round(raw * 10f) / 10f;
+                value.setText(format(raw, isInt, percent));
                 if (!fromUser) {
                     return;
                 }
@@ -216,10 +234,33 @@ public final class MainActivity extends Activity {
         return fallback;
     }
 
-    private String format(float value, boolean isInt) {        if (isInt) {
-            return String.valueOf(Math.round(value));
+    private String format(float value, boolean isInt, boolean percent) {
+        if (isInt) {
+            int rounded = Math.round(value);
+            return percent ? rounded + "%" : String.valueOf(rounded);
         }
         return (Math.round(value * 10f) / 10f) + " dp";
+    }
+
+    /** The manifest label, so the title cannot drift from the installed app name. */
+    private String appLabel() {
+        try {
+            CharSequence label = getApplicationInfo().loadLabel(getPackageManager());
+            if (label != null && label.length() > 0) {
+                return label.toString();
+            }
+        } catch (Throwable ignored) {
+        }
+        return "iLayoutSettings";
+    }
+
+    /** Version comes from the manifest, so the subtitle cannot drift again. */
+    private String versionName() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Throwable t) {
+            return "?";
+        }
     }
 
     private LinearLayout.LayoutParams wrap() {

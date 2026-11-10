@@ -3,7 +3,7 @@
 > 把澎湃 OS（HyperOS 3）「设置」首页改成 iOS 风格：入口重排、条件卡片（软件更新 / 耳机 / iCloud）、搜索栏沉底、卡片细节修正。
 > **全部复用 MIUI 原生控件与原生数据，模块不重绘任何页面。**
 
-[![Version](https://img.shields.io/badge/version-16.1-1f6feb)](https://github.com/abradanthawk-design/iLayoutSettings/releases)
+[![Version](https://img.shields.io/badge/version-16.2-1f6feb)](https://github.com/abradanthawk-design/iLayoutSettings/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-HyperOS%203%20%7C%20Android%2015%2B-green)](docs/01-overview.md)
 [![LSPosed](https://img.shields.io/badge/framework-LSPosed-orange)](docs/04-install.md)
@@ -26,14 +26,14 @@
 | 软件更新卡（条件） | 读 `Settings.Global.miui_new_version`，非空才显示「有软件更新可用」+ 红色「1」角标，点击进系统更新 |
 | 耳机卡（条件） | 检测已连接的蓝牙/有线/USB 耳机，标题 = 设备别名；**连上/断开后即时刷新，不用重启设置**；没连耳机整张卡不出现，点击进 MIUI 耳机详情页（电量/改名/EQ） |
 | iCloud 入口 | 固定在「Game Center」下方，点击打开小米云服务 |
-| 条件卡图标 | 优先用设置（`com.android.settings`）里的同名 `ic_cloud` / `ic_sub_airpods`，没有才用模块内置图标 |
+| 条件卡图标 | 用指定资源包里的 `ic_cloud` / `ic_sub_airpods`（已打进模块）；设置同名 drawable 只作兜底 |
 | 专注模式 / 相机 / 搜索入口 | 分别在「屏幕时间」「外观」「墙纸」附近，复用系统或模块图标 |
 | 飞行模式开关 | 右侧原生 `SlidingSwitch`，图标优先用设置主题里的 `ic_airplane_mode_settings` |
 | 底部搜索栏 | `miuix_appcompat_search_stub` 原生布局 + **Kyant backdrop 玻璃**（模糊 + 折射；保留主题胶囊） |
 | 搜索栏过渡 | 进出搜索 220ms 滑动+缩放+淡入淡出；**退出时等 MIUI 收起顶部搜索框后再出现底部栏**，不再短暂出现两个搜索栏 |
-| 参数界面 | 应用内滑杆：搜索栏模糊 / 折射力度 / 折射厚度、顶栏模糊，滑杆即改即生效 |
+| 参数界面 | 应用内滑杆：搜索栏模糊（0.1dp）/ 折射 19dp / 厚度 12dp、顶栏模糊 0–100%、顶栏透明度 0–100%，即改即生效 |
 | 卡片细节修正 | 去掉每组最后一行的双层圆角/放大图标；外观页预览加卡片底 |
-| 顶部模糊 | 列表滚动时出现；半径由 `topbar_blur` 实时读取 |
+| 顶部模糊 / 发丝线 | 默认 30% 模糊 + 45% 透明度（淡磨砂，参考图效果）；折叠栏出现后底边才显示半透明线 |
 
 ## 截图
 
@@ -49,11 +49,11 @@
 
 ## 安装
 
-1. 下载 [`dist/iLayoutSettings-16.1.apk`](dist/iLayoutSettings-16.1.apk)，或到 [Releases · v16.1](https://github.com/abradanthawk-design/iLayoutSettings/releases/tag/v16.1) 下同名附件（224,305 B，SHA-256 `83BE7335…77F7`，与 `dist/` 同一份）；
+1. 下载 [`dist/iLayoutSettings-16.2.apk`](dist/iLayoutSettings-16.2.apk)，或到 [Releases · v16.2](https://github.com/abradanthawk-design/iLayoutSettings/releases/tag/v16.2) 下同名附件（236,593 B，SHA-256 `2D2F068C…EC3B`，与 `dist/` 同一份）；
    **16.0 起包名是** `com.Remo.ilayoutsettings`，从 16.0 升级可直接覆盖（同一签名）；
 2. LSPosed 中启用 **iLayoutSettings**，作用域只勾选 **设置**（`com.android.settings`）；
 3. **强制停止「设置」**（或重启手机），再打开设置；
-4. 打开桌面上的 **iLayoutSettings** 图标即可调参数（模糊 / 折射 / 顶栏模糊）。
+4. 打开桌面上的 **iLayoutSettings** 图标即可调参数（模糊 / 折射 / 顶栏模糊百分比 / 顶栏透明度）。
 
 > 本机 MIUI 会拦截 adb 安装新包（`INSTALL_FAILED_USER_RESTRICTED`）：把 APK 复制到手机后
 > 在文件管理器里点开安装即可；或在开发者选项里允许「USB 安装」。
@@ -61,7 +61,9 @@
 
 日志过滤 `iLayoutSettings` 应能看到 `hooks installed`、`icloud row added below Game Center`、
 按条件出现的 `update card added: …` / `airpods card added: …`、`headset devices changed, refresh cards`，
-以及 `liquid glass shader compiled`、`search glass mask=...`、`airplane icon set: ...`。
+以及 `card icon … <- module (supplied theme)`、`native header blur applied: … dp`、
+`top bar blur=true … blur=30% radius=45dp alpha=45%`、`liquid glass shader compiled`、
+`search glass mask=...`、`airplane icon set: ...`。
 详见 [安装与调试](docs/04-install.md)。
 
 ## 兼容性
@@ -86,7 +88,7 @@ pwsh -File module/build.ps1 `
 ```
 
 输出 `dist/iLayoutSettings-<versionName>.apk`。
-发版用 `tools/release.ps1 -Version 16.1`：构建 → 校验 → 打 tag → 建 Release → 上传 APK，一条命令完成。
+发版用 `tools/release.ps1 -Version 16.2`：构建 → 校验 → 自动提交/推送 → 打 tag → 建 Release → 上传 APK，一条命令完成。
 完整工具链版本、可复现性说明见 [构建指南](docs/03-build.md)。
 
 ## 文档

@@ -8,8 +8,9 @@
       1. 从 module/AndroidManifest.xml 读 versionName / versionCode / 包名；
       2. 调 module/build.ps1 构建并做四项校验（badging / xposed_init / module class / 签名）；
       3. 计算 SHA-256，写入 Release 说明；
-      4. git tag v<version> 并 push（工作区有未提交改动时默认中止）；
-      5. 用 git credential 里的 GitHub token 调 REST API 建 Release 并上传 APK 附件。
+      4. 自动 git add/commit/push 当前分支（工作区无改动时跳过；-SkipCommit 可关闭）；
+      5. git tag v<version> 并 push；
+      6. 用 git credential 里的 GitHub token 调 REST API 建 Release 并上传 APK 附件。
 
     本机没有 gh CLI，所以走 REST；中文说明必须先写 UTF-8 无 BOM 文件再 curl --data-binary，
     否则会 422 或乱码（见 docs/06-pitfalls.md 的 E 节）。
@@ -27,7 +28,13 @@
     跳过构建，直接对 dist/ 里的产物发版（产物必须已存在）。
 
 .PARAMETER SkipPush
-    只打本地 tag，不 push、也不建 Release（演练用）。
+    只打本地 tag，不 push、也不建 Release（演练用；同时跳过自动提交）。
+
+.PARAMETER SkipCommit
+    不自动 git add/commit/push 当前工作区，只打 tag 并发 Release。
+
+.PARAMETER CommitMessage
+    自动提交用的 message；默认 `chore(release): iLayoutSettings <version> (<code>)`。
 
 .PARAMETER Notes
     额外的 Release 正文（追加在自动生成的内容后面）。
@@ -45,6 +52,8 @@ param(
     [string]$AndroidJar,
     [switch]$SkipBuild,
     [switch]$SkipPush,
+    [switch]$SkipCommit,
+    [string]$CommitMessage,
     [string]$Notes
 )
 
@@ -124,9 +133,34 @@ if (Test-Path $apksigner) {
 }
 
 # ------------------------------------------------------------- git state ---
-$dirty = & git -C $root status --porcelain
-if ($dirty) {
-    Write-Host "[warn] working tree is dirty; commit first for a reproducible release." -ForegroundColor Yellow
+if (-not $SkipPush -and -not $SkipCommit) {
+    # One command must produce a reproducible release: the tag has to point at a
+    # commit that contains the source and the dist/ APK we just built. The old
+    # script only warned about a dirty tree, so the tag could point at a commit
+    # without the changes and the Release notes could describe unreleased code.
+    $branch = (& git -C $root rev-parse --abbrev-ref HEAD).Trim()
+    if (-not $branch) { throw 'cannot resolve current git branch' }
+    $dirty = & git -C $root status --porcelain
+    if ($dirty) {
+        & git -C $root add -A
+        if ($LASTEXITCODE -ne 0) { throw 'git add -A failed' }
+        if (-not $CommitMessage) {
+            $CommitMessage = "chore(release): iLayoutSettings $Version ($versionCode)"
+        }
+        & git -C $root commit -m $CommitMessage
+        if ($LASTEXITCODE -ne 0) { throw 'git commit failed' }
+        Write-Host "[git] committed: $CommitMessage"
+    } else {
+        Write-Host '[git] working tree clean, nothing to commit'
+    }
+    & git -C $root push origin $branch
+    if ($LASTEXITCODE -ne 0) { throw "git push origin $branch failed" }
+    Write-Host "[git] pushed $branch"
+} else {
+    $dirty = & git -C $root status --porcelain
+    if ($dirty) {
+        Write-Host "[warn] working tree is dirty; tag may not contain these changes." -ForegroundColor Yellow
+    }
 }
 $existingTag = & git -C $root tag -l $tag
 if (-not $existingTag) {
@@ -170,20 +204,21 @@ $bodyTemplate = @'
 
 > 本机 MIUI 可能拦截 adb 安装新包（`INSTALL_FAILED_USER_RESTRICTED`），请把 APK 拷到手机手动安装。
 
-### 本版内容（16.1）
+### 本版内容（16.2）
 
-- **耳机卡即时刷新**：设置首页打开时连上/断开耳机，卡片立刻出现/消失，不用再强制停止设置
-  （`HeadsetWatcher` 监听 `AudioDeviceCallback`，350ms 防抖）；
-- **耳机卡点击进耳机详情页**：`miui.bluetooth.action.HEADSET_SETTINGS` →
-  `MiuiHeadsetActivity`（电量 / 改名 / 检查更新 / 功能开关），不再只跳蓝牙列表；
-  地址从音频设备取，带 MIUI 占位地址时用私有字段兜底，A2DP 优先；
-- **图标优先用设置自己的**：iCloud / 耳机行先找 `com.android.settings` 里的
-  `ic_cloud` / `ic_sub_airpods`，没有才用模块内置图标；
-- **退出搜索不再短暂出现两个搜索栏**：底部栏等 MIUI 收起顶部搜索框（
-  `ActionModeAnimationListener#onStop(open=false)`）后再出现，并带 700ms 兜底；
-- **修搜索栏从二级页回来消失**：`isSearching()` 改读 `mIsInActionMode`，不再被
-  `search_result_ll` 的残留高度误判；
-- 版本 16.1 / versionCode 92。
+- **耳机 / iCloud 换用指定图标**：改用 `com.android.settings` 资源包里的
+  `ic_sub_airpods.png`（灰色 AirPods 圆角图标）和 `ic_cloud.png`（白底蓝色云），
+  模块内置优先，不再被第三方主题的同名资源覆盖；
+- **顶栏透明度 / 模糊都改成百分比**：参数页新增「透明度」0~100%，
+  顶栏「模糊」改为 0~100%（默认 **30% 模糊 + 45% 透明度**，即参考图的低模糊淡磨砂）；
+  模糊直接改 `NestedHeaderLayout` 的原生半径，拖动真正生效；
+- **顶栏底部 iOS 分隔线**：折叠顶栏出现后，最底部显示 0.5dp 黑色 12% 半透明发丝线
+  （深色模式白色 15%）；大标题展开/回到顶部时隐藏；
+- **搜索栏玻璃默认值**：折射力度 8 → **19 dp**，折射厚度 **12 dp**；
+  模糊滑杆改成 **0.1 dp 步进**，可以选 1.5 dp 这样的值；
+- **构建 / 发版自动化**：`module/build.ps1` 成功后自动删掉 `dist/` 里除本次以外的
+  旧 APK；`tools/release.ps1` 默认自动 `git add/commit/push` 后再打 tag、发 Release；
+- 版本 16.2 / versionCode 93。
 
 完整变更见 [docs/07-changelog.md](../blob/main/docs/07-changelog.md)。
 '@

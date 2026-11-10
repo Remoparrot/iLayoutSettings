@@ -1,10 +1,10 @@
 # 构建指南
 
-> 状态：**现行** · 对应版本：16.1 (92)
+> 状态：**现行** · 对应版本：16.2 (93)
 
 ## 1. 为什么不走 Gradle
 
-模块只有一个 dex、没有第三方运行时依赖、资源极少。用 `aapt2 → javac → d8 → zipalign → apksigner` 五步就够，构建一次几秒，产物体积可控（195 KB），也避免了 AGP 与 JDK/AGP 版本互相绑架。
+模块只有一个 dex、没有第三方运行时依赖、资源极少。用 `aapt2 → javac → d8 → zipalign → apksigner` 五步就够，构建一次几秒，产物体积可控（16.2 约 231 KiB），也避免了 AGP 与 JDK/AGP 版本互相绑架。
 
 代价是**工具链要自己准备**，见下。
 
@@ -35,7 +35,10 @@ $env:ANDROID_JAR         = "C:\android-sdk\platforms\android-36\android.jar"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File module\build.ps1
 ```
 
-输出：`dist/IosSettingsLayout-<versionName>.apk`（版本号从 `AndroidManifest.xml` 读，不用手改文件名）。
+输出：`dist/iLayoutSettings-<versionName>.apk`（版本号从 `AndroidManifest.xml` 读，不用手改文件名）。
+
+> **16.2 起构建成功会自动清 `dist/`**：除本次 APK / idsig 外的 `*.apk`、`*.idsig` 都会被删除，
+> 历史包请从 GitHub Releases 取。需要保留旧包时传 `-KeepOldVersions`。
 
 > **必须加 `-ExecutionPolicy Bypass`**：本机默认执行策略禁止运行 `.ps1`，直接 `& .\build.ps1` 会报 `UnauthorizedAccess`。
 > 脚本用 Windows PowerShell 5.1 编写（`#Requires -Version 5.1`），**不需要** PowerShell 7。
@@ -63,6 +66,17 @@ python tools\check_agsl.py
 | `-OutDir` | `dist` | 产物目录 |
 | `-KeyStore` | `.keystore/testkey.jks` | 签名库，不存在则自动生成（首次构建后复用） |
 | `-KeyAlias` / `-KeyPass` | `iossettings` / `android` | 调试密钥参数 |
+| `-KeepOldVersions` | 关 | 保留 `dist/` 里的旧 APK（默认构建成功即清） |
+
+### 一键发版
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -Version 16.2
+```
+
+16.2 起默认自动 `git add -A` → commit → push 当前分支 → 打 tag → 建 Release → 上传 APK；
+不想自动提交时加 `-SkipCommit`，只演练时加 `-SkipPush`（同时跳过自动提交）。
+Release 正文在脚本里的 `$bodyTemplate`，发版前先改成本版内容。
 
 ## 4. 每一步在干什么
 
@@ -78,7 +92,7 @@ python tools\check_agsl.py
 ## 5. 成功判据
 
 ```
-package: name='com.Remo.ilayoutsettings' versionCode='92' versionName='16.1'
+package: name='com.Remo.ilayoutsettings' versionCode='93' versionName='16.2'
 sdkVersion:'29'
 targetSdkVersion:'36'
 dex version : 039
