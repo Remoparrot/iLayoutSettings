@@ -184,10 +184,19 @@ if ($SkipPush) {
 if ($LASTEXITCODE -ne 0) { throw "git push $tag failed" }
 
 # --------------------------------------------------------------- release ---
-$cred = ("protocol=https`nhost=github.com`n`n" | & git credential fill 2>$null)
-$token = ($cred | Select-String -Pattern '^password=' | Select-Object -First 1).Line
-if (-not $token) { throw 'GitHub token not found in git credential (git credential fill).' }
-$token = $token -replace '^password=', ''
+$token = $env:GH_TOKEN
+if (-not $token) {
+    # PowerShell cannot redirect a file (or reliably pipe) into a native command, so
+    # git gets the query through cmd.exe. The old `"..." | git credential fill` form
+    # returned nothing under PS 5.1 and aborted the release after the tag was pushed.
+    $query = Join-Path $env:TEMP 'ilayout-settings-gh-cred.txt'
+    [System.IO.File]::WriteAllText($query, "protocol=https`nhost=github.com`n`n", [System.Text.Encoding]::ASCII)
+    $cred = cmd /c "git credential fill < `"$query`" 2>nul"
+    Remove-Item $query -ErrorAction SilentlyContinue
+    $token = ($cred | Select-String -Pattern '^password=' | Select-Object -First 1).Line
+    if ($token) { $token = $token -replace '^password=', '' }
+}
+if (-not $token) { throw 'GitHub token not found: set $env:GH_TOKEN or store a github.com credential in git.' }
 
 $bodyTemplate = @'
 ## iLayoutSettings {{VERSION}} ({{CODE}})
