@@ -11,10 +11,11 @@
 
 ## 2. 视觉与实现思路参考
 
-- **kyant0 液态玻璃（liquid glass）**：`SearchGlass` 中的折射/模糊实现思路参考其公开实现；
+- **kyant0 液态玻璃**（[Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass)，Apache-2.0）：`SearchGlass` 的折射/高光算法按其 `backdrop` 2.0.1 的 `Shaders.kt` / `HighlightStyle` 移植为 Java + AGSL；
+- **kyant0 Shapes**（[Kyant0/Shapes](https://github.com/Kyant0/Shapes)，Apache-2.0）：16.6 的 G2 连续曲率胶囊轮廓来自其 `ContinuousCurvatureRoundedRectangleCornerBuilder`，胶囊分支的 20 个贝塞尔控制点按同一公式离线计算后硬编码；
 - **lattice**：15.x–17.x 实验分支曾反编译并复用其 `LiquidGlassView` / `SearchBottom`（据开发记录已获原作者同意），**该部分未包含在本仓库主线**；主线 `SearchGlass` 为独立实现。
 
-上述参考仅涉及思路与算法，未直接拷贝其源码到本仓库主线。若权利人有异议，请开 Issue，我们会调整或移除。
+上述移植只使用其公开源码中的数学与常量，未引入其运行时库；许可文本见各自仓库。若权利人有异议，请开 Issue，我们会调整或移除。
 
 ## 3. 图标
 

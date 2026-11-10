@@ -1,6 +1,6 @@
 # 构建指南
 
-> 状态：**现行** · 对应版本：16.4 (95)
+> 状态：**现行** · 对应版本：16.6 (97)
 
 ## 1. 为什么不走 Gradle
 
@@ -74,7 +74,7 @@ python tools\check_agsl.py
 ### 一键发版
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -Version 16.4
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -Version 16.6
 ```
 
 16.2 起默认自动 `git add -A` → commit → push 当前分支 → 打 tag → 建 Release → 上传 APK；
@@ -95,7 +95,7 @@ Release 正文在脚本里的 `$bodyTemplate`，发版前先改成本版内容�
 ## 5. 成功判据
 
 ```
-package: name='com.Remo.ilayoutsettings' versionCode='95' versionName='16.4'
+package: name='com.Remo.ilayoutsettings' versionCode='97' versionName='16.6'
 sdkVersion:'29'
 targetSdkVersion:'36'
 dex version : 039

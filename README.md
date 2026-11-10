@@ -3,7 +3,7 @@
 > 把澎湃 OS（HyperOS 3）「设置」首页改成 iOS 风格：入口重排、条件卡片（软件更新 / 耳机 / iCloud）、搜索栏沉底、卡片细节修正。
 > **全部复用 MIUI 原生控件与原生数据，模块不重绘任何页面。**
 
-[![Version](https://img.shields.io/badge/version-16.5-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
+[![Version](https://img.shields.io/badge/version-16.6-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-HyperOS%203%20%7C%20Android%2015%2B-green)](docs/01-overview.md)
 [![LSPosed](https://img.shields.io/badge/framework-LSPosed-orange)](docs/04-install.md)
@@ -23,15 +23,16 @@
 | 能力 | 说明 |
 | --- | --- |
 | 首页重排 / 分组 | iOS 顺序 + 独立卡片，卡片圆角与间距仍由 miuix `CardItemDecoration` 绘制 |
-| 软件更新卡（条件） | 读 `Settings.Global.miui_new_version`，非空才显示「有软件更新可用」+ 红色「1」角标，点击进系统更新 |
+| 软件更新卡（条件） | 读 `Settings.Global.miui_new_version`，非空才显示「有软件更新可用」+ 红色「1」角标，点击进系统更新；**16.6 起「通用」行的蓝 1 也换成同一颗红角标**，两行都带系统自带的箭头 |
 | 耳机卡（条件） | 检测已连接的蓝牙/有线/USB 耳机，标题 = 设备别名；**连上/断开后即时刷新，不用重启设置**；没连耳机整张卡不出现，点击进 MIUI 耳机详情页（电量/改名/EQ） |
 | iCloud 入口 | 固定在「Game Center」下方，点击打开小米云服务 |
 | 条件卡图标 | 用指定资源包里的 `ic_cloud` / `ic_sub_airpods`（已打进模块）；设置同名 drawable 只作兜底 |
 | 专注模式 / 相机 / 搜索入口 | 分别在「屏幕时间」「外观」「墙纸」附近，复用系统或模块图标 |
 | 飞行模式开关 | 右侧原生 `SlidingSwitch`，图标优先用设置主题里的 `ic_airplane_mode_settings` |
-| 底部搜索栏 | `miuix_appcompat_search_stub` 原生布局 + **Kyant backdrop 玻璃**（模糊 + 折射；保留主题胶囊） |
+| 底部搜索栏 | `miuix_appcompat_search_stub` 原生布局 + **自绘 Kyant 液态玻璃**（G2 连续圆角 + 模糊 + 折射 + 上下光边，不再叠 MIUI 9-patch） |
+| 搜索栏图标 / 小爱 | 指定 iOS 27 搜索/麦克风图标，随深浅色染色；点麦克风走与电源键长按相同的 `VoiceService` 入口唤醒小爱 |
 | 搜索栏过渡 | 进出搜索 220ms 滑动+缩放+淡入淡出；**退出时等 MIUI 收起顶部搜索框后再出现底部栏**，不再短暂出现两个搜索栏 |
-| 参数界面 | 应用内滑杆：搜索栏模糊（0.1dp）/ 折射 19dp / 厚度 12dp；**「高级设置」总开关**（默认关）开启后才出现顶栏模糊 0–100%、顶栏透明度 0–100%、显示顶栏分割线 |
+| 参数界面 | 应用内滑杆：搜索栏模糊（0.1dp）/ 折射 19dp / 厚度 12dp；顶栏模糊 0–100%、顶栏透明度 0–100%、显示顶栏分割线（16.6 删除「高级设置」总开关，全部常显） |
 | 卡片细节修正 | 去掉每组最后一行的双层圆角/放大图标；外观页预览加卡片底 |
 | 顶部模糊 / 发丝线 | 默认 5% 模糊 + 2% 透明度，**顶栏始终带模糊**——账户卡等内容滑到栏下面就是糊的，不再被不透明栏切掉；发丝线跟着栏一起出现（浅色黑 12%，深色中性灰 30%）；**设置内切换深浅色后线不消失**，折叠栏第一次出现就带模糊 |
 | 应用图标 | 蓝紫渐变 + 半透明玻璃盘 + 白齿轮（[预览](docs/assets/icon-16.4.png)）；`tools/make_launcher_icon.py` 生成五档 mipmap，脚本内另有两套候选（[并排对比](docs/assets/icon-candidates-16.4.png)） |
@@ -46,15 +47,15 @@
 
 | 首页 | 搜索栏 · 浅色 | 搜索栏 · 深色 |
 | --- | --- | --- |
-| ![首页](docs/assets/home-15.3-light.png) | ![搜索栏 · 浅色](docs/assets/search-glass-15.3-light.png) | ![搜索栏 · 深色](docs/assets/search-glass-15.3-dark.png) |
+| ![首页](docs/assets/home-15.3-light.png) | ![搜索栏 · 浅色](docs/assets/search-glass-16.6-light.png) | ![搜索栏 · 深色](docs/assets/search-glass-16.6-dark.png) |
 
 ## 安装
 
-1. 下载 [`dist/iLayoutSettings-16.5.apk`](dist/iLayoutSettings-16.5.apk)，或到 [Releases · v16.5](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.5) 下同名附件（286,069 B，SHA-256 `84493529…B566`，与 `dist/` 同一份）；
+1. 下载 [`dist/iLayoutSettings-16.6.apk`](dist/iLayoutSettings-16.6.apk)，或到 [Releases · v16.6](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.6) 下同名附件（294,434 B，SHA-256 `48BF9927…1FEA`，与 `dist/` 同一份）；
    **16.0 起包名是** `com.Remo.ilayoutsettings`，从 16.0 升级可直接覆盖（同一签名）；
 2. LSPosed 中启用 **iLayoutSettings**，作用域只勾选 **设置**（`com.android.settings`）；
 3. **强制停止「设置」**（或重启手机），再打开设置；
-4. 打开桌面上的 **iLayoutSettings** 图标即可调参数（搜索栏模糊 / 折射 / 厚度；开启「高级设置」后才有顶栏模糊 / 透明度 / 发丝线开关）。
+4. 打开桌面上的 **iLayoutSettings** 图标即可调参数（搜索栏模糊 / 折射 / 厚度；顶栏模糊 / 透明度 / 发丝线开关）。
 
 > 本机 MIUI 会拦截 adb 安装新包（`INSTALL_FAILED_USER_RESTRICTED`）：把 APK 复制到手机后
 > 在文件管理器里点开安装即可；或在开发者选项里允许「USB 安装」。
@@ -89,7 +90,7 @@ pwsh -File module/build.ps1 `
 ```
 
 输出 `dist/iLayoutSettings-<versionName>.apk`。
-发版用 `tools/release.ps1 -Version 16.5`：构建 → 校验 → 自动提交/推送 → 打 tag → 建 Release → 上传 APK，一条命令完成。
+发版用 `tools/release.ps1 -Version 16.6`：构建 → 校验 → 自动提交/推送 → 打 tag → 建 Release → 上传 APK，一条命令完成。
 完整工具链版本、可复现性说明见 [构建指南](docs/03-build.md)。
 
 ## 文档
@@ -118,7 +119,7 @@ pwsh -File module/build.ps1 `
 
 - 代码：[GPL-3.0](LICENSE)；
 - 图标为自制（`tools/make_subpage_icons.py` / `tools/make_launcher_icon.py` 生成），仅参考 iOS 视觉风格；Apple / iOS 是 Apple Inc. 的商标，本项目与其无关；
-- 玻璃/折射实现的思路参考了 kyant0 的液态玻璃与 lattice 的实现，第三方声明见 [NOTICE.md](NOTICE.md)。
+- 玻璃/折射实现参考了 [kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass)（Apache-2.0）与 [kyant0/Shapes](https://github.com/Kyant0/Shapes)（Apache-2.0），第三方声明见 [NOTICE.md](NOTICE.md)。
 
 ---
 

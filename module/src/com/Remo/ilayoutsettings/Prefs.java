@@ -21,8 +21,6 @@ final class Prefs {
     static final String TOPBAR_ALPHA = "topbar_alpha";
     /** 16.4: show the 0.5 dp hairline under the condensed top bar. */
     static final String TOPBAR_DIVIDER = "topbar_divider";
-    /** 16.4: unlocks the advanced section (top bar controls) in the GUI. */
-    static final String ADVANCED = "advanced_mode";
 
     /** Thickness of the refracted band at the capsule edge, in dp. */
     static final float DEFAULT_REFRACTION_HEIGHT = 12f;
@@ -36,10 +34,16 @@ final class Prefs {
     static final float DEFAULT_SHADOW_W = 8f;
     /** Backdrop blur radius before the lens, in dp. */
     static final float DEFAULT_GLASS_BLUR = 1f;
-    /** Retired in 15.1: the rim highlight is gone, kept so old prefs still parse. */
-    static final float DEFAULT_RIM_ALPHA = 0f;
-    /** Retired in 15.1 with {@link #DEFAULT_RIM_ALPHA}. */
-    static final float DEFAULT_RIM_WIDTH = 0f;
+    /**
+     * 16.6: Kyant's directional rim highlight is back ("光边"). The value is a
+     * 0..1 alpha multiplier; the GUI does not expose it (the shape is tuned for
+     * the iOS 27 look), but keeping it here documents the two knobs. Tuned down
+     * after the first device pass: a pure white rim at 0.55 read as a blown
+     * highlight in dark mode.
+     */
+    static final float DEFAULT_RIM_ALPHA = 0.20f;
+    /** Width of the visible rim band inside the glass edge, in dp. */
+    static final float DEFAULT_RIM_WIDTH = 1.0f;
     /** Native blur is capped at 400 px, ~145 dp on a 2.75x screen. */
     static final int MAX_TOPBAR_BLUR_DP = 150;
     /**
@@ -49,10 +53,8 @@ final class Prefs {
      */
     static final int DEFAULT_TOPBAR_BLUR_PCT = 5;
     static final int DEFAULT_TOPBAR_ALPHA = 2;
-    /** The hairline is on by default; the GUI switch only exists in advanced mode. */
+    /** The hairline is on by default. */
     static final boolean DEFAULT_TOPBAR_DIVIDER = true;
-    /** Advanced mode is opt-in, so the first screen only has the glass sliders. */
-    static final boolean DEFAULT_ADVANCED = false;
 
     private Prefs() {
     }
@@ -149,14 +151,9 @@ final class Prefs {
         }
     }
 
-    /** Hairline visibility: on unless the user (in advanced mode) turned it off. */
+    /** Hairline visibility: on unless the user turned it off in the GUI. */
     static boolean topBarDivider(android.content.Context context) {
         return getBoolean(context, TOPBAR_DIVIDER, DEFAULT_TOPBAR_DIVIDER);
-    }
-
-    /** Whether the GUI should expose the top-bar / hairline section. */
-    static boolean advanced(android.content.Context context) {
-        return getBoolean(context, ADVANCED, DEFAULT_ADVANCED);
     }
 
     /**

@@ -7,19 +7,20 @@
 
 | 项 | 值 |
 | --- | --- |
-| versionName / versionCode | **16.5 / 96**（唯一来源：`module/AndroidManifest.xml`） |
+| versionName / versionCode | **16.6 / 97**（唯一来源：`module/AndroidManifest.xml`） |
 | 包名 | **`com.Remo.ilayoutsettings`**（16.0 由 `com.abradant.iossettings` 改名，属于破坏性变更） |
 | 应用名 / 仓库名 | **iLayoutSettings**（GitHub 仓库同步改名，旧地址会 301 跳转） |
 | minSdk / targetSdk | 29 / 36 |
 | 作用域 | `com.android.settings` |
-| 当前包 | `dist/iLayoutSettings-16.5.apk`（286,069 B，SHA-256 `84493529…B566`；**已在 25053RT47C 上覆盖安装并实测**） |
-| 旧包 | `dist/` 只保留当前包；16.4 / 16.3 / 16.2 / 16.1 / 16.0 / 15.x / 14.8 在各自 GitHub Release |
+| 当前包 | `dist/iLayoutSettings-16.6.apk`（294,434 B，SHA-256 `F167D382…B6FE`；**已在 25053RT47C 上覆盖安装并实测**） |
+| 旧包 | `dist/` 只保留当前包；16.5 / 16.4 / 16.3 / 16.2 / 16.1 / 16.0 / 15.x / 14.8 在各自 GitHub Release |
 
 ## 发布物指纹
 
 | 包 | 大小 | SHA-256 | 签名证书 SHA-256 |
 | --- | --- | --- | --- |
-| `iLayoutSettings-16.5.apk`（**当前**） | 286,069 B | `8449352927AD053BD49FDDF3505AADE4532F90933E680CDF94AE72257854B566` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-16.6.apk`（**当前**） | 294,434 B | `F167D3820FEEAF83FED1B8C7FFDF8CD006BF9ADB38EFE4C24E4E9116076BE6FE` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-16.5.apk`（历史，Release） | 286,069 B | `8449352927AD053BD49FDDF3505AADE4532F90933E680CDF94AE72257854B566` | 同上 |
 | `iLayoutSettings-16.4.apk`（历史，Release） | 286,069 B | `EE68C55D05E9567831C3DE3327544A3D9AB2EBAD426B907EEC9C17329368B3C0` | 同上 |
 | `iLayoutSettings-16.3.apk`（历史，Release） | 236,593 B | `ED0C383E5A91DC4F054ED3C362AAF4AAE3F44506CE80F4078CD3C36439402873` | 同上 |
 | `iLayoutSettings-16.2.apk`（历史，Release） | 236,593 B | `2D2F068C8DEC1A5D5B982F6347F71580F6C4800B8BE89F4286C2836E945AEC3B` | 同上 |
@@ -36,9 +37,9 @@
 | --- | --- |
 | 仓库 | https://github.com/Remoparrot/iLayoutSettings （旧 `iLyayot` 自动跳转） |
 | 默认分支 | `main` |
-| 最新 Release | [v16.5](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.5)（附件 `iLayoutSettings-16.5.apk`，286,069 B，SHA-256 `84493529…B566`） |
+| 最新 Release | [v16.6](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.6)（附件 `iLayoutSettings-16.6.apk`，294,434 B，SHA-256 `F167D382…B6FE`） |
 | 自动发版 | `tools/release.ps1`：构建 → 校验 → **自动 add/commit/push 当前分支** → 打 tag → 建 Release → 上传附件；脚本必须是 UTF-8 **带 BOM**，且在发 POST 前自检正文（中文丢失 / 占位符残留即中止） |
-| 旧 Release | v16.4、16.3、16.2、16.1、16.0、15.5、14.8 保留（本地 `dist/` 不再保留旧包） |
+| 旧 Release | v16.5、16.4、16.3、16.2、16.1、16.0、15.5、14.8 保留（本地 `dist/` 不再保留旧包） |
 
 ## 现在能做什么
 
@@ -49,7 +50,9 @@
   图标用模块内置的 `ic_cloud.png`（来源：用户提供的 `com.android.settings` 资源包），
   设置包同名 drawable 只作兜底
 - ✅ **软件更新卡片（16.0，条件显示）**：读 `Settings.Global.miui_new_version`，
-  非空才出现；标题「有软件更新可用」，右侧红色「1」角标（`HeaderOverlay` 画在 `widget_frame` 里），
+  非空才出现；标题「有软件更新可用」（16.6 起标题左移到 16dp 内边距），右侧红色「1」角标
+  （`HeaderOverlay` 画在 `widget_frame` 里，24dp / 13sp 白粗体，与箭头垂直居中）；
+  **16.6 起「通用」行的蓝色「1」也换成同一颗红角标，并补上和其它行一样的箭头**，
   点击打开 `com.android.updater/.MainActivity`
 - ✅ **耳机卡片（16.0 起，16.1 增强）**：
   - `AudioManager.getDevices()` 检测 A2DP / SCO / BLE / 有线 / USB / 助听器，A2DP 优先；
@@ -61,7 +64,11 @@
     有线耳机等没有蓝牙设备时退回蓝牙设置；
   - **16.1：`HeadsetWatcher` 注册 `AudioDeviceCallback`，在设置首页打开期间连上/断开耳机，
     卡片即时出现/消失，不用强制停止设置**（350ms 防抖）
-- ✅ 底部搜索栏 + 液态玻璃（`BottomSearch` / `SearchGlass`）
+- ✅ **底部搜索栏 + iOS 27 液态玻璃（16.6 重做）**：不再叠 MIUI 的
+  `miuix_appcompat_search_mode_edit_text_bg_light/dark` 9-patch，`SearchGlass` 自己画
+  模糊 + 折射 + 半透明底色；轮廓是 Kyant Shapes 的 **G2 连续曲率胶囊**；光边只在**上下**
+  且两侧等亮，无内阴影。搜索/麦克风图标换成指定 iOS 27 图标，随深浅色自动变色；
+  点麦克风通过 `com.miui.voiceassist/.VoiceService`（与电源键长按同一条入口）唤醒小爱。
 - ✅ **搜索栏进出场过渡（16.0 / 16.1 修时序）**：进出搜索 220ms 滑动 + 缩放 + 淡入淡出；
   退出时底部栏保持隐藏，等 MIUI 收起顶部搜索框（`ActionModeAnimationListener#onStop(open=false)`）
   后才出现，不再短暂同时显示两个搜索栏
@@ -80,9 +87,8 @@
   就带模糊；**16.5 起不再按「是否滚动」开关模糊和底色，并且清掉 MIUI 给滚动容器的
   `clipBounds`**——账户卡等内容滑进栏下就是模糊的，不再被不透明栏硬切。
   旧 110dp 读取时折算为 73%
-- ✅ **高级设置开关（16.4，GUI）**：模块应用内「高级设置」总开关（默认关）。关闭时只显示
-  搜索栏玻璃滑杆；开启后才出现「顶栏」卡片（模糊 / 透明度 / 显示顶栏分割线）。
-  发丝线默认仍绘制，开关只控制是否显示/隐藏
+- ✅ **GUI（16.6 简化）**：删除「高级设置」总开关，搜索栏玻璃与顶栏两组滑杆直接显示；
+  发丝线开关只控制是否显示/隐藏。搜索栏玻璃滑杆仍支持 0.1dp 步进
 - ✅ **应用图标（16.4 换风格）**：蓝紫渐变 + 半透明玻璃盘 + 白齿轮，`tools/make_launcher_icon.py`
   生成 mdpi/hdpi/xhdpi/xxhdpi/xxxhdpi 五档 PNG；另有 B（纸感线框）、C（深色滑杆）两套候选
 - ✅ 二级页图标、卡片末行修正、应用内参数界面（搜索栏模糊支持 0.1dp）
@@ -113,16 +119,29 @@
    要跟系统主题走，后续可加 `mipmap-anydpi-v26/ic_launcher.xml`。
 8. `docs/07-changelog.md` 的旧「7. 校验」节数据过期（历史记录，未改）。
 9. 无 CI：`tools/release.ps1` 已能自动提交/推送/发 Release，但 GitHub Actions 仍未接。
+10. **搜索栏玻璃不再依赖 9-patch**：16.6 起 `SearchGlass` 是唯一表面，`visibleBackgroundBounds`
+    改为「先存 drawable、首帧 `OnPreDraw` 量像素」；如果换 ROM 后 `android:id/inputArea`
+    改名或 9-patch 结构变了，玻璃会退回整个 `inputArea`（高 44dp）而不是可见胶囊。
+11. **小爱入口是 MIUI 私有导出服务**：`com.miui.voiceassist/.VoiceService` +
+    `com.miui.voicetrigger.ACTION_VOICE_TRIGGER_START_VOICEASSIST`，冷启动约 4–5s 才出现
+    `voice_assist_root`；ROM 升级若改 action/加权限，`wakeXiaoAi` 会走 `ACTION_ASSIST` 兜底
+    （可能弹 Resolver）。
+12. **光边在浅色纯白页上几乎不可见**：白色加法高光叠在浅灰胶囊上，白底环境没有对比；深色
+    模式实测上下峰值 `#63`/`#62`（等亮），浅色只在彩色内容上明显。
+13. **G2 轮廓只对宽 ≥ 2×高 的胶囊生效**；其他比例退回普通圆角矩形（`buildShape` 分支）。
 
 ## 下一步（优先级从高到低）
 
-1. 观察 16.5 的「常开模糊」在**搜索模式**、第三方主题、平板/横屏下的表现（栏高变化会不会
+1. 观察 16.6 搜索栏在**第三方主题/彩色壁纸/浅色纯白页**下的光边与折射；必要时给浅色加
+   1px 灰色轮廓（先确认不违反「不要阴影」）；
+2. 观察小爱入口在 ROM 升级后的可用性；必要时把 `VoiceService` 的 `ComponentName` 做成
+   可配置，或改走 `ACTION_ASSIST`；
+3. 观察 16.5 的「常开模糊」在**搜索模式**、第三方主题、平板/横屏下的表现（栏高变化会不会
    让线提前出现）；必要时把发丝线的显示条件收紧到「折叠进度 > 阈值」；
-2. 图标如需跟随系统主题，补 `mipmap-anydpi-v26` adaptive icon（前景 = 齿轮+玻璃盘，背景 = 渐变）；
-3. 观察耳机卡在真实「开盖自动连」场景下的出现时机，必要时把防抖从 350ms 调到 200ms；
-4. 接 GitHub Actions：tag 触发 `tools/release.ps1` 的只读版本（构建 + 上传）；
-5. 清理 `Hook` 未引用的遗留类（`GlassToggle`、`IntroCard`、`AboutIos` 等）；
-6. 平板/分屏适配。
+4. 图标如需跟随系统主题，补 `mipmap-anydpi-v26` adaptive icon（前景 = 齿轮+玻璃盘，背景 = 渐变）；
+5. 接 GitHub Actions：tag 触发 `tools/release.ps1` 的只读版本（构建 + 上传）；
+6. 清理 `Hook` 未引用的遗留类（`GlassToggle`、`IntroCard`、`AboutIos` 等）；
+7. 平板/分屏适配。
 
 ## 环境事实（本机）
 

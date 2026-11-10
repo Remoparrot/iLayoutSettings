@@ -1,6 +1,6 @@
 # 排错手册
 
-> 状态：**现行** · 对应版本：16.5 (96)
+> 状态：**现行** · 对应版本：16.6 (97)
 > 用法：先按「现象」定位，再看「下一步」。每个问题都给了判断依据，不要凭感觉重装。
 
 ## 0. 通用排查顺序
@@ -50,6 +50,11 @@
 | 耳机 / iCloud 图标不是指定图 | 旧包缓存或主题覆盖 | 16.2 日志应为 `card icon … <- module (supplied theme)`；若是 `<- settings`，说明模块资源没打进 APK |
 | 过渡动画期间玻璃有拖影 | 玻璃抓图层跟着移动 | 16.0 动画期间会隐藏 `SearchGlass`；如果还看到拖影说明动画没走 `animateBar` |
 | 玻璃里有重影 | `capturing` 没跳过自身 | 见 [坑 4](06-pitfalls.md#坑-4底部搜索栏把自己拍进玻璃里) |
+| **玻璃比原胶囊高、图标偏**（16.6） | 首帧没量到 9-patch，遮罩退回整个 `inputArea` | 日志应有 `search glass pill: [x,y][x,y]`；若为 `none`，检查 `OnPreDraw` 是否执行、`pill` 是否拿到 `android:id/inputArea` |
+| **搜索图标过大/把文字挤走**（16.6） | ImageView 是 `wrap_content`，新 drawable 撑大布局 | 见 [坑 F12](06-pitfalls.md#坑-f12给-wrap_content-的-imageview-换大-drawable-会把布局撑开) |
+| **上下光边看起来不等亮**（16.6） | 底色渐变导致下半边对比更强 | 16.6 已把底色改成统一 alpha、光边上下同权；若仍不等，看是否用了旧包（`rimAlpha` 旧值） |
+| **点麦克风没反应**（16.6） | 小爱服务冷启动 4–5s；或 ROM 改了 `VoiceService` | 等 5 秒看 `mCurrentFocus=voice_assist_root`；日志应有 `xiaoai: VoiceService start requested`；失败会走 `ACTION_ASSIST` 兜底（可能弹 Resolver），见 [坑 F14](06-pitfalls.md#坑-f14voiceservice-冷启动-45-秒像没点中) |
+| **麦克风/搜索图标出现切边** | 用户素材本身按 bbox 紧裁，没有留白 | 见 [坑 F15](06-pitfalls.md#坑-f15用户提供的图标是紧裁的边缘被切)；换图时直接替换 `ic_*_glass.png` 资源名 |
 
 ## 3.1 条件卡片（16.0 起，16.1 增强）
 

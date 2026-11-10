@@ -3,10 +3,66 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前主线是 **16.5（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前主线是 **16.6（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
+
+---
+
+# iLayoutSettings · LSPosed 模块（v16.6：搜索栏 iOS 27 液态玻璃 + 小爱麦克风）
+
+## v16.6 变更
+
+- **搜索栏不再叠 MIUI 的 9-patch**：去掉 `miuix_appcompat_search_mode_edit_text_bg_light/dark`
+  之后，`SearchGlass` 成为唯一表面，自己画模糊 + 折射 + 半透明底色；胶囊的可见范围不再取自
+  drawable 的 padding，而是在首帧 `OnPreDraw` 里把旧 9-patch 渲染后量像素（`setPillVisibleRect`），
+  图标位置不漂移。
+- **G2 连续圆角**：轮廓改用 Kyant Shapes 1.2.1 的
+  `ContinuousCurvatureRoundedRectangleCornerBuilder`（胶囊分支控制点硬编码成 `G2_CAPSULE`），
+  不再用普通 stadium 圆角；折射 SDF 仍是圆角矩形（胶囊下差 <1px）。
+- **上下光边**：光边折进 AGSL，用 SDF 法线的垂直分量 `abs(grad.y)` 选边，只有上下亮、两端淡出；
+  顶部和底部同权（`rimAlpha` 默认 0.20，实测上下峰值 `#63`/`#62`）；内阴影已删除。
+- **指定图标**：`ic_search_glass.png` / `ic_mic_glass.png` 来自用户提供的 `下载.zip`，运行时用
+  `PorterDuff.SRC_IN` 染色（深色白、浅色 `#1C1C1E`）；搜索 14dp、麦克风 12×16dp，均向栏内收。
+- **麦克风唤醒小爱**：点麦克风 → `startForegroundService(com.miui.voiceassist/.VoiceService)`，
+  action 为 `com.miui.voicetrigger.ACTION_VOICE_TRIGGER_START_VOICEASSIST`，与电源键长按出现
+  同一个 `voice_assist_root` 悬浮窗（冷启动约 4–5s，点击有触感 + 回弹）。
+- **GUI**：删除「高级设置」总开关，顶栏卡片常显。
+- **「红 1」角标统一**：更新卡的红角标改成 24dp / 13sp 白粗体，并与右侧箭头垂直居中
+  （`widget_frame` 是竖直 LinearLayout，还有一个空占位，角标原本贴底）；MIUI 给「通用」行画的
+  **蓝色**「1」也换成同一颗红角标，大小一致。
+- **补箭头**：带角标的行 MIUI 会把原生箭头藏掉，模块把该行 `arrow_right` 的 drawable 克隆到自建
+  ImageView 里，放进同一个箭头槽位（`1 ›` 的读法），像素级等同系统箭头；浅色/深色都跟随。
+- **更新卡标题左移**：合成行没有 icon，MIUI 仍按图标槽缩进；标题平移到 16dp 内边距，
+  与右侧箭头留白对称，整行看起来居中。
+- **版本**：16.6 / versionCode **97**；APK `dist/iLayoutSettings-16.6.apk`，294,434 B。
+
+## v16.6 校验
+
+```
+package: name='com.Remo.ilayoutsettings' versionCode='97' versionName='16.6'
+sdkVersion:'29'
+targetSdkVersion:'36'
+launchable-activity: name='com.Remo.ilayoutsettings.MainActivity'  label='iLayoutSettings'
+dex version : 039
+xposed_init : True
+module class: True
+reorder     : True
+size   : 294434 bytes
+sha256 : F167D3820FEEAF83FED1B8C7FFDF8CD006BF9ADB38EFE4C24E4E9116076BE6FE
+```
+
+真机 25053RT47C / HyperOS 3 / Android 16（2026-11-10 23:20 前后）：
+
+- 深色：x=640 竖扫，栏内 `#333334`，上边缘峰值 `#63`、下边缘峰值 `#62`（等亮），两端不亮；
+- 浅色：胶囊 `#F3F3F5`，白底上仍可辨；搜索/麦克风为深色图标；
+- 麦克风：点击后 `mCurrentFocus=voice_assist_root`（约 4.8s），日志
+  `xiaoai: VoiceService start requested`；
+- 搜索栏：点击后 uiautomator 出现 `search_panel`，MIUI 搜索框与键盘正常；
+- 截图：[深色](assets/search-glass-16.6-dark.png)、[浅色](assets/search-glass-16.6-light.png)、
+  [GUI](assets/gui-16.6.png)、[更新卡红 1 + 箭头](assets/update-badge-16.6.png)、
+  [通用行红 1 + 箭头](assets/general-badge-16.6.png)。
 
 ---
 

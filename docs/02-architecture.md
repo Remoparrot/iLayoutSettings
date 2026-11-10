@@ -1,6 +1,6 @@
 # 架构与 Hook 链路
 
-> 状态：**现行** · 对应版本：16.5 (96)
+> 状态：**现行** · 对应版本：16.6 (97)
 > 源码：`module/src/com/Remo/ilayoutsettings/`
 
 ## 1. 从加载到生效
@@ -88,11 +88,19 @@ LSPosed
 
 - 更新卡（group 1）与耳机卡（group 2）用的是 `SLOT_GROUP` 里没占用的两个组号，排序天然落在
   账号卡（0）之后、网络卡（3）之前；iCloud 复用 Game Center 所在的 group 7。
-- 原生 header 行没有「角标」位，所以 `HeaderOverlay` 在 `HeaderAdapter.onBindViewHolder`
-  之后把红色圆点 `TextView` 塞进 `android.R.id.widget_frame`（同样处理 LinearLayout / FrameLayout /
-  RelativeLayout 三种父容器，`marginEnd` 6dp 给箭头留位）。
+- 原生 header 行没有「角标」位，所以 `HeaderOverlay` 把红色圆点 `TextView`（24dp / 13sp 白粗体）
+  塞进 `android.R.id.widget_frame`（同样处理 LinearLayout / FrameLayout / RelativeLayout 三种父容器，
+  `marginEnd` 8dp 给箭头留位）。
 - 判断「这行是不是我们的」不靠标题（耳机名会变），而是 `Header.extras` 里的 `ios_synthetic` 标记；
   行被回收成普通行时按 tag 把角标摘掉。
+- **16.6 起「通用」行共用同一颗角标**：MIUI 自己在「通用」上画一个蓝色「1」(`com.android.settings:id/text_right`)，
+  模块把它隐藏、换成同样的红角标，并复用该行原生 `arrow_right` 的 drawable 在角标右侧补一个箭头
+  （原生箭头在这类行里是 GONE 的）。`widget_frame` 在 header 行里是**竖直** LinearLayout、还可能带一个空占位，
+  所以角标会贴到底部；模块在 `OnPreDraw` 里把同帧其它子 View 全部 GONE 掉，角标才和箭头齐平。
+- 原生角标是 **bind 之后才淡入** 的，`onBindViewHolder` 里读到的往往是空文本；因此替换逻辑挂在
+  `OnPreDraw`（`HeaderOverlay.ensureGuard`）里，等数字出现再 `post` 一次替换。
+- **更新卡标题左移（16.6）**：合成行没有 icon，MIUI 仍按图标槽缩进标题；模块在预绘制里把标题容器
+  `translationX` 平移到 16dp 内边距，与右侧箭头留白对称（`HeaderOverlay.shiftTitle`）。
 - 耳机 / iCloud 的图标除了写 `Header.icon` 之外，还会在 bind 之后直接 `setImageDrawable`：
   MIUI 的 adapter 有时优先读 `iconRes`，只写 `icon` 会渲染成空行。
 - **图标来源（16.2）**：`HeaderData.cardDrawable()` **先取模块内置**的
@@ -112,6 +120,7 @@ LSPosed
 
 1. 找到首页的原生搜索条（`header_view` / `mAnchorView`），**隐藏但保留**；
 2. inflate 系统的 `miuix_appcompat_search_stub` 作为底部浮层（失败则退化成自绘胶囊）；
+   **16.6 起 stub 只提供布局和点击外壳**——`inputArea` 的 9-patch 背景会被清掉；
 3. 浮层尺寸：高 50dp，左右 8dp，底部 12dp；拿到导航栏 inset 后改为 `14dp + nav`；
 4. 列表底部 padding 同步加上 `搜索栏高 + nav + 24dp`，避免最后一张卡片被挡；
 5. 点击浮层 → 先播 120ms 出场动画，再调原生 anchor 的 `performClick()` → 走 MIUI 自己的搜索 ActionMode；
@@ -121,14 +130,24 @@ LSPosed
    收到 `onStop(open=false)`（收起动画结束、`mIsInActionMode` 已为 false）后才播底部栏进场，
    另有 700ms 兜底。`isSearching()` 也改成优先读 `mIsInActionMode`：原来的
    `search_result_ll` 探测在首次布局后永远为真，害得从二级页返回时底部栏被误隐藏；
-6. `SearchGlass` 负责视觉层：抓窗口（跳过自身子树）→ **1dp 模糊**（`RenderEffect`）→
-   圆角矩形折射（`RuntimeShader` + AGSL，默认 **12dp 厚度 / 8dp 力度**）→ 深色保留底部内阴影、浅色关闭；
-   **不再往 shader 里混表面色**，原生 `miuix_appcompat_search_mode_edit_text_bg_light/dark` 胶囊保持主题原样；
-   遮罩不是视图边界，而是 `paintedBackgroundBounds()` 把原生胶囊 drawable 画进位图后取的实际像素矩形
-   （主题 9-patch 的透明边距烘在 PNG 里，`getPadding()` 不可靠）；
-   **抓图在 `OnPreDraw` 里做，只有抓到的位图与前一张不同才 `invalidate()`**；
-7. 逐级兜底：全量 shader → 只有折射的 shader → 只有模糊 → 半透明胶囊（`shaderUnavailable` 只置一次，
-   不会每帧重试抛异常）。`SearchHost` 在抓图那一帧跳过自身子树，避免把搜索栏自己拍进背景里。
+6. `SearchGlass` 负责视觉层（16.6 重做）：
+   - 抓窗口（跳过自身子树）→ **1dp 模糊**（`RenderEffect`）→ `RuntimeShader` 折射（默认 **12dp 厚度 / 19dp 力度**）；
+   - **不再画 MIUI 的 `miuix_appcompat_search_mode_edit_text_bg_light/dark`**：玻璃自己画半透明底色
+     （深色白 10%、浅色浅灰 `#E6E6EB` 50%），并做上下等亮的光边（AGSL 里用 `abs(grad.y)` 选边，
+     `rimAlpha=0.20`、`rimWidth=1dp`）；内阴影已删除；
+   - 轮廓是 Kyant Shapes 的 **G2 连续曲率胶囊**（`G2_CAPSULE` 控制点 + `buildG2Capsule`），
+     折射 SDF 仍是圆角矩形（胶囊下差 <1px）；
+   - 胶囊的可见矩形不再靠 9-patch 的 padding：install 时保存 drawable、先清背景，首帧 `OnPreDraw`
+     里用保存的 drawable 按真实尺寸渲染后量像素（`SearchGlass.paintedBounds`），再 `setPillVisibleRect()`；
+   - **抓图在 `OnPreDraw` 里做，只有抓到的位图与前一张不同才 `invalidate()`**；
+7. 图标/麦克风（16.6）：搜索 ImageView 固定回 44×24dp，内容框 14dp、左 21dp/右 9dp；
+   麦克风是本模块加的 12×16dp ImageView（右距 36dp），`PorterDuff.SRC_IN` 按深浅色染色；
+   点麦克风 → `startForegroundService(com.miui.voiceassist/.VoiceService)`，
+   action `com.miui.voicetrigger.ACTION_VOICE_TRIGGER_START_VOICEASSIST`，与电源键长按同一个
+   `voice_assist_root` 悬浮窗（冷启动约 4–5s）；
+8. 逐级兜底：完整 AGSL → 只有模糊 + 底色 + 平直上下光边（`drawFlatRim`）→ 半透明 G2 胶囊
+   （`shaderUnavailable` 只置一次，不会每帧重试抛异常）。`SearchHost` 在抓图那一帧跳过自身子树，
+   避免把搜索栏自己拍进背景里。
 
 > 抓图 + 两个 RenderEffect 是整份代码里性能最敏感的部分，改之前先读 [设计思路 · 2.4 玻璃](05-design-notes.md)。
 > 搜索栏挂在 `android.R.id.content` 上，**不在滚动列表里**：列表滚动不会弄脏它，所以必须自己判断
@@ -187,9 +206,9 @@ LSPosed
   直接加在它上面不可见，实测用洋红 8px 探针确认）。颜色每帧按当前 `uiMode` 取：
   浅色黑色 12%（`0x1F000000`），深色中性灰 30%（`0x4DAAAAAA`，16.3 由白 15% 改来）；
   坐标用 `appBar.getLeft()/getTop()` 换算，仍贴在栏的最底边。
-- **高级设置（16.4，GUI 侧）**：`Prefs.ADVANCED`（`advanced_mode`，默认 false）只控制
-  `MainActivity` 是否构建「顶栏」卡片；`Prefs.TOPBAR_DIVIDER`（`topbar_divider`，默认 true）
-  控制发丝线是否绘制。关闭高级设置不会改写 divider 的值，避免「关一下开关线就永久没了」。
+- **高级设置（16.4 引入，16.6 删除）**：16.4 的 `Prefs.ADVANCED`（`advanced_mode`，默认 false）
+  曾控制 `MainActivity` 是否构建「顶栏」卡片；16.6 删除这个总开关，顶栏卡片常显。
+  `Prefs.TOPBAR_DIVIDER`（`topbar_divider`，默认 true）仍控制发丝线是否绘制。
 - 15.3 用**设置进程的 classloader** 解析 `miuix.core.util.MiuiBlurUtils`。LSPosed 把模块类放在独立 loader 里，
   之前的 `UiTweaks.class.getClassLoader()` 会 `ClassNotFoundException`，所以滑杆写进去了但从未生效；
 - 16.4 仍保留 700ms 的空闲轮询（`ensurePoll`，`attach` 时启动、detach 时停），

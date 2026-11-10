@@ -775,6 +775,20 @@ final class HeaderData {
         return isMarked(header, "update");
     }
 
+    /**
+     * The "通用" row (16.6). It is the one MIUI decorates with a blue count while
+     * a system update is waiting; the title is checked instead of an id because
+     * themes rename both.
+     */
+    static boolean isGeneralHeader(Object header) {
+        Object title = field(header, "title");
+        if (!(title instanceof CharSequence)) {
+            return false;
+        }
+        String value = title.toString().trim();
+        return "通用".equals(value) || "更多设置".equals(value);
+    }
+
     static boolean isAirpodsHeader(Object header) {
         return isMarked(header, "airpods");
     }

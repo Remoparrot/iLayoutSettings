@@ -1,16 +1,23 @@
 package com.Remo.ilayoutsettings;
 
 import android.app.Activity;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Insets;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import java.lang.reflect.Method;
@@ -30,6 +37,11 @@ import de.robv.android.xposed.XposedBridge;
 final class BottomSearch {
 
     private static final String TAG = "ios_bottom_search";
+    /** 16.6: Xiao Ai's exported voice-trigger service (power-key long press path). */
+    private static final String XIAOAI_PKG = "com.miui.voiceassist";
+    private static final String XIAOAI_SERVICE = "com.xiaomi.voiceassistant.VoiceService";
+    private static final String XIAOAI_ACTION =
+            "com.miui.voicetrigger.ACTION_VOICE_TRIGGER_START_VOICEASSIST";
     private static final java.util.Map<View, Integer> BASE_BOTTOM =
             new java.util.WeakHashMap<>();
     private static final java.util.Set<ViewGroup> WATCHED =
@@ -131,12 +143,22 @@ final class BottomSearch {
             // Reverted to our own SearchGlass (kyant refraction shader): the
             // lattice port produced ghosted text and missing icons on device.
             final SearchGlass glass = new SearchGlass(activity);
-            // The native capsule is the widget_frame LinearLayout (44dp, 9-patch
+            // The native capsule is the inputArea LinearLayout (44dp, 9-patch
             // background) inside the 56dp stub; clipping the glass to the stub
             // itself made the lens wider and taller than the bar it sits in.
-            View pill = pickNativePill(activity, bar);
+            final View pill = pickNativePill(activity, bar);
             glass.setMaskView(pill);
             glass.setCaptureHost(wrap);
+            final Drawable pillBackground = pill == null ? null : pill.getBackground();
+            if (pill != null) {
+                // 16.6: no more miuix_appcompat_search_mode_edit_text_bg_*.9
+                // under the liquid glass — SearchGlass is the only surface.
+                // Keep the drawable: the visible pill is inset from its view
+                // (transparent margins are baked into the 9-patch), and that
+                // inset is measured after the first layout below.
+                pill.setBackground(null);
+                XLog.i("pill 9-patch removed: " + pill.getClass().getSimpleName());
+            }
             boolean embedded = false;
             if (nativeStub) {
                 try {
@@ -167,6 +189,7 @@ final class BottomSearch {
             try {
                 disableChildTouches(bar);
                 tintSearchText(bar);
+                styleGlassContent(activity, bar, pill);
             } catch (Throwable t) {
                 XLog.w("search bar text styling skipped: " + t);
             }
@@ -221,6 +244,30 @@ final class BottomSearch {
                     wrap.bringToFront();
                 }
             });
+            if (pill != null && pillBackground != null) {
+                // The pill has no size during install. Measure the saved
+                // 9-patch on the first pre-draw, when layout has run but nothing
+                // has been painted yet, so the glass never flashes its full
+                // (taller) stub-sized shape.
+                wrap.getViewTreeObserver().addOnPreDrawListener(
+                        new android.view.ViewTreeObserver.OnPreDrawListener() {
+                            @Override
+                            public boolean onPreDraw() {
+                                if (pill.getWidth() <= 0 || pill.getHeight() <= 0) {
+                                    return true;
+                                }
+                                try {
+                                    wrap.getViewTreeObserver().removeOnPreDrawListener(this);
+                                } catch (Throwable ignored) {
+                                }
+                                android.graphics.Rect visible = SearchGlass.paintedBounds(
+                                        pillBackground, pill.getWidth(), pill.getHeight());
+                                glass.setPillVisibleRect(visible);
+                                glass.invalidate();
+                                return true;
+                            }
+                        });
+            }
 
             Object listObject = HeaderData.field(fragment, "mListView");
             final View listView = listObject instanceof View ? (View) listObject : null;
@@ -673,20 +720,23 @@ final class BottomSearch {
     }
 
     /**
-     * The visible capsule is the stub's {@code widget_frame} LinearLayout: the
-     * stub root is 56dp tall and mostly padding, the pill inside it is 44dp and
-     * carries the 9-patch. Falls back to the smallest view with a background.
+     * The visible capsule is the stub's {@code inputArea} LinearLayout: the
+     * stub root is 56dp tall and mostly padding, the pill inside it carries the
+     * 9-patch. Falls back to {@code widget_frame} and then to the smallest view
+     * with a background for other MIUI versions.
      */
     private static View pickNativePill(Activity activity, View bar) {
-        try {
-            int id = activity.getResources().getIdentifier("widget_frame", "id", "android");
-            if (id != 0) {
-                View pill = bar.findViewById(id);
-                if (pill != null) {
-                    return pill;
+        for (String name : new String[]{"inputArea", "widget_frame"}) {
+            try {
+                int id = activity.getResources().getIdentifier(name, "id", "android");
+                if (id != 0) {
+                    View pill = bar.findViewById(id);
+                    if (pill != null) {
+                        return pill;
+                    }
                 }
+            } catch (Throwable ignored) {
             }
-        } catch (Throwable ignored) {
         }
         return findBackgroundView(bar);
     }
@@ -777,6 +827,139 @@ final class BottomSearch {
 
     private static int area(View v) {
         return Math.max(0, v.getWidth()) * Math.max(0, v.getHeight());
+    }
+
+    /**
+     * 16.6: replace MIUI's search/mic glyphs with the supplied iOS 27 icons,
+     * drop the 9-patch's baked-in voice icon (on this ROM it is the hint
+     * TextView's drawableEnd), and add a clickable microphone that wakes Xiao Ai
+     * the same way the power-key long press does.
+     */
+    private static void styleGlassContent(final Activity activity, View bar, View pill) {
+        boolean dark = UiTweaks.isDarkMode(activity);
+        int tint = dark ? 0xFFFFFFFF : 0xFF1C1C1E;
+
+        TextView input = bar.findViewById(android.R.id.input);
+        if (input != null) {
+            // Clearing the compound drawables removes MIUI's own mic; leaving
+            // it in place would draw a second, non-clickable glyph next to ours.
+            input.setCompoundDrawablesRelative(null, null, null, null);
+            input.setPadding(input.getPaddingLeft(), input.getPaddingTop(),
+                    Math.max(input.getPaddingRight(), dp(activity, 34)),
+                    input.getPaddingBottom());
+        }
+
+        Drawable search = HeaderData.moduleDrawable(activity, "ic_search_glass");
+        View icon = firstImageView(pill != null ? pill : bar);
+        if (icon instanceof ImageView) {
+            ImageView searchIcon = (ImageView) icon;
+            // The stub's ImageView is wrap_content: assigning a 59dp-intrinsic
+            // module drawable would widen the view to 84dp and push the hint to
+            // the right. Pin the original 44x24dp box back. MIUI's own drawable
+            // was 14dp inside asymmetric 17/9dp padding; ours is 16dp in an
+            // 18/10dp padding, so the glyph centre does not move.
+            ViewGroup.LayoutParams vlp = searchIcon.getLayoutParams();
+            if (vlp != null) {
+                vlp.width = dp(activity, 44);
+                vlp.height = dp(activity, 24);
+                searchIcon.setLayoutParams(vlp);
+            }
+            // 16.6: 14dp glyph instead of 16dp, and 2dp further inside.
+            searchIcon.setPadding(dp(activity, 21), dp(activity, 5),
+                    dp(activity, 9), dp(activity, 5));
+            if (search != null) {
+                searchIcon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                searchIcon.setImageDrawable(search);
+                searchIcon.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+                XLog.i("search icon <- ic_search_glass");
+            } else {
+                searchIcon.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+            }
+        }
+
+        if (!(bar instanceof ViewGroup)) {
+            return;
+        }
+        ImageView mic = new ImageView(activity);
+        Drawable micDrawable = HeaderData.moduleDrawable(activity, "ic_mic_glass");
+        if (micDrawable != null) {
+            mic.setImageDrawable(micDrawable);
+            mic.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            mic.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+        }
+        mic.setContentDescription("小爱同学");
+        mic.setClickable(true);
+        mic.setFocusable(true);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                dp(activity, 12), dp(activity, 16),
+                Gravity.END | Gravity.CENTER_VERTICAL);
+        // The stub root has no padding (the inner stub layout is the one that is
+        // inset), so 36dp from the root's right edge puts the smaller mic 3dp
+        // further inside than the first pass, matching the reference.
+        lp.rightMargin = dp(activity, 36);
+        mic.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                v.animate().cancel();
+                v.setScaleX(0.86f);
+                v.setScaleY(0.86f);
+                v.animate().scaleX(1f).scaleY(1f).setDuration(170)
+                        .setInterpolator(new android.view.animation.OvershootInterpolator(2f))
+                        .start();
+                wakeXiaoAi(activity);
+            }
+        });
+        ((ViewGroup) bar).addView(mic, lp);
+        XLog.i("mic icon added (tap -> Xiao Ai)");
+    }
+
+    private static View firstImageView(View root) {
+        if (root instanceof ImageView) {
+            return root;
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                View found = firstImageView(group.getChildAt(i));
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Wakes Xiao Ai the way the power-key long press does: the voice trigger
+     * starts com.miui.voiceassist's exported VoiceService with
+     * ACTION_VOICE_TRIGGER_START_VOICEASSIST, which brings up the same
+     * voice_assist_root overlay. Verified on 25053RT47C (HyperOS 3 / Android 16);
+     * the first tap after a cold start takes a few seconds to show the overlay.
+     */
+    private static void wakeXiaoAi(Activity activity) {
+        try {
+            Intent intent = new Intent(XIAOAI_ACTION);
+            intent.setComponent(new ComponentName(XIAOAI_PKG, XIAOAI_SERVICE));
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                activity.startForegroundService(intent);
+            } else {
+                activity.startService(intent);
+            }
+            XLog.i("xiaoai: VoiceService start requested");
+            return;
+        } catch (Throwable t) {
+            XLog.w("xiaoai: VoiceService failed: " + t);
+        }
+        try {
+            Intent intent = new Intent(Intent.ACTION_ASSIST);
+            intent.setPackage(XIAOAI_PKG);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            activity.startActivity(intent);
+            XLog.i("xiaoai: fallback ACTION_ASSIST");
+        } catch (Throwable t) {
+            XLog.e("xiaoai: fallback failed", t);
+        }
     }
 
     /** "搜索" hint: black 70% in light mode, white 70% in dark mode. */

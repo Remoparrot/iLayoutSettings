@@ -1,6 +1,6 @@
 # 踩坑记录
 
-> 状态：**现行** · 对应版本：16.4 (95)
+> 状态：**现行** · 对应版本：16.6 (97)
 > 规则：每踩一个新坑就追加一条，写清 **现象 → 根因 → 解法 → 如何避免**。旧结论被推翻时保留原文并标「已过时」。
 
 ## 最贵的五个坑（先看这五条）
@@ -78,10 +78,16 @@
 | 发丝线要等头部完全收起才出现 | 显示条件写死 `scrolled && !isHeaderOpen()`，折叠动画期间 `scrolled` 还是 false | 16.5：条件改为「`scrolled` **或** 栏已从大标题高度收缩」——用 `OPEN_BAR_HEIGHT` 记住见过的最大栏高，当前高度小 1dp 就算折叠中 |
 | 耳机 / iCloud 图标被第三方主题换掉 | 16.1 的 `cardDrawable` 是 settings 优先，主题同名 `ic_*` 会赢 | 16.2 改为模块内置优先，settings 只作兜底 |
 | `R.string.*` 编译报「找不到符号 R」 | `build.ps1` 只把 `module/src` 传给 javac，aapt2 生成的 `build/gen/**/R.java` 从未参与编译 | 避免在 Java 引用 `R`；标题用 `loadLabel()`，版本用 `getPackageInfo().versionName` |
-| 搜索栏去色后完全消失 | 把 `miuix_appcompat_search_mode_edit_text_bg_light/dark` 的 fill 清掉了；它才是可见胶囊 | 保留主题胶囊；只把 shader 的 `surfaceAlpha` 置 0，不再叠 shader 表面色 |
+| ~~搜索栏去色后完全消失~~（**已过时，见 F11–F15**） | 把 `miuix_appcompat_search_mode_edit_text_bg_light/dark` 的 fill 清掉了；它才是可见胶囊 | 15.x 的解法是保留主题胶囊；**16.6 改为不再使用 9-patch**，玻璃自己画底色与光边，见 F11–F15 |
+| **16.6：去掉 9-patch 后玻璃变高、图标漂移** | install 时 view 还没布局，`paintedBackgroundBounds()` 直接返回 null，遮罩退回整个 44dp `inputArea` | 保存 drawable → 清背景 → 首帧 `OnPreDraw` 里按真实尺寸量（`paintedBounds`）再 `setPillVisibleRect` |
+| **16.6：换 drawable 后搜索图标撑满 44dp** | stub 的 ImageView 是 `wrap_content`，模块 PNG 固有 58dp，view 被撑到 84dp | 把 LayoutParams 固定回 44×24dp，用 padding 做 14dp 内容框 |
+| **16.6：上下光边看起来不一样亮** | 底色是上亮下暗的渐变；同一加法高光在更暗的下半边对比更强 | 底色改统一 alpha（0.10），光边上下同权；实测峰值 `#63`/`#62` |
+| **16.6：点麦克风后几秒没反应** | `VoiceService` 冷启动要 4–5s 才 add `voice_assist_root` | 点击给触感 + 回弹；用 `dumpsys window` 确认是慢而不是没触发 |
 | 外观页预览和卡片之间有空隙 | MIUI 自己加了 margin | 保留原间距，只在预览后补一层同色同圆角的卡片背景（`AppearanceTweak`） |
 | 合成行的图标是空的（耳机/iCloud） | MIUI 的 `HeaderAdapter` 在有些版本优先读 `iconRes`，只给 `Header.icon` 不生效 | `HeaderOverlay` 在 `onBindViewHolder` 之后直接 `icon.setImageDrawable(...)` 兜底 |
-| 更新卡右侧没有红色角标 | 原生 header 行没有「角标」这个位置 | 自己在 `android.R.id.widget_frame` 里加一个 20dp 圆形 `TextView`（`HeaderOverlay`），按 tag 清理 |
+| 更新卡右侧没有红色角标 | 原生 header 行没有「角标」这个位置 | 自己在 `android.R.id.widget_frame` 里加一个 24dp 圆形 `TextView`（`HeaderOverlay`），按 tag 清理 |
+| 角标比箭头低半行（16.6 修复前） | `widget_frame` 是**竖直** LinearLayout，上面还有一个空占位子 View，角标被顶到底部 | 预绘制里把同帧其它子 View 全设 `GONE`，只留角标（`HeaderOverlay.hideOthers`） |
+| 换上红角标后偶尔又冒出原生蓝「1」 | MIUI 的角标是 bind **之后**才淡入的，`onBindViewHolder` 里读到的文本还是空的 | 用 `OnPreDraw` guard 每帧检查，数字出现再 `post` 替换一次（`HeaderOverlay.ensureGuard`） |
 | 搜索栏进出场时出现两个胶囊 | `install()` 每次 resume 都删旧建新，旧胶囊还在播动画 | 16.0 改为同 fragment / 同夜间模式复用现有胶囊；动画状态用 `animUntil` 互斥 |
 | 退出搜索时短暂同时出现顶部搜索框和底部搜索栏 | `onDestroyActionMode` 在 MIUI 收起动画**开始**时就回调，底部栏立刻进场；等顶部框收完（约 200ms）才不重叠 | 16.1：`onDestroyActionMode` 只隐藏；给 `SearchActionMode` 挂 `ActionModeAnimationListener` 代理，`onStop(open=false)` 后进场，700ms 兜底 |
 | 从二级页返回后底部搜索栏消失 | `isSearching()` 探测 `search_result_ll`，它首次布局后一直有高度/可见，被误判成「还在搜索」 | 16.1：优先读 `SettingsFragment.mIsInActionMode`（`onPrepareActionMode` 置 true、`onDestroyActionMode` 置 false），视图探测只作兜底 |
@@ -279,6 +285,60 @@
   量出来会窄 8dp 左右）。遮罩直接用这个矩形，不再手调居中。
 - **如何避免**：主题/9-patch 场景不要信 `getPadding()`，直接测像素；阈值要在真机截图上核对
   （本次 72 能覆盖可见 fill，96 会在左侧露一条原生 fill）。
+- **16.6 补充**：上面「保留 9-patch 并量像素」的做法已被 16.6 取代——现在量完就清掉背景，
+  且必须等首帧 `OnPreDraw`（见 F11）。F10 只保留「透明边距烘在 PNG 里、`getPadding()` 不可信」
+  这一条仍然成立。
+
+#### 坑 F11：去掉 9-patch 后，胶囊可见矩形在 install 时量不到
+
+- **现象**：`setPillVisibleRect()` 拿到 null，玻璃按整个 `inputArea`（44dp）画，比原来的可见胶囊高，
+  图标也跟着偏；日志 `visible=none`。
+- **根因**：`BottomSearch.install()` 在首帧 layout 之前执行，`pill.getWidth()==0`，
+  `paintedBackgroundBounds()` 直接返回 null；而背景一旦清掉，之后也没有 drawable 可量。
+- **解法**：install 时保存 `pill.getBackground()` 引用再 `setBackground(null)`；在 `OnPreDraw`
+  第一次回调（layout 完成、尚未绘制）里用保存的 drawable 按真实尺寸调用 `SearchGlass.paintedBounds()`
+  （与 `paintedBackgroundBounds` 共用实现），拿到矩形后 `setPillVisibleRect()` + `invalidate()`，
+  这样第一帧就用正确几何，不会闪一下 44dp。
+- **如何避免**：任何依赖 view 尺寸的测量都放到 `OnPreDraw`/`onLayout` 之后；不要「先清掉再想办法量」。
+
+#### 坑 F12：给 wrap_content 的 ImageView 换大 drawable 会把布局撑开
+
+- **现象**：搜索图标变成 44dp 大图，把「搜索」文字从 63dp 推到 103dp，之前按原图标算的 padding 全失效。
+- **根因**：`miuix_appcompat_search_stub` 里的搜索 ImageView 是 `wrap_content`；模块 PNG 在
+  `drawable-xxhdpi` 下固有尺寸约 58dp，view 变成 58+26=84dp；`CENTER_INSIDE` 的内容框也随之变大，
+  图标不再缩小。
+- **解法**：在 `styleGlassContent()` 里把 ImageView 的 `LayoutParams` 固定回 44×24dp，再用
+  `paddingLeft=21dp / paddingRight=9dp / paddingTop/Bottom=5dp` 做 14dp 内容框；`CENTER_INSIDE` 才会
+  按 14dp 缩放。麦克风则直接给 12×16dp 的 `FrameLayout.LayoutParams`，不依赖固有尺寸。
+- **如何避免**：替换系统布局里的 drawable 前先看目标 view 的 `layout_width/height`；`wrap_content`
+  的 view 会跟着 drawable 的固有尺寸变。
+
+#### 坑 F13：底色渐变让「上下等亮」的光边看起来不等
+
+- **现象**：同一套 `rimAlpha`，顶部峰值 `#45`、底部 `#69`，用户仍说上下不一致、深色高光太亮。
+- **根因**：底色是 0.16→0.07 的白色渐变，下边缘基色更暗；加法高光的绝对增量相同，但对比度更高，
+  肉眼觉得底部更亮。
+- **解法**：底色改成统一 alpha（深色 0.10、浅色 `#E6E6EB` 50%），光边上下同权（去掉 top/bottom
+  权重差），`rimAlpha` 从 0.55 → 0.26 → 0.14 → 0.20 逐轮按真机截图调；最终上下峰值 `#63`/`#62`。
+- **如何避免**：做「等亮」效果时先统一基色，再谈高光权重；验收要看像素峰值，不要只看代码里的权重。
+
+#### 坑 F14：`VoiceService` 冷启动 4–5 秒，像没点中
+
+- **现象**：第一次点麦克风后 3 秒内没有任何窗口变化，容易以为点击没生效。
+- **根因**：`com.miui.voiceassist` 进程/模型冷启动，`voice_assist_root` 要等服务起来才 addView；
+  实测从点击到 `mCurrentFocus=voice_assist_root` 约 4.8s，热启动会快很多。
+- **解法**：点击处加 `HapticFeedbackConstants.KEYBOARD_TAP` 触感和 0.86→1.0 的回弹动画，给即时反馈；
+  不去缩短服务端等待。调试时用 `dumpsys window | findstr voice_assist_root` 确认是「慢」而不是「没触发」。
+- **如何避免**：接入第三方语音助手时先用 `adb shell am start-foreground-service` 实测入口和延迟，
+  再写进代码；不要用「3 秒没反应 = 失败」的假设验收。
+
+#### 坑 F15：用户提供的图标是紧裁的，边缘被切
+
+- **现象**：`search.png` 的放大镜手柄、`mic.png` 的底座横条都贴到画布边缘，缩小后仍能看到切边。
+- **根因**：素材按图形 bbox 紧裁，没有留白；`下载.zip` 里的 PNG 就是最终边界。
+- **解法**：按原样使用（用户指定），只在 ImageView 里用 `CENTER_INSIDE/FIT_CENTER` 控制大小；
+  不补画、不镜像、不擅自扩画布。记录里写明素材限制，后续如用户换图直接替换资源名即可。
+- **如何避免**：接图标素材时先看 alpha 包围盒是否贴边；贴边就说明被裁过，提前和用户确认接受。
 
 ---
 
