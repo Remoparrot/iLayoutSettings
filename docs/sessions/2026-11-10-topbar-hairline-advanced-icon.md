@@ -9,7 +9,7 @@
 16.4 修了两个顶栏问题：设置界面内切换深浅色后发丝线消失（监听器绑在会被重建的 fragment 视图上），
 以及顶栏第一次出现时模糊可能从 0 开始（原生 `refreshBlur()` 前没有把半径写好）。
 另外 GUI 新增「高级设置」总开关（关闭时隐藏顶栏/发丝线选项），启动图标换成蓝紫渐变 + 玻璃盘 + 白齿轮。
-真机 25053RT47C 深浅色各验一次，发丝线像素与 16.3 文档一致。
+真机 25053RT47C 深浅色各验一次，发丝线像素与 16.3 文档一致；已发 v16.4。
 
 ## 2. 对话重点
 
@@ -111,9 +111,12 @@ sha256 : EE68C55D05E9567831C3DE3327544A3D9AB2EBAD426B907EEC9C17329368B3C0
 
 ## 7. 未完成 / 下一步 / 风险
 
-- 未发 Release（如需要：`tools/release.ps1 -Version 16.4`）。
-- 图标只上了 A 方案；`tools/make_launcher_icon.py` 里 B/C 可一行切换，用户不满意可直接换。
+- 已发版：[v16.4](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.4)，tag 指向 `59c3ef6`，
+  附件 `iLayoutSettings-16.4.apk`（286,069 B，SHA-256 `EE68C55D…B3C0`）。
+- 图标只上了 A 方案（`docs/assets/icon-16.4.png`，三套候选并排见
+  `docs/assets/icon-candidates-16.4.png`）；`tools/make_launcher_icon.py` 里 B/C 可一行切换。
 - 发丝线宿主依赖 `action_bar_container` 的父级是一个会画 overlay 的 ViewGroup（当前是 ActionBarOverlayLayout）；
   换 ROM 若父级也自定义绘制，需要再换宿主（可退回根 content overlay）。
 - 高级设置开关只影响 GUI，不做权限/作用域校验；「只在设置里加了高级设置」如果用户原意是别的语义，
   需要再对齐一次。
+- 模糊首发只验证了半径下发顺序（`refreshBlur` 前预写），没抓到折叠动画第一帧的肉眼效果。
