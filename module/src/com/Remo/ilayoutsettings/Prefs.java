@@ -19,6 +19,10 @@ final class Prefs {
     static final String TOPBAR_BLUR = "topbar_blur";
     /** Opacity (0..100 %) of the scrolled top bar surface, 16.2. */
     static final String TOPBAR_ALPHA = "topbar_alpha";
+    /** 16.4: show the 0.5 dp hairline under the condensed top bar. */
+    static final String TOPBAR_DIVIDER = "topbar_divider";
+    /** 16.4: unlocks the advanced section (top bar controls) in the GUI. */
+    static final String ADVANCED = "advanced_mode";
 
     /** Thickness of the refracted band at the capsule edge, in dp. */
     static final float DEFAULT_REFRACTION_HEIGHT = 12f;
@@ -45,6 +49,10 @@ final class Prefs {
      */
     static final int DEFAULT_TOPBAR_BLUR_PCT = 5;
     static final int DEFAULT_TOPBAR_ALPHA = 2;
+    /** The hairline is on by default; the GUI switch only exists in advanced mode. */
+    static final boolean DEFAULT_TOPBAR_DIVIDER = true;
+    /** Advanced mode is opt-in, so the first screen only has the glass sliders. */
+    static final boolean DEFAULT_ADVANCED = false;
 
     private Prefs() {
     }
@@ -107,8 +115,48 @@ final class Prefs {
             if (value instanceof Number) {
                 return ((Number) value).intValue();
             }
+            if (value instanceof Boolean) {
+                return ((Boolean) value) ? 1 : 0;
+            }
         }
         return getInt(read(), key, fallback);
+    }
+
+    static boolean getBoolean(android.content.Context context, String key, boolean fallback) {
+        android.os.Bundle values = snapshot(context);
+        if (values != null && values.containsKey(key)) {
+            Object value = values.get(key);
+            if (value instanceof Boolean) {
+                return (Boolean) value;
+            }
+            if (value instanceof Number) {
+                return ((Number) value).intValue() != 0;
+            }
+        }
+        XSharedPreferences prefs = read();
+        if (prefs == null) {
+            return fallback;
+        }
+        try {
+            return prefs.getBoolean(key, fallback);
+        } catch (Throwable t) {
+            // A slider stored this key as a number in an older build.
+            try {
+                return prefs.getInt(key, fallback ? 1 : 0) != 0;
+            } catch (Throwable ignored) {
+                return fallback;
+            }
+        }
+    }
+
+    /** Hairline visibility: on unless the user (in advanced mode) turned it off. */
+    static boolean topBarDivider(android.content.Context context) {
+        return getBoolean(context, TOPBAR_DIVIDER, DEFAULT_TOPBAR_DIVIDER);
+    }
+
+    /** Whether the GUI should expose the top-bar / hairline section. */
+    static boolean advanced(android.content.Context context) {
+        return getBoolean(context, ADVANCED, DEFAULT_ADVANCED);
     }
 
     /**

@@ -1,12 +1,12 @@
 # 安装与调试
 
-> 状态：**现行** · 对应版本：16.3 (94)
+> 状态：**现行** · 对应版本：16.4 (95)
 
 ## 1. 前置
 
 - 已 root / 已装 **LSPosed**（1.x 或 2.x，Zygisk 或 Riru 均可）；
 - 系统为澎湃 OS 3（HyperOS 3）；
-- 已安装 `dist/iLayoutSettings-16.3.apk`（与 [Release v16.3](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.3) 的附件同一份；应用名 **iLayoutSettings**，包名 `com.Remo.ilayoutsettings`）。
+- 已安装 `dist/iLayoutSettings-16.4.apk`（与 [Release v16.4](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.4) 的附件同一份；应用名 **iLayoutSettings**，包名 `com.Remo.ilayoutsettings`）。
 
 ## 2. 16.0 迁移（从 15.x 升级才需要）
 
@@ -120,7 +120,7 @@ iLayoutSettings: icloud row added below Game Center
 ```powershell
 # 覆盖安装失败时
 adb uninstall com.Remo.ilayoutsettings
-adb install dist\iLayoutSettings-16.3.apk
+adb install dist\iLayoutSettings-16.4.apk
 ```
 
 卸载模块不会影响系统设置数据。

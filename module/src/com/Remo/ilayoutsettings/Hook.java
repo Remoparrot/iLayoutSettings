@@ -59,7 +59,7 @@ final class Hook {
                     // SettingsFragment.onViewCreated, so install afterwards.
                     BottomSearch.install(param.thisObject);
                     ForceBlur.forceHeaderBlur(param.thisObject);
-                    UiTweaks.attachScrollBlur(param.thisObject);
+                    UiTweaks.refreshTopBar(param.thisObject);
                     // Watch audio outputs so a headset connected while this page
                     // is open adds the conditional card without a restart.
                     HeadsetWatcher.attach(param.thisObject);
@@ -77,6 +77,9 @@ final class Hook {
                     HeaderData.apply(self);
                     BottomSearch.install(self);
                     HeadsetWatcher.attach(self);
+                    // After a uiMode change MIUI may reuse the fragment view; make
+                    // sure the hairline picks up the new theme straight away.
+                    UiTweaks.refreshTopBar(self);
                 } catch (Throwable t) {
                     XLog.e("after onResume", t);
                 }
@@ -120,6 +123,9 @@ final class Hook {
         AppearanceTweak.install(cl);
         // Title restyling removed: sub pages keep MIUI's native title behaviour.
         ForceBlur.install(cl);
+        // Top-bar overlays (blur / opacity / hairline) are driven from the
+        // NestedHeaderLayout class so they survive uiMode recreation.
+        UiTweaks.installTopBar(cl);
 
         try {
             // sub-page title hooks removed (no more forced titles)

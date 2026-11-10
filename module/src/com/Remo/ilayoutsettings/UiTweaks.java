@@ -9,6 +9,8 @@ import android.view.ViewGroup;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
+import de.robv.android.xposed.XC_MethodHook;
+import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 
 /**
@@ -26,12 +28,21 @@ final class UiTweaks {
     private static final String BLUR = "miuix.core.util.MiuiBlurUtils";
     private static final java.util.Set<View> REFRESHING =
             java.util.Collections.newSetFromMap(new java.util.WeakHashMap<View, Boolean>());
-    /** app_bar containers that already have the scroll-blur listeners. */
-    private static final java.util.Set<View> BLUR_ATTACHED =
-            java.util.Collections.newSetFromMap(new java.util.WeakHashMap<View, Boolean>());
     /** One bottom hairline drawable per action-bar container (drawn in its overlay). */
     private static final java.util.Map<View, android.graphics.drawable.ColorDrawable> DIVIDERS =
             new java.util.WeakHashMap<>();
+    /** Last background colour pushed into an action bar, so idle polls are free. */
+    private static final java.util.Map<View, Integer> APPLIED_BG =
+            new java.util.WeakHashMap<>();
+    /** Last radius pushed through {@code MiuiBlurUtils.setBackgroundBlur}. */
+    private static final java.util.Map<View, Integer> APPLIED_APPBAR_BLUR =
+            new java.util.WeakHashMap<>();
+    /** Header layouts that already have the slow pref poll running. */
+    private static final java.util.Map<View, Boolean> POLLING =
+            new java.util.WeakHashMap<>();
+
+    /** {@code com.android.settings:id/action_bar_container}, resolved once. */
+    private static int sAppBarId;
 
     private UiTweaks() {
     }
@@ -294,187 +305,224 @@ final class UiTweaks {
         }
     }
 
-    /* --------------------- home: blur only while scrolling ------------------ */
+    /* ------------------ top bar: blur / opacity / hairline ------------------- */
 
-    static void attachScrollBlur(Object fragment) {
+    /**
+     * Installs the top-bar hooks.
+     *
+     * <p>They hang off {@code NestedHeaderLayout} instead of the home fragment.
+     * The fragment view — and with it the action bar container — is rebuilt on
+     * every uiMode change, and a listener captured for the old view silently
+     * stopped receiving scroll events; that is exactly why the hairline
+     * vanished after switching light/dark inside Settings. A class-level hook
+     * also catches the very first scroll frame, before the old 500 ms poll had
+     * a chance to apply the blur radius.</p>
+     */
+    static void installTopBar(ClassLoader cl) {
         try {
-            Activity activity = activityOf(fragment);
-            if (activity == null || activity.isFinishing()) {
+            Class<?> nested = XposedHelpers.findClassIfExists(
+                    "miuix.nestedheader.widget.NestedHeaderLayout", cl);
+            if (nested == null) {
+                XLog.w("NestedHeaderLayout not found, top bar overlay disabled");
                 return;
             }
-            View appBar = activity.findViewById(activity.getResources().getIdentifier(
-                    "action_bar_container", "id", "com.android.settings"));
-            Object listObject = HeaderData.field(fragment, "mListView");
-            if (appBar == null) {
-                XLog.w("scroll blur: appBar=" + appBar);
-                return;
-            }
-            final View appBarView = appBar;
-            // mListView is not always the view that scrolls on HyperOS 3:
-            // the header list is the RecyclerView with id scroll_headers. Use
-            // that when present, otherwise fall back to the fragment field.
-            final View list = scrollList(activity, listObject);
-            if (list == null) {
-                XLog.w("scroll blur: no scrollable list (mListView=" + listObject + ")");
-                return;
-            }
-            // The visible blur belongs to NestedHeaderLayout's own blur helper.
-            // Keep a reference so the slider can update that radius too.
-            final Object nestedHeader = HeaderData.field(fragment, "mNestedHeaderLayout");
-            final Object blurHelper = nestedHeader == null
-                    ? null : HeaderData.field(nestedHeader, "mBlurUiHelper");
-            if (!BLUR_ATTACHED.add(appBar)) {
-                return;
-            }
-            // Resolve MiuiBlurUtils through the *host* loader. In LSPosed the
-            // module classes can live in a sibling loader, and Class.forName on
-            // UiTweaks.class.getClassLoader() used to throw ClassNotFoundException
-            // here, so the blur radius was never actually applied.
-            final ClassLoader hostLoader = appBarView.getContext().getClassLoader();
-            final boolean dark = isDark(activity);
-            final int base = dark ? 0x000000 : 0x00F2F2F7;
-            final int solid = dark ? 0xFF000000 : 0xFFF2F2F7;
-            // iOS draws a hairline under the collapsed navigation bar: 12 % black
-            // on light. Dark mode cannot use black (invisible on a black bar) and
-            // 15 % white was lost on the 16.3 almost-clear bar, so it uses a
-            // semi-transparent grey: a neutral grey at 30 % reads as a hairline
-            // over both the black bar and bright blurred content.
-            final int dividerColor = dark ? 0x4DAAAAAA : 0x1F000000;
-            final int[] state = {-1};
-            final int[] appliedRadius = {-1};
-            final int[] appliedAlpha = {-1};
-            final int[] appliedNativeRadius = {-1};
-
-            final Runnable update = new Runnable() {
+            XC_MethodHook refresh = new XC_MethodHook() {
                 @Override
-                public void run() {
-                    try {
-                        int offset = 0;
-                        Object value = call(list, "computeVerticalScrollOffset");
-                        if (value instanceof Integer) {
-                            offset = ((Integer) value).intValue();
-                        }
-                        boolean scrolled = offset > dp(appBarView.getContext(), 4);
-                        // Some MIUI RecyclerViews report 0 from
-                        // computeVerticalScrollOffset but still move their
-                        // first child up; use that as the honest signal.
-                        if (!scrolled && list instanceof ViewGroup) {
-                            ViewGroup group = (ViewGroup) list;
-                            if (group.getChildCount() > 0
-                                    && group.getChildAt(0).getTop()
-                                    < -dp(appBarView.getContext(), 4)) {
-                                scrolled = true;
-                            }
-                        }
-                        int blurPercent = scrolled
-                                ? Prefs.topBarBlurPercent(appBarView.getContext()) : 0;
-                        int blurRadius = Math.round(
-                                blurPercent * Prefs.MAX_TOPBAR_BLUR_DP / 100f);
-                        int alphaPercent = Math.max(0, Math.min(100, Prefs.getInt(
-                                appBarView.getContext(), Prefs.TOPBAR_ALPHA,
-                                Prefs.DEFAULT_TOPBAR_ALPHA)));
-                        int alpha = Math.round(255f * alphaPercent / 100f);
-                        int translucent = (alpha << 24) | base;
-                        int s = scrolled ? 1 : 0;
-                        // iOS only shows the hairline once the condensed bar is
-                        // there; at the top the large header has no separator.
-                        // isHeaderOpen() is true while the big title is still
-                        // expanded, so it is a better gate than the 4 dp scroll
-                        // threshold (which could show the line too early).
-                        boolean compactBar = scrolled;
-                        if (compactBar && nestedHeader != null) {
-                            Object open = call(nestedHeader, "isHeaderOpen");
-                            if (open instanceof Boolean && (Boolean) open) {
-                                compactBar = false;
-                            }
-                        }
-                        applyDivider(appBarView, dividerColor, compactBar);
-                        if (appliedNativeRadius[0] != blurRadius) {
-                            appliedNativeRadius[0] = blurRadius;
-                            applyNativeHeaderBlur(blurHelper, blurRadius);
-                        }
-                        // The old code only reacted to "scrolled / not scrolled",
-                        // so moving a slider while already scrolled changed
-                        // nothing. Track radius + opacity too, and poll below.
-                        if (state[0] == s && appliedRadius[0] == blurRadius
-                                && appliedAlpha[0] == alpha) {
-                            return;
-                        }
-                        state[0] = s;
-                        appliedRadius[0] = blurRadius;
-                        appliedAlpha[0] = alpha;
-                        if (scrolled) {
-                            appBarView.setBackgroundColor(translucent);
-                            if (blurRadius > 0) {
-                                Object set = callStatic(hostLoader, BLUR, "setBackgroundBlur",
-                                        appBarView, Integer.valueOf(blurRadius));
-                                Object radius = callStatic(hostLoader, BLUR,
-                                        "setBackgroundBlurRadius", appBarView,
-                                        Integer.valueOf(blurRadius));
-                                XLog.i("top bar blur=true offset=" + offset
-                                        + " blur=" + blurPercent + "% radius=" + blurRadius
-                                        + "dp alpha=" + alphaPercent + "% set=" + set
-                                        + " radiusResult=" + radius);
-                            } else {
-                                callStatic(hostLoader, BLUR, "clearBackgroundBlur", appBarView);
-                                XLog.i("top bar blur=true offset=" + offset
-                                        + " blur=0% (off) alpha=" + alphaPercent + "%");
-                            }
-                        } else {
-                            appBarView.setBackgroundColor(solid);
-                            callStatic(hostLoader, BLUR, "clearBackgroundBlur", appBarView);
-                            XLog.i("top bar blur=false offset=" + offset + " blur=0%");
-                        }
-                    } catch (Throwable t) {
-                        // The list can be detached mid-poll; recompute next time.
-                        XLog.w("scroll blur update failed: " + t);
+                protected void afterHookedMethod(MethodHookParam param) {
+                    Object self = param.thisObject;
+                    if (!isHeaderLayout(self)) {
+                        return;
                     }
+                    View header = (View) self;
+                    refreshTopBar(header);
+                    ensurePoll(header);
                 }
             };
-            list.getViewTreeObserver().addOnScrollChangedListener(
-                    new android.view.ViewTreeObserver.OnScrollChangedListener() {
-                        @Override
-                        public void onScrollChanged() {
-                            update.run();
-                        }
-                    });
-
-            // The settings screen is a different activity: while it is in front
-            // the module's sliders can change the pref without any scroll event.
-            // Poll at 2 Hz (Prefs already caches for 400 ms) so the new radius
-            // lands as soon as the user comes back.
-            final Runnable[] poll = new Runnable[1];
-            poll[0] = new Runnable() {
-                @Override
-                public void run() {
-                    update.run();
-                    if (appBarView.isAttachedToWindow()) {
-                        appBarView.postDelayed(poll[0], 500);
-                    }
-                }
-            };
-            appBarView.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
-                @Override
-                public void onViewAttachedToWindow(View v) {
-                    v.removeCallbacks(poll[0]);
-                    v.postDelayed(poll[0], 500);
-                }
-
-                @Override
-                public void onViewDetachedFromWindow(View v) {
-                    v.removeCallbacks(poll[0]);
-                }
-            });
-            if (appBarView.isAttachedToWindow()) {
-                appBarView.postDelayed(poll[0], 500);
-            }
-            update.run();
-            XLog.i("scroll blur attached (live radius, list="
-                    + list.getClass().getSimpleName() + ", hostLoader="
-                    + (hostLoader == null ? "null" : hostLoader.getClass().getName()) + ")");
+            XposedBridge.hookAllMethods(nested, "onScrollingProgressUpdated", refresh);
+            XposedBridge.hookAllMethods(nested, "onAttachedToWindow", refresh);
+            XposedBridge.hookAllMethods(nested, "onConfigurationChanged", refresh);
+            XLog.i("top bar hooks installed");
         } catch (Throwable t) {
-            XLog.e("attachScrollBlur failed", t);
+            XLog.e("top bar hooks failed", t);
         }
+    }
+
+    private static boolean isHeaderLayout(Object value) {
+        return value instanceof View
+                && value.getClass().getName().endsWith("NestedHeaderLayout");
+    }
+
+    /** Re-applies the overlays for the home fragment (called from its hooks). */
+    static void refreshTopBar(Object fragment) {
+        Object header = HeaderData.field(fragment, "mNestedHeaderLayout");
+        if (header instanceof View) {
+            refreshTopBar((View) header);
+            ensurePoll((View) header);
+        }
+    }
+
+    /**
+     * One pass over the top bar: hairline (with the <em>current</em> theme
+     * colour), background tint and native blur radius.
+     */
+    private static void refreshTopBar(View header) {
+        try {
+            Context context = header.getContext();
+            if (context == null) {
+                return;
+            }
+            View appBar = appBarOf(header, context);
+            if (appBar == null) {
+                return;
+            }
+            boolean scrolled = isScrolled(scrollList(header, context), dp(context, 4));
+            boolean headerOpen = Boolean.TRUE.equals(call(header, "isHeaderOpen"));
+            boolean compact = scrolled && !headerOpen;
+            boolean dark = isDark(context);
+
+            int alphaPercent = Math.max(0, Math.min(100, Prefs.getInt(
+                    context, Prefs.TOPBAR_ALPHA, Prefs.DEFAULT_TOPBAR_ALPHA)));
+            int alpha = Math.round(255f * alphaPercent / 100f);
+            int base = dark ? 0x000000 : 0xF2F2F7;
+            int solid = dark ? 0xFF000000 : 0xFFF2F2F7;
+            int background = scrolled ? ((alpha << 24) | base) : solid;
+
+            // Re-read the theme every pass: toggling dark mode inside Settings
+            // is a configuration change, not a new scroll, so a colour captured
+            // once in attachScrollBlur() went stale (black hairline on a black
+            // bar = "the divider disappeared").
+            applyDivider(appBar, dark ? 0x4DAAAAAA : 0x1F000000,
+                    compact && Prefs.topBarDivider(context));
+
+            Integer lastBackground = APPLIED_BG.get(appBar);
+            if (lastBackground == null || lastBackground.intValue() != background) {
+                appBar.setBackgroundColor(background);
+                APPLIED_BG.put(appBar, background);
+            }
+
+            // Only touch the helper's radius while the bar is actually visible.
+            // Writing 0 when idle would fight the refreshBlur() hook (which
+            // always primes the pref radius) and re-run refreshBlur forever.
+            int radius = scrolled ? Prefs.topBarBlurRadius(context) : 0;
+            Object helper = HeaderData.field(header, "mBlurUiHelper");
+            if (scrolled && helper != null) {
+                Object current = HeaderData.field(helper, "mBlurEffect");
+                int applied = current instanceof Integer ? (Integer) current : Integer.MIN_VALUE;
+                if (applied != radius) {
+                    HeaderData.setIntField(helper, "mBlurEffect", radius);
+                    call(helper, "refreshBlur");
+                }
+            }
+            // Keep the action bar's own background blur in sync too. It sits
+            // behind the native over-bg layer, but some themes show it alone.
+            Integer lastAppBarBlur = APPLIED_APPBAR_BLUR.get(appBar);
+            if (lastAppBarBlur == null || lastAppBarBlur.intValue() != radius) {
+                APPLIED_APPBAR_BLUR.put(appBar, radius);
+                ClassLoader hostLoader = context.getClassLoader();
+                if (radius > 0) {
+                    callStatic(hostLoader, BLUR, "setBackgroundBlur", appBar,
+                            Integer.valueOf(radius));
+                    callStatic(hostLoader, BLUR, "setBackgroundBlurRadius", appBar,
+                            Integer.valueOf(radius));
+                } else {
+                    callStatic(hostLoader, BLUR, "clearBackgroundBlur", appBar);
+                }
+            }
+        } catch (Throwable t) {
+            // The header can be detached mid-pass; the next scroll recomputes.
+            XLog.w("top bar refresh failed: " + t);
+        }
+    }
+
+    /** Slow poll so slider changes land even while the list does not scroll. */
+    private static void ensurePoll(final View header) {
+        if (POLLING.put(header, Boolean.TRUE) != null) {
+            return;
+        }
+        final Runnable[] poll = new Runnable[1];
+        poll[0] = new Runnable() {
+            @Override
+            public void run() {
+                if (!header.isAttachedToWindow()) {
+                    POLLING.remove(header);
+                    return;
+                }
+                refreshTopBar(header);
+                header.postDelayed(poll[0], 700);
+            }
+        };
+        header.postDelayed(poll[0], 700);
+    }
+
+    /** Resolves the action-bar container through the settings resources. */
+    private static View appBarOf(View header, Context context) {
+        try {
+            if (sAppBarId == 0) {
+                sAppBarId = context.getResources().getIdentifier(
+                        "action_bar_container", "id", "com.android.settings");
+            }
+            if (sAppBarId == 0) {
+                return null;
+            }
+            return header.getRootView().findViewById(sAppBarId);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /**
+     * The view that actually scrolls. {@code NestedHeaderLayout.mScrollableView}
+     * is the {@code SpringBackLayout} wrapper on HyperOS 3, whose
+     * {@code computeVerticalScrollOffset()} is always 0, so prefer the
+     * {@code scroll_headers} RecyclerView and unwrap the spring-back shell.
+     */
+    private static Object scrollList(View header, Context context) {
+        try {
+            int id = context.getResources().getIdentifier(
+                    "scroll_headers", "id", "com.android.settings");
+            if (id != 0) {
+                View list = header.getRootView().findViewById(id);
+                if (list != null) {
+                    return list;
+                }
+            }
+        } catch (Throwable t) {
+            XLog.w("scroll_headers lookup failed: " + t);
+        }
+        Object fallback = HeaderData.field(header, "mScrollableView");
+        if (fallback instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) fallback;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                View child = group.getChildAt(i);
+                String name = child.getClass().getSimpleName();
+                if (name.contains("RecyclerView") || name.contains("ListView")) {
+                    return child;
+                }
+            }
+        }
+        return fallback;
+    }
+
+    private static boolean isScrolled(Object list, int threshold) {        if (!(list instanceof View)) {
+            return false;
+        }
+        int offset = 0;
+        Object value = call(list, "computeVerticalScrollOffset");
+        if (value instanceof Integer) {
+            offset = (Integer) value;
+        }
+        if (offset > threshold) {
+            return true;
+        }
+        // Some MIUI RecyclerViews report 0 but still move their first child up.
+        if (list instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) list;
+            if (group.getChildCount() > 0
+                    && group.getChildAt(0).getTop() < -threshold) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -493,61 +541,32 @@ final class UiTweaks {
             if (width <= 0 || height <= 0) {
                 return;
             }
-            android.graphics.drawable.ColorDrawable divider = DIVIDERS.get(appBar);
+            // The ActionBarContainer in MIUI is drawn by its own code path and
+            // never paints its ViewOverlay, so the line lives in the overlay of
+            // its parent instead (a plain FrameLayout that does draw it).
+            View parent = appBar.getParent() instanceof View
+                    ? (View) appBar.getParent() : appBar;
+            android.graphics.drawable.ColorDrawable divider = DIVIDERS.get(parent);
             if (divider == null) {
                 divider = new android.graphics.drawable.ColorDrawable(color);
-                DIVIDERS.put(appBar, divider);
-                appBar.getOverlay().add(divider);
+                DIVIDERS.put(parent, divider);
+                parent.getOverlay().add(divider);
             } else {
                 divider.setColor(color);
             }
             int thickness = Math.max(1, dp(appBar.getContext(), 0.5f));
-            int top = height - thickness;
+            int top = appBar.getTop() + height - thickness;
             android.graphics.Rect want = visible
-                    ? new android.graphics.Rect(0, top, width, height)
+                    ? new android.graphics.Rect(appBar.getLeft(), top,
+                    appBar.getLeft() + width, top + thickness)
                     : new android.graphics.Rect(0, 0, 0, 0);
             if (!want.equals(divider.getBounds())) {
                 divider.setBounds(want);
-                appBar.invalidate();
+                parent.invalidate();
             }
         } catch (Throwable t) {
             XLog.w("top bar divider failed: " + t);
         }
-    }
-
-    /**
-     * Pushes {@code topbar_blur} into NestedHeaderLayout's own blur helper.
-     * Setting the field alone is not enough: {@code refreshBlur()} is what
-     * re-applies the native background blur with the new radius.
-     */
-    private static void applyNativeHeaderBlur(Object helper, int radius) {
-        if (helper == null) {
-            return;
-        }
-        try {
-            HeaderData.setField(helper, "mBlurEffect", radius);
-            call(helper, "refreshBlur");
-            XLog.i("native header blur applied: " + radius + " dp");
-        } catch (Throwable t) {
-            XLog.w("native header blur failed: " + t);
-        }
-    }
-
-    /** The real scrolling RecyclerView, with the fragment field as fallback. */
-    private static View scrollList(Activity activity, Object fallback) {
-        try {
-            int id = activity.getResources().getIdentifier(
-                    "scroll_headers", "id", "com.android.settings");
-            if (id != 0) {
-                View view = activity.findViewById(id);
-                if (view != null) {
-                    return view;
-                }
-            }
-        } catch (Throwable t) {
-            XLog.w("scroll_headers lookup failed: " + t);
-        }
-        return fallback instanceof View ? (View) fallback : null;
     }
 
     /* ------------------------------- helpers -------------------------------- */
@@ -664,7 +683,8 @@ final class UiTweaks {
         return null;
     }
 
-    static boolean isDarkMode(Context c) {        int mode = c.getResources().getConfiguration().uiMode
+    static boolean isDarkMode(Context c) {
+        int mode = c.getResources().getConfiguration().uiMode
                 & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
         return mode == android.content.res.Configuration.UI_MODE_NIGHT_YES;
     }
@@ -673,19 +693,6 @@ final class UiTweaks {
         int mode = c.getResources().getConfiguration().uiMode
                 & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
         return mode == android.content.res.Configuration.UI_MODE_NIGHT_YES;
-    }
-
-    private static Activity activityOf(Object fragment) {
-        try {
-            Method m = fragment.getClass().getMethod("getActivity");
-            Object r = m.invoke(fragment);
-            if (r instanceof Activity) {
-                return (Activity) r;
-            }
-        } catch (Throwable ignored) {
-        }
-        Object ctx = HeaderData.field(fragment, "mContext");
-        return ctx instanceof Activity ? (Activity) ctx : null;
     }
 
     private static int dp(Context c, float v) {

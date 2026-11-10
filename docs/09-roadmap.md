@@ -16,6 +16,7 @@
 | 16.1 已验证 | 正式包（`com.Remo.ilayoutsettings` 16.1）已覆盖安装并真机实测 | 耳机卡即时刷新（AudioDeviceCallback）、点击进 `MiuiHeadsetActivity` 详情页、退出搜索无两个搜索栏、二级页返回底部栏不消失 |
 | 16.2 已验证 | 正式包（`com.Remo.ilayoutsettings` 16.2）已覆盖安装并真机实测 | 指定耳机/iCloud 图标、顶栏透明度 45% + 模糊 30%（淡磨砂）、折叠栏发丝线、搜索栏 19/12/0.1dp、构建自动清 dist |
 | 16.3 已验证 | 正式包（`com.Remo.ilayoutsettings` 16.3）已覆盖安装并真机实测 | 顶栏默认 5% 模糊 / 2% 透明度（近乎全透明）、深色发丝线改中性灰 30%（实拍 (58,58,59)）、浅色仍是黑 12%、`pm clear` 后默认值复验 |
+| 16.4 已验证 | 正式包（`com.Remo.ilayoutsettings` 16.4）已覆盖安装并真机实测 | 设置内切深浅色后发丝线不消失（类钩子 + 每帧取色，实拍深 (58,58,59) / 浅 (222,222,223)）、首次折叠前预写模糊半径、GUI 高级设置总开关（关时隐藏顶栏/分割线选项）、新蓝紫玻璃图标 |
 | 16.0 改包名 | 旧模块必须卸载、LSPosed 要重新启用 | 见 [安装 · 16.0 迁移](04-install.md#2-160-迁移从-15x-升级才需要) |
 | 无 CI | 发版靠本地构建 | 构建脚本已可参数化，适合接 Actions |
 
@@ -24,7 +25,7 @@
 ### P0 — 发版可信度
 
 - [x] **自动发版**：`tools/release.ps1`（构建 → 校验 → tag → Release → 上传），v16.0 起每次发版一条命令；
-- [x] 用新包名完成 16.1 / 16.2 / 16.3 真机验证（安装 + LSPosed 启用），见会话记录 `2026-11-10-headset-card-live-and-search-exit.md`、`2026-11-10-icons-topbar-opacity-and-release-cleanup.md`、`2026-11-10-topbar-clear-and-dark-divider.md`；
+- [x] 用新包名完成 16.1 / 16.2 / 16.3 / 16.4 真机验证（安装 + LSPosed 启用），见会话记录 `2026-11-10-headset-card-live-and-search-exit.md`、`2026-11-10-icons-topbar-opacity-and-release-cleanup.md`、`2026-11-10-topbar-clear-and-dark-divider.md`、`2026-11-10-topbar-hairline-advanced-icon.md`；
 - [x] 明确「发布包来自哪个 commit」：16.2 起 `release.ps1` 先自动 commit/push 再打 tag；v16.2 tag 指向包含 dist APK 的提交；
 - [ ] 清理 `Hook` 未引用的遗留类（`GlassToggle` / `IntroCard` / `AboutIos` / `AboutExtras` / `TitleFix` / `TitleOverlay` / `PrefsBridge`）与 `BottomSearch` 里的 lattice 反射分支；
 - [ ] 清理后对比 dex 体积，确认与发布包量级一致。

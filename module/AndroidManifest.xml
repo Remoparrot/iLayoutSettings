@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  iLayoutSettings — LSPosed module for HyperOS 3 Settings (v16.3).
+  iLayoutSettings — LSPosed module for HyperOS 3 Settings (v16.4).
   Reorders the native header list, adds conditional iOS cards (software update,
   connected headset, iCloud) and swaps the app identity to iLayoutSettings.
   Nothing is redrawn by the module.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.Remo.ilayoutsettings"
-    android:versionCode="94"
-    android:versionName="16.3">
+    android:versionCode="95"
+    android:versionName="16.4">
 
     <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="36" />
 

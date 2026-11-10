@@ -78,16 +78,8 @@ final class ForceBlur {
                         if (param.args == null || param.args.length != 3) {
                             return;
                         }
-                        Object target = HeaderData.field(param.thisObject, "mViewApplyBlur");
-                        if (!(target instanceof View)) {
-                            return;
-                        }
-                        View view = (View) target;
-                        Object parent = view.getParent();
-                        // Only the top bar: other blur helpers (search bar, bottom
-                        // sheets) keep their own radius.
-                        if (parent == null || !parent.getClass().getName()
-                                .endsWith("NestedHeaderLayout")) {
+                        View view = headerView(param.thisObject);
+                        if (view == null) {
                             return;
                         }
                         param.args[2] = Prefs.topBarBlurRadius(view.getContext());
@@ -96,10 +88,46 @@ final class ForceBlur {
                     }
                 }
             });
-            XLog.i("hooked MiuiBlurUiHelper.setBlurParams (header radius)");
+            // setBlurParams only writes the field; refreshBlur() is what hands the
+            // radius to the native blur node. Priming mBlurEffect here means the
+            // very first condensed frame is already blurred - previously the field
+            // was still the theme radius (or the 0 written at startup) until the
+            // UiTweaks poll happened to run.
+            XposedBridge.hookAllMethods(helper, "refreshBlur", new XC_MethodHook() {
+                @Override
+                protected void beforeHookedMethod(MethodHookParam param) {
+                    try {
+                        View view = headerView(param.thisObject);
+                        if (view == null) {
+                            return;
+                        }
+                        HeaderData.setIntField(param.thisObject, "mBlurEffect",
+                                Prefs.topBarBlurRadius(view.getContext()));
+                    } catch (Throwable t) {
+                        XLog.w("header blur refresh hook failed: " + t);
+                    }
+                }
+            });
+            XLog.i("hooked MiuiBlurUiHelper (header radius + refreshBlur)");
         } catch (Throwable t) {
             XLog.e("header blur radius hook failed", t);
         }
+    }
+
+    /** The view a helper blurs, when that helper belongs to the top bar. */
+    private static View headerView(Object helper) {
+        Object target = HeaderData.field(helper, "mViewApplyBlur");
+        if (!(target instanceof View)) {
+            return null;
+        }
+        View view = (View) target;
+        Object parent = view.getParent();
+        // Only the top bar: other blur helpers (search bar, bottom sheets)
+        // keep their own radius.
+        if (parent == null || !parent.getClass().getName().endsWith("NestedHeaderLayout")) {
+            return null;
+        }
+        return view;
     }
 
     /** Turns on NestedHeaderLayout blur/overlay for the home fragment. */

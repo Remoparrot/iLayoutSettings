@@ -1,6 +1,6 @@
 # 踩坑记录
 
-> 状态：**现行** · 对应版本：16.3 (94)
+> 状态：**现行** · 对应版本：16.4 (95)
 > 规则：每踩一个新坑就追加一条，写清 **现象 → 根因 → 解法 → 如何避免**。旧结论被推翻时保留原文并标「已过时」。
 
 ## 最贵的五个坑（先看这五条）
@@ -67,6 +67,10 @@
 | 默认太实、不像参考图的淡磨砂 | 16.1 默认 110dp / 80% 透明度，白底上看起来就是一条实色栏 | 16.2 默认 30% / 45%；16.3 再降到 **5% / 2%**（近乎全透明，只留发丝线），淡磨砂仍可用滑杆选回 |
 | 深色模式顶栏「没有线」 | 16.2 用白 15%（`0x26FFFFFF`）画线，压在 2% 透明度的黑栏上只剩 `#262626`，和黑底几乎同色 | 16.3 深色改中性灰 30%（`0x4DAAAAAA`），实拍 `(58,58,59)`，黑栏/亮内容上都读得出；浅色仍黑 12% |
 | 顶栏发丝线在大标题还没折叠时就出现 | 只看 `scroll offset > 4dp`，而大标题要滚过一段才收起 | 读 `NestedHeaderLayout.isHeaderOpen()`，为 true 时隐藏线；回到顶部也隐藏 |
+| **画了发丝线但完全看不见**（16.4 排查） | MIUI 的 `ActionBarContainer` 不画自己的 `ViewOverlay`，`getOverlay().add()` 的 drawable 不参与绘制；日志里 bounds 正常 | 加到父级 `ActionBarOverlayLayout` 的 overlay，坐标用 `appBar.getLeft()/getTop()` 换算；调试时先用洋红 8px 探针确认宿主会不会画 |
+| **设置内切换深浅色后发丝线消失**（16.4 修） | 控制器把 `appBar`/`list` 抓在 fragment 视图上；切主题会 recreate 视图，旧的 `OnScrollChangedListener` 不再触发，永远认为「没滚动」 | 控制器改挂 `NestedHeaderLayout` 类钩子（`onScrollingProgressUpdated` / `onAttachedToWindow` / `onConfigurationChanged`），每次 fresh 解析视图；颜色每帧从当前 `uiMode` 取 |
+| 控制器一直认为列表在顶部 | `NestedHeaderLayout.mScrollableView` 在 HyperOS 3 上是 `SpringBackLayout` 包装层，`computeVerticalScrollOffset()` 恒 0 | 优先按 `com.android.settings:id/scroll_headers` 找 RecyclerView；必要时解包 ViewGroup 的 RecyclerView 子级 |
+| 冷启动后第一次折叠顶栏没有模糊 | 启动时把 `mBlurEffect` 写成 0；首次 `applyBlur(true)` → `refreshBlur()` 复用了它 | 在 `MiuiBlurUiHelper.refreshBlur()` 的 before hook 里按 prefs 预写半径（只匹配父级为 `NestedHeaderLayout` 的 helper） |
 | 耳机 / iCloud 图标被第三方主题换掉 | 16.1 的 `cardDrawable` 是 settings 优先，主题同名 `ic_*` 会赢 | 16.2 改为模块内置优先，settings 只作兜底 |
 | `R.string.*` 编译报「找不到符号 R」 | `build.ps1` 只把 `module/src` 传给 javac，aapt2 生成的 `build/gen/**/R.java` 从未参与编译 | 避免在 Java 引用 `R`；标题用 `loadLabel()`，版本用 `getPackageInfo().versionName` |
 | 搜索栏去色后完全消失 | 把 `miuix_appcompat_search_mode_edit_text_bg_light/dark` 的 fill 清掉了；它才是可见胶囊 | 保留主题胶囊；只把 shader 的 `surfaceAlpha` 置 0，不再叠 shader 表面色 |

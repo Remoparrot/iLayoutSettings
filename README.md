@@ -3,7 +3,7 @@
 > 把澎湃 OS（HyperOS 3）「设置」首页改成 iOS 风格：入口重排、条件卡片（软件更新 / 耳机 / iCloud）、搜索栏沉底、卡片细节修正。
 > **全部复用 MIUI 原生控件与原生数据，模块不重绘任何页面。**
 
-[![Version](https://img.shields.io/badge/version-16.3-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
+[![Version](https://img.shields.io/badge/version-16.4-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-HyperOS%203%20%7C%20Android%2015%2B-green)](docs/01-overview.md)
 [![LSPosed](https://img.shields.io/badge/framework-LSPosed-orange)](docs/04-install.md)
@@ -31,9 +31,10 @@
 | 飞行模式开关 | 右侧原生 `SlidingSwitch`，图标优先用设置主题里的 `ic_airplane_mode_settings` |
 | 底部搜索栏 | `miuix_appcompat_search_stub` 原生布局 + **Kyant backdrop 玻璃**（模糊 + 折射；保留主题胶囊） |
 | 搜索栏过渡 | 进出搜索 220ms 滑动+缩放+淡入淡出；**退出时等 MIUI 收起顶部搜索框后再出现底部栏**，不再短暂出现两个搜索栏 |
-| 参数界面 | 应用内滑杆：搜索栏模糊（0.1dp）/ 折射 19dp / 厚度 12dp、顶栏模糊 0–100%、顶栏透明度 0–100%，即改即生效 |
+| 参数界面 | 应用内滑杆：搜索栏模糊（0.1dp）/ 折射 19dp / 厚度 12dp；**「高级设置」总开关**（默认关）开启后才出现顶栏模糊 0–100%、顶栏透明度 0–100%、显示顶栏分割线 |
 | 卡片细节修正 | 去掉每组最后一行的双层圆角/放大图标；外观页预览加卡片底 |
-| 顶部模糊 / 发丝线 | 默认 5% 模糊 + 2% 透明度，滚动后顶栏近乎全透明、只留底部发丝线（浅色黑 12%，深色中性灰 30%）；折叠栏出现后底边才显示 |
+| 顶部模糊 / 发丝线 | 默认 5% 模糊 + 2% 透明度，滚动后顶栏近乎全透明、只留底部发丝线（浅色黑 12%，深色中性灰 30%）；**设置内切换深浅色后线不消失**；折叠栏第一次出现就带模糊 |
+| 应用图标 | 蓝紫渐变 + 半透明玻璃盘 + 白齿轮；`tools/make_launcher_icon.py` 生成五档 mipmap，脚本内另有两套候选 |
 
 ## 截图
 
@@ -49,20 +50,20 @@
 
 ## 安装
 
-1. 下载 [`dist/iLayoutSettings-16.3.apk`](dist/iLayoutSettings-16.3.apk)，或到 [Releases · v16.3](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.3) 下同名附件（236,593 B，SHA-256 `ED0C383E…2873`，与 `dist/` 同一份）；
+1. 下载 [`dist/iLayoutSettings-16.4.apk`](dist/iLayoutSettings-16.4.apk)，或到 [Releases · v16.4](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.4) 下同名附件（286,069 B，SHA-256 `EE68C55D…B3C0`，与 `dist/` 同一份）；
    **16.0 起包名是** `com.Remo.ilayoutsettings`，从 16.0 升级可直接覆盖（同一签名）；
 2. LSPosed 中启用 **iLayoutSettings**，作用域只勾选 **设置**（`com.android.settings`）；
 3. **强制停止「设置」**（或重启手机），再打开设置；
-4. 打开桌面上的 **iLayoutSettings** 图标即可调参数（模糊 / 折射 / 顶栏模糊百分比 / 顶栏透明度）。
+4. 打开桌面上的 **iLayoutSettings** 图标即可调参数（搜索栏模糊 / 折射 / 厚度；开启「高级设置」后才有顶栏模糊 / 透明度 / 发丝线开关）。
 
 > 本机 MIUI 会拦截 adb 安装新包（`INSTALL_FAILED_USER_RESTRICTED`）：把 APK 复制到手机后
 > 在文件管理器里点开安装即可；或在开发者选项里允许「USB 安装」。
 > 旧版本 15.5 / 14.8 仍在各自 Release 里（14.8 证书不同）。
 
-日志过滤 `iLayoutSettings` 应能看到 `hooks installed`、`icloud row added below Game Center`、
+日志过滤 `iLayoutSettings` 应能看到 `hooks installed`、`top bar hooks installed`、
+`hooked MiuiBlurUiHelper (header radius + refreshBlur)`、`icloud row added below Game Center`、
 按条件出现的 `update card added: …` / `airpods card added: …`、`headset devices changed, refresh cards`，
-以及 `card icon … <- module (supplied theme)`、`native header blur applied: … dp`、
-`top bar blur=true … blur=5% radius=8dp alpha=2%`、`liquid glass shader compiled`、
+以及 `card icon … <- module (supplied theme)`、`liquid glass shader compiled`、
 `search glass mask=...`、`airplane icon set: ...`。
 详见 [安装与调试](docs/04-install.md)。
 
@@ -88,7 +89,7 @@ pwsh -File module/build.ps1 `
 ```
 
 输出 `dist/iLayoutSettings-<versionName>.apk`。
-发版用 `tools/release.ps1 -Version 16.3`：构建 → 校验 → 自动提交/推送 → 打 tag → 建 Release → 上传 APK，一条命令完成。
+发版用 `tools/release.ps1 -Version 16.4`：构建 → 校验 → 自动提交/推送 → 打 tag → 建 Release → 上传 APK，一条命令完成。
 完整工具链版本、可复现性说明见 [构建指南](docs/03-build.md)。
 
 ## 文档
@@ -116,7 +117,7 @@ pwsh -File module/build.ps1 `
 ## 许可与致谢
 
 - 代码：[GPL-3.0](LICENSE)；
-- 图标为自制（`tools/make_subpage_icons.py` 生成），仅参考 iOS 视觉风格；Apple / iOS 是 Apple Inc. 的商标，本项目与其无关；
+- 图标为自制（`tools/make_subpage_icons.py` / `tools/make_launcher_icon.py` 生成），仅参考 iOS 视觉风格；Apple / iOS 是 Apple Inc. 的商标，本项目与其无关；
 - 玻璃/折射实现的思路参考了 kyant0 的液态玻璃与 lattice 的实现，第三方声明见 [NOTICE.md](NOTICE.md)。
 
 ---

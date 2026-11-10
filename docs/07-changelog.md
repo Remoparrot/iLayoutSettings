@@ -3,10 +3,60 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前主线是 **16.3（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前主线是 **16.4（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
+
+---
+
+# iLayoutSettings · LSPosed 模块（v16.4：发丝线跟随主题 + 高级设置 + 新图标）
+
+## v16.4 变更
+
+- **设置内切换深浅色，发丝线不再消失**：顶栏控制器从「SettingsFragment 视图上的一次性监听」
+  改成挂在 `NestedHeaderLayout` 类上的钩子（滚动进度 / attach / 配置变更），每次回调重新解析
+  action bar 和 `scroll_headers`，颜色按当前 `uiMode` 取。切深浅色会重建 fragment 视图，
+  旧实现的 appBar/list 随之失联，于是一直认为「没有滚动」，线就不画了。
+- **发丝线宿主改了**：MIUI 的 `ActionBarContainer` 不绘制自己的 `ViewOverlay`，
+  现在画在父级 `ActionBarOverlayLayout` 的 overlay 上（仍贴在栏的最底边，0.5dp、浅色黑 12% /
+  深色中性灰 30% 不变）。
+- **顶栏第一次出现就带模糊**：`MiuiBlurUiHelper.refreshBlur()` 前把 `mBlurEffect` 预写成
+  `topbar_blur` 对应半径——启动时该字段被写成 0，首次折叠的 `refreshBlur()` 会复用它，
+  所以以前第一帧是「没有模糊」的。默认仍是 5% 模糊 / 2% 透明度。
+- **GUI 新增「高级设置」总开关**（默认关）：关闭时只显示「搜索栏玻璃」滑杆；
+  开启后才出现「顶栏」卡片（模糊 / 透明度 / 显示顶栏分割线）。发丝线默认仍绘制，
+  「显示顶栏分割线」只负责显示/隐藏，不能绕过高级设置直接改。
+- **应用图标换风格**：蓝紫渐变 + 半透明玻璃盘 + 白齿轮（`tools/make_launcher_icon.py` 生成
+  mdpi/hdpi/xhdpi/xxhdpi/xxxhdpi 五档）；脚本里另有纸感线框（B）和深色滑杆（C）两套候选。
+- **版本**：16.4 / versionCode **95**；APK `dist/iLayoutSettings-16.4.apk`，286,069 B
+  （+49 KB 来自五档图标）。
+
+## v16.4 校验
+
+```
+package: name='com.Remo.ilayoutsettings' versionCode='95' versionName='16.4'
+sdkVersion:'29'
+targetSdkVersion:'36'
+launchable-activity: name='com.Remo.ilayoutsettings.MainActivity'  label='iLayoutSettings'
+dex version : 039
+xposed_init : True
+module class: True
+reorder     : True
+size   : 286069 bytes
+sha256 : EE68C55D05E9567831C3DE3327544A3D9AB2EBAD426B907EEC9C17329368B3C0
+```
+
+真机 25053RT47C / HyperOS 3 / Android 16（2026-11-10 21:41–21:52）：
+
+- 深色：`cmd uimode night yes` 重建设置后滚动，`y=329–330` 为 `(58,58,59)`，
+  上方栏底 `(10,10,11)`、下方卡片 `(28,28,30)`——切主题后仍然是那条中性灰线；
+- 浅色：同位置 `(222,222,223)`，上方 `(253,253,254)`、下方 `(255,255,255)`；
+- GUI：高级设置开 → 顶栏卡片（模糊 5% / 透明度 2% / 分割线 开）；
+  关掉「显示顶栏分割线」后滚动，同位置变回 `(253,253,254)`；再打开恢复 `(222,222,223)`；
+- 高级设置关 → 顶栏卡片消失，只剩搜索栏玻璃 + 高级设置；重新打开后开关状态保持；
+- 图标：应用信息页显示新图标（蓝紫玻璃 + 白齿轮）；
+- 回归：首页条件卡片、底部搜索栏、二级页跳转均无变化。
 
 ---
 

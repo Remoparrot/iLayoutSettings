@@ -1,10 +1,10 @@
 # 构建指南
 
-> 状态：**现行** · 对应版本：16.3 (94)
+> 状态：**现行** · 对应版本：16.4 (95)
 
 ## 1. 为什么不走 Gradle
 
-模块只有一个 dex、没有第三方运行时依赖、资源极少。用 `aapt2 → javac → d8 → zipalign → apksigner` 五步就够，构建一次几秒，产物体积可控（16.3 约 231 KiB），也避免了 AGP 与 JDK/AGP 版本互相绑架。
+模块只有一个 dex、没有第三方运行时依赖、资源极少。用 `aapt2 → javac → d8 → zipalign → apksigner` 五步就够，构建一次几秒，产物体积可控（16.4 约 279 KiB，其中约 49 KiB 是五档启动图标），也避免了 AGP 与 JDK/AGP 版本互相绑架。
 
 代价是**工具链要自己准备**，见下。
 
@@ -12,12 +12,15 @@
 
 | 工具 | 本项目验证版本 | 用途 | 获取 |
 | --- | --- | --- | --- |
-| JDK | **17.0.21**（17 即可） | javac / jar / keytool / apksigner 运行时 | https://adoptium.net |
-| Android build-tools | **34.0.0** | aapt2 / d8 / zipalign / apksigner | sdkmanager `build-tools;34.0.0` |
-| Android platform | **android-36.1**（API 36 的 `android.jar`） | 编译期 bootclasspath | sdkmanager `platforms;android-36` |
+| JDK | **21.0.2**（16.4 实测；17 亦可） | javac / jar / keytool / apksigner 运行时 | https://adoptium.net |
+| Android build-tools | **37.0.0**（16.4 实测；34.0.0 亦可） | aapt2 / d8 / zipalign / apksigner | sdkmanager `build-tools;37.0.0` |
+| Android platform | **android-37.0**（API 37 的 `android.jar`；16.4 实测） | 编译期 bootclasspath | sdkmanager `platforms;android-37` |
 | Xposed API | **82** | 编译期 `de.robv.android.xposed.*` | 仓库已带 `lib/xposed-api-82.jar` |
 
-> `aapt2` 用 34 的版本去 link `targetSdk 36` 是可以的（本项目实测通过）；如果换更高版本 build-tools，注意 `--target-sdk-version` 行为可能变化。
+> 16.4 实际使用的组合是 `D:\Android\jdk21\jdk-21.0.2` + `D:\Android\Sdk\build-tools\37.0.0` +
+> `D:\Android\Sdk\platforms\android-37.0\android.jar`，产物 badging 显示 `compileSdk 37 / targetSdk 36`。
+> `aapt2` 用 34 的版本去 link `targetSdk 36` 也可以（历史上实测通过）；换更高版本 build-tools 时注意
+> `--target-sdk-version` 行为可能变化。
 
 ## 3. 构建
 
@@ -71,7 +74,7 @@ python tools\check_agsl.py
 ### 一键发版
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -Version 16.3
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -Version 16.4
 ```
 
 16.2 起默认自动 `git add -A` → commit → push 当前分支 → 打 tag → 建 Release → 上传 APK；
@@ -92,7 +95,7 @@ Release 正文在脚本里的 `$bodyTemplate`，发版前先改成本版内容�
 ## 5. 成功判据
 
 ```
-package: name='com.Remo.ilayoutsettings' versionCode='94' versionName='16.3'
+package: name='com.Remo.ilayoutsettings' versionCode='95' versionName='16.4'
 sdkVersion:'29'
 targetSdkVersion:'36'
 dex version : 039

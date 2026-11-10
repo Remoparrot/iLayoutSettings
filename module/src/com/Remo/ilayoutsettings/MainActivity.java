@@ -12,6 +12,7 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
+import android.widget.Switch;
 import android.widget.TextView;
 
 /**
@@ -80,14 +81,32 @@ public final class MainActivity extends Activity {
         addSlider(glass, "折射厚度", Prefs.REFRACTION_HEIGHT, 2, 40, 1f,
                 Prefs.DEFAULT_REFRACTION_HEIGHT, "dp，弯曲影响到的边缘宽度");
 
-        LinearLayout top = card(root, "顶栏");
-        // Percent instead of dp: MIUI's native blur saturates at 400 px, and a
-        // 0..300 dp slider spent half its travel in that dead zone.
-        addSlider(top, "模糊", Prefs.TOPBAR_BLUR, 0, 100, 1,
-                Prefs.DEFAULT_TOPBAR_BLUR_PCT,
-                "%，列表滚动后顶栏的背景模糊；0 = 关闭，100 = 最糊");
-        addSlider(top, "透明度", Prefs.TOPBAR_ALPHA, 0, 100, 1, Prefs.DEFAULT_TOPBAR_ALPHA,
-                "%，滚动后顶栏底色的不透明度；0 = 全透明，100 = 不透明");
+        // Advanced mode gates the whole top-bar section, so a fresh install only
+        // shows the search-glass sliders. Turning it off keeps the current
+        // hairline value but hides the controls that could change it.
+        addSwitch(card(root, "高级设置"), "启用高级设置", Prefs.ADVANCED,
+                Prefs.DEFAULT_ADVANCED,
+                "开启后可调顶栏模糊、透明度与分割线；关闭时保持现状、隐藏这些选项",
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        recreate();
+                    }
+                });
+
+        if (readBoolean(Prefs.ADVANCED, Prefs.DEFAULT_ADVANCED)) {
+            LinearLayout top = card(root, "顶栏");
+            // Percent instead of dp: MIUI's native blur saturates at 400 px, and a
+            // 0..300 dp slider spent half its travel in that dead zone.
+            addSlider(top, "模糊", Prefs.TOPBAR_BLUR, 0, 100, 1,
+                    Prefs.DEFAULT_TOPBAR_BLUR_PCT,
+                    "%，列表滚动后顶栏的背景模糊；0 = 关闭，100 = 最糊");
+            addSlider(top, "透明度", Prefs.TOPBAR_ALPHA, 0, 100, 1, Prefs.DEFAULT_TOPBAR_ALPHA,
+                    "%，滚动后顶栏底色的不透明度；0 = 全透明，100 = 不透明");
+            addSwitch(top, "显示顶栏分割线", Prefs.TOPBAR_DIVIDER,
+                    Prefs.DEFAULT_TOPBAR_DIVIDER,
+                    "折叠顶栏出现时在底部画 0.5dp 发丝线；浅色黑色 12%、深色中性灰 30%");
+        }
 
         TextView reset = text("恢复默认值", 15, Typeface.DEFAULT_BOLD, 0xFF0A84FF);
         reset.setPadding(0, dp(22), 0, dp(10));
@@ -103,6 +122,7 @@ public final class MainActivity extends Activity {
                         .putFloat(Prefs.REFRACTION_HEIGHT, Prefs.DEFAULT_REFRACTION_HEIGHT)
                         .putInt(Prefs.TOPBAR_BLUR, Prefs.DEFAULT_TOPBAR_BLUR_PCT)
                         .putInt(Prefs.TOPBAR_ALPHA, Prefs.DEFAULT_TOPBAR_ALPHA)
+                        .putBoolean(Prefs.TOPBAR_DIVIDER, Prefs.DEFAULT_TOPBAR_DIVIDER)
                         .apply();
                 recreate();
             }
@@ -219,6 +239,56 @@ public final class MainActivity extends Activity {
     }
 
     /**
+     * One labelled on/off row. The switch writes the boolean straight into the
+     * shared prefs; {@code after} (optional) runs after a change, e.g. so the
+     * advanced section can appear without leaving the screen.
+     */
+    private Switch addSwitch(LinearLayout card, String label, final String key,
+                             final boolean fallback, String hint, final Runnable after) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView name = text(label, 15, Typeface.DEFAULT, textPrimary);
+        row.addView(name, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        final Switch toggle = new Switch(this);
+        toggle.setShowText(false);
+        toggle.setChecked(readBoolean(key, fallback));
+        row.addView(toggle);
+
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        rowLp.topMargin = dp(16);
+        card.addView(row, rowLp);
+
+        TextView caption = text(hint, 12, Typeface.DEFAULT, textSecondary);
+        LinearLayout.LayoutParams capLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        capLp.bottomMargin = dp(14);
+        card.addView(caption, capLp);
+
+        toggle.setOnCheckedChangeListener(
+                new android.widget.CompoundButton.OnCheckedChangeListener() {
+                    @Override
+                    public void onCheckedChanged(android.widget.CompoundButton button,
+                                                 boolean checked) {
+                        prefs.edit().putBoolean(key, checked).apply();
+                        if (after != null) {
+                            after.run();
+                        }
+                    }
+                });
+        return toggle;
+    }
+
+    private Switch addSwitch(LinearLayout card, String label, String key, boolean fallback,
+                             String hint) {
+        return addSwitch(card, label, key, fallback, hint, null);
+    }
+
+    /**
      * Reads a numeric preference whatever type an older build stored it as.
      * 15.x experiments wrote some of these keys as floats, and a plain
      * {@code getInt} throws ClassCastException on those files.
@@ -228,6 +298,21 @@ public final class MainActivity extends Activity {
             Object value = prefs.getAll().get(key);
             if (value instanceof Number) {
                 return ((Number) value).floatValue();
+            }
+        } catch (Throwable ignored) {
+        }
+        return fallback;
+    }
+
+    /** Boolean preference, tolerant of a number written by an older build. */
+    private boolean readBoolean(String key, boolean fallback) {
+        try {
+            Object value = prefs.getAll().get(key);
+            if (value instanceof Boolean) {
+                return (Boolean) value;
+            }
+            if (value instanceof Number) {
+                return ((Number) value).intValue() != 0;
             }
         } catch (Throwable ignored) {
         }
