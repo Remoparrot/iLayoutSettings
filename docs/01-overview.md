@@ -1,6 +1,6 @@
 # 项目概览
 
-> 状态：**现行** · 对应版本：15.5 (90)
+> 状态：**现行** · 对应版本：16.0 (91)
 
 ## 1. 一句话定位
 
@@ -35,20 +35,21 @@
 
 ## 4. 版本线（重要，别被 changelog 绕晕）
 
-- **主线 = 15.5（iLyayot）**：本仓库源码对应 15.5，已发布为 [Release v15.5](https://github.com/abradanthawk-design/iLyayot/releases/tag/v15.5)（附件与 `dist/IosSettingsLayout-15.5.apk` 同一份）；`dist/IosSettingsLayout-14.8.apk` 是旧发布包（证书不同）。功能是「重排 + 图标 + 底部搜索（液态玻璃）+ 卡片修正 + 参数界面 + 专注模式/相机/搜索入口」。
-- **历史 15.x ~ 17.x 是已放弃的实验分支**：液态玻璃（kyant / lattice shader）、GUI 参数页、动态折射等，记录保留在 [版本记录](07-changelog.md) 里；当前的 15.x 主线（15.5）是 14.9 之后重新起的，不是那批实验。
+- **主线 = 16.0（iLayoutSettings）**：本仓库源码对应 16.0，发布为 [Release v16.0](https://github.com/abradanthawk-design/iLayoutSettings/releases/tag/v16.0)（附件与 `dist/iLayoutSettings-16.0.apk` 同一份）；`dist/IosSettingsLayout-14.8.apk` 是旧发布包（证书不同）。功能是「重排 + 条件卡片（更新/耳机/iCloud）+ 底部搜索（液态玻璃 + 过渡动画）+ 卡片修正 + 参数界面 + 专注模式/相机/搜索入口」。
+- **16.0 是破坏性改动**：应用名 iLayoutSettings、包名 `com.Remo.ilayoutsettings`、仓库改名 iLayoutSettings；旧包必须卸载，新包要在 LSPosed 重新启用。
+- **历史 15.x ~ 17.x 是已放弃的实验分支**：液态玻璃（kyant / lattice shader）、GUI 参数页、动态折射等，记录保留在 [版本记录](07-changelog.md) 里；14.9 之后重新起的 15.x 主线以 15.5 收尾，16.0 在其上继续。
 - 但源码里**残留了少量后续版本的类**（`GlassToggle`、`IntroCard`、`AboutIos` 等），它们没有被 `Hook` 调用，属于死代码。这件事写在 [状态](00-status.md#已知问题) 与 [踩坑](06-pitfalls.md) 里，清理前不要误以为它们是现行功能。
 
 ## 5. 目录结构
 
 ```
-iLyayot/
+iLayoutSettings/
 ├── module/                  模块工程（唯一源码）
 │   ├── AndroidManifest.xml   版本号、xposed 元数据、作用域
 │   ├── build.ps1             无 Gradle 构建脚本
 │   ├── assets/xposed_init    入口类名
 │   ├── res/                  图标、字符串、作用域数组
-│   └── src/com/abradant/iossettings/*.java
+│   └── src/com/Remo/ilayoutsettings/*.java
 ├── dist/                    当前发布 APK
 ├── lib/xposed-api-82.jar    编译期依赖（Xposed API）
 ├── tools/make_subpage_icons.py  二级页图标生成

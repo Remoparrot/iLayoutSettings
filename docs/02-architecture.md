@@ -1,7 +1,7 @@
 # 架构与 Hook 链路
 
-> 状态：**现行** · 对应版本：15.5 (90)
-> 源码：`module/src/com/abradant/iossettings/`
+> 状态：**现行** · 对应版本：16.0 (91)
+> 源码：`module/src/com/Remo/ilayoutsettings/`
 
 ## 1. 从加载到生效
 
@@ -15,6 +15,7 @@ LSPosed
             │    └─ onResume               → HeaderData.apply() + BottomSearch.install()
             ├─ SubPageIcons.install()      → PreferenceFragmentCompat#onCreate/onViewCreated/onResume
             ├─ AirplaneSwitch.install()    → MiuiSettings$HeaderAdapter#onBindViewHolder
+            ├─ HeaderOverlay.install()     → HeaderAdapter#onBindViewHolder（更新卡角标 / 耳机/iCloud 图标）
             ├─ CardFix.install()           → HeaderAdapter#onBindViewHolder + ResourcesImpl#loadDrawable
             ├─ SubPageCards.install()      → androidx Preference#onBindViewHolder
             ├─ WirelessPage.install()      → MiuiWirelessSettings#onViewCreated/onResume
@@ -34,6 +35,7 @@ LSPosed
 | 同上 | `onResume` | MIUI 可能刷新 header，回来后再排一次 | `HeaderData` |
 | `androidx.preference.PreferenceFragmentCompat` | `onCreate` / `onViewCreated` / `onResume` | 二级页每次进入都补图标 | `SubPageIcons` |
 | `MiuiSettings$HeaderAdapter` | `onBindViewHolder(HeaderViewHolder,int)` | 控制中心行塞开关（HyperiOS 时用自有 `GlassToggle`）；末行清理主题 drawable | `AirplaneSwitch` / `CardFix` |
+| 同上 | `onBindViewHolder` | 更新卡右侧红色「1」角标；耳机 / iCloud 行强制设置模块图标 | `HeaderOverlay` |
 | `ResourcesImpl` | `loadDrawable` | 末行绑定时把四个主题 drawable 换成透明图 | `CardFix` |
 | `androidx.preference.Preference` | `onBindViewHolder` | 二级页每组最后一行去双层圆角 | `SubPageCards` |
 | `MiuiWirelessSettings` | `onViewCreated` / `onResume` | 删飞行模式行、补「隔空播放与连续互通」 | `WirelessPage` |
@@ -60,6 +62,13 @@ LSPosed
 7. `addCameraRow()` / `addSearchRow()`：`addIntentRow()` 生成的两条合成行 —— 「相机」锚在「外观」（slot 14）之后、
    「搜索」锚在「墙纸」（slot 11）之后。锚点写法是**共用锚点的 slot + `originalIndex = MAX_VALUE-4`**，
    排序后自然落在锚点行下面，不需要重编号 `SLOT_IDS`；`apply()` 用显式组件（`isIntentRow()`）识别并清理；
+7.1 `addUpdateRow()`（16.0，条件）：`Settings.Global.miui_new_version` 非空才合成「有软件更新可用」行，
+  单独占 group 1（账号卡之后、网络卡之前），点击打开系统更新 `com.android.updater/.MainActivity`；
+7.2 `addAirpodsRow()`（16.0，条件）：`AudioManager.getDevices(GET_DEVICES_OUTPUTS)` 找到耳机类输出设备才合成，
+  标题 = 蓝牙别名 / 产品名，占 group 2；点击打开 `android.settings.BLUETOOTH_SETTINGS`；
+7.3 `addICloudRow()`（16.0）：直接排在「Game Center」之后（同 group 7、slot 28），
+  跳 `com.xiaomi.action.MICLOUD_MAIN`（失败退回显式 `MiCloudMainActivity`）；
+  这三条都用 `mark(header, tag)` 往 `Header.extras` 写标记，`apply()` 靠 `isMarked()` 识别并清理；
 8. `ensureInterconnection()`：设备有 MiLink 服务但列表里没有对应 entry 时补一条；
 9. 按 `(group, slot, 原下标)` 排序；
 10. 给每个 header 写 `groupId = 101 + group`（`GROUP_ID_BASE`），让 miuix 画出卡片；
@@ -69,13 +78,28 @@ LSPosed
 
 卡片的 `group` 号（0~9）与内容对应关系见 `HeaderData.SLOT_GROUP`，首页视觉顺序见 [版本记录 · 首页顺序](07-changelog.md#1-首页顺序)。
 
+### 3.1 条件卡片与角标（`HeaderOverlay`）
+
+- 更新卡（group 1）与耳机卡（group 2）用的是 `SLOT_GROUP` 里没占用的两个组号，排序天然落在
+  账号卡（0）之后、网络卡（3）之前；iCloud 复用 Game Center 所在的 group 7。
+- 原生 header 行没有「角标」位，所以 `HeaderOverlay` 在 `HeaderAdapter.onBindViewHolder`
+  之后把红色圆点 `TextView` 塞进 `android.R.id.widget_frame`（同样处理 LinearLayout / FrameLayout /
+  RelativeLayout 三种父容器，`marginEnd` 6dp 给箭头留位）。
+- 判断「这行是不是我们的」不靠标题（耳机名会变），而是 `Header.extras` 里的 `ios_synthetic` 标记；
+  行被回收成普通行时按 tag 把角标摘掉。
+- 耳机 / iCloud 的图标除了写 `Header.icon` 之外，还会在 bind 之后直接 `setImageDrawable`：
+  MIUI 的 adapter 有时优先读 `iconRes`，只写 `icon` 会渲染成空行。
+- 调试用：`settings put global ilayout_fake_headset "Test Buds"` 可以在没有耳机时预览耳机卡，
+  `settings delete global ilayout_fake_headset` 恢复真实检测。
+
 ## 4. 底部搜索栏（`BottomSearch` / `SearchGlass` / `SearchHost`）
 
 1. 找到首页的原生搜索条（`header_view` / `mAnchorView`），**隐藏但保留**；
 2. inflate 系统的 `miuix_appcompat_search_stub` 作为底部浮层（失败则退化成自绘胶囊）；
 3. 浮层尺寸：高 50dp，左右 8dp，底部 12dp；拿到导航栏 inset 后改为 `14dp + nav`；
 4. 列表底部 padding 同步加上 `搜索栏高 + nav + 24dp`，避免最后一张卡片被挡；
-5. 点击浮层 → 调原生 anchor 的 `performClick()` → 走 MIUI 自己的搜索 ActionMode；搜索界面出现时浮层自动隐藏；
+5. 点击浮层 → 先播 120ms 出场动画，再调原生 anchor 的 `performClick()` → 走 MIUI 自己的搜索 ActionMode；
+   搜索界面出现时浮层隐藏；退出搜索时同一路径反向播放（`animateBar`，220ms 滑动 + 缩放 + 淡入淡出）；
 6. `SearchGlass` 负责视觉层：抓窗口（跳过自身子树）→ **1dp 模糊**（`RenderEffect`）→
    圆角矩形折射（`RuntimeShader` + AGSL，默认 **12dp 厚度 / 8dp 力度**）→ 深色保留底部内阴影、浅色关闭；
    **不再往 shader 里混表面色**，原生 `miuix_appcompat_search_mode_edit_text_bg_light/dark` 胶囊保持主题原样；

@@ -14,6 +14,7 @@
 
 | 日期 | 标题 | 一句话结论 | 状态 |
 | --- | --- | --- | --- |
+| 2026-11-10 | [改名 iLayoutSettings + 条件卡片 + 搜索栏过渡](2026-11-10-rename-and-conditional-cards.md) | 16.0：应用/仓库改名 iLayoutSettings、包名 `com.Remo.ilayoutsettings`；新增 iCloud 行、条件式「有软件更新可用」卡（红色 1 角标）与耳机卡；搜索栏进出场加 220ms 过渡；新增 `tools/release.ps1` 自动发版 | 已完成（正式包待手动安装验证） |
 | 2026-11-10 | [Releases 同步：发布 v15.5](2026-11-10-release-v15.5.md) | 补 tag `v15.5`（→ `fc25b08`）并在 Releases 挂上与 `dist/` 同一份的 APK；14.9~15.4 未补发，14.8 留档；文档里指向 v14.8 的说法改到 v15.5 | 已完成 |
 | 2026-11-10 | [首页「相机」「搜索」入口](2026-11-10-camera-and-search-entries.md) | 「相机」锚在「外观」下方、「搜索」锚在「墙纸」下方；显式组件分别打开相机设置/搜索设置，图标复用设置 `ic_settings_camera` / `ic_search_24dp` | 已完成 |
 | 2026-11-10 | [首页「专注模式」入口](2026-11-10-focus-mode-entry.md) | 「屏幕时间」上方合成一行专注模式，点击走 `ZEN_MODE_SETTINGS` 打开勿扰页；图标复用设置 `ic_do_not_disturb_mode_settings`，主题/深浅色自动跟随 | 已完成 |

@@ -3,10 +3,73 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前主线是 **15.5**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前主线是 **16.0（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
+
+---
+
+# iLayoutSettings · LSPosed 模块（v16.0：改名 + 条件卡片 + 搜索过渡）
+
+## v16.0 变更
+
+- **项目改名**：LSPosed 模块 / 应用名 `iLyayot` → **iLayoutSettings**，包名
+  `com.abradant.iossettings` → **`com.Remo.ilayoutsettings`**，GitHub 仓库同步改名
+  `iLyayot` → `iLayoutSettings`（旧地址 301 跳转）。**包名变了，不能覆盖安装旧包。**
+- **新增 iCloud 行**（`HeaderData.addICloudRow`）：固定在「Game Center」正下方、同一张卡片；
+  点击走 `com.xiaomi.action.MICLOUD_MAIN`（解析不到时退回显式组件
+  `com.miui.cloudservice/.ui.MiCloudMainActivity`）；图标为模块内置 `ic_cloud`。
+- **新增「有软件更新可用」卡片（条件显示）**（`HeaderData.addUpdateRow`）：
+  条件 = `Settings.Global.miui_new_version` 非空（小米更新 App 发现新版本时写入，检查完会清空）；
+  卡片单独一组（groupId 1），点击打开 `com.android.updater/.MainActivity`；
+  右侧红色「1」角标由 `HeaderOverlay` 在 `widget_frame` 里画（原生 header 没有角标位）。
+- **新增耳机卡片（条件显示）**（`HeaderData.addAirpodsRow`）：
+  用 `AudioManager.getDevices(GET_DEVICES_OUTPUTS)` 找 A2DP / SCO / BLE / 有线 / USB / 助听器，
+  标题 = `BluetoothDevice.getAlias()`（没有再退 `getProductName()`），图标 `ic_sub_airpods`，
+  点击进蓝牙设置；没连接耳机时整张卡不存在（groupId 2，排在更新卡之后、网络卡之前）。
+- **搜索栏进出场过渡**（`BottomSearch`）：进出搜索时底部胶囊 220ms 滑动 + 缩放 + 淡入淡出，
+  点击后先播 120ms 再唤起 MIUI 搜索；动画期间隐藏 `SearchGlass` 抓图层，避免拖影；
+  `install()` 不再每次 resume 重建胶囊（同 fragment / 同夜间模式时复用），消除过渡期间的「两个搜索栏」。
+- **图标脚本**：`tools/make_subpage_icons.py` 修正输出目录（原来是 `tools/module/...`），
+  新增 `ic_cloud`、`ic_sub_airpods` 两个图标。
+- **自动发版**：新增 `tools/release.ps1`（构建 → 校验 → tag → GitHub Release → 上传附件）。
+- **版本**：16.0 / versionCode **91**；APK `dist/iLayoutSettings-16.0.apk`，220,209 B。
+
+## v16.0 校验
+
+```
+package: name='com.Remo.ilayoutsettings' versionCode='91' versionName='16.0'
+sdkVersion:'29'
+targetSdkVersion:'36'
+launchable-activity: name='com.Remo.ilayoutsettings.MainActivity'  label='iLayoutSettings'
+dex version : 039
+xposed_init : True
+module class: True
+reorder     : True
+size   : 220209 bytes
+sha256 : 8DA082CD8FC578676EB5138F7150BDCFB40C4DBE45CD3625E8B0521923921A73
+```
+
+真机 25053RT47C / HyperOS 3 / Android 16（2026-11-10 13:20~13:27，**同源测试包**：代码完全相同、
+只是包名仍是旧 `com.abradant.iossettings`，便于走 MIUI 的覆盖安装）：
+
+- `icloud row added below Game Center`；截图里「Game Center」下一行就是「iCloud」，同一张卡片；
+  点击 → `com.miui.cloudservice/com.miui.cloudservice.ui.MiCloudMainActivity`；
+- `update card added: 3.0.999.0.WOLCNXM.TEST`（临时写 `miui_new_version`）→ 首页出现
+  「有软件更新可用」卡片 + 红色「1」角标；点击 → `com.android.updater/com.android.updater.UpdateActivity`；
+  删除该 global 值后卡片消失；
+- 连接 REDMI Buds 8 Pro 时 `airpods card added: REDMI Buds 8 Pro`，卡片显示设备名 + 耳机图标；
+  点击 → `com.android.settings/.Settings$BluetoothSettingsActivity`；耳机断开后卡片消失；
+- 搜索栏：点击后 220ms 内滑动淡出、随后进入 MIUI 搜索；取消搜索时同一路径返回；
+  动画期间无重复胶囊、无玻璃拖影（截图 `docs/assets/home-cards-16.0.png`、`home-icloud-16.0.png`）。
+- **未验证**：16.0 正式包（新包名）因本机 MIUI 禁止 adb 安装新包，尚未上机；见 [状态](00-status.md#已知问题)。
+
+## v16.0 发布
+
+- 发布到 GitHub **Release · v16.0**（仓库已改名 iLayoutSettings）：
+  tag `v16.0`，附件 `iLayoutSettings-16.0.apk`，与 `dist/` 同一份。
+- 旧 Release v15.5 / v14.8 保留。
 
 ---
 

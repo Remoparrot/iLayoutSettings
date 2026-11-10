@@ -1,6 +1,6 @@
 # 踩坑记录
 
-> 状态：**现行** · 对应版本：15.5 (90)
+> 状态：**现行** · 对应版本：16.0 (91)
 > 规则：每踩一个新坑就追加一条，写清 **现象 → 根因 → 解法 → 如何避免**。旧结论被推翻时保留原文并标「已过时」。
 
 ## 最贵的五个坑（先看这五条）
@@ -64,6 +64,9 @@
 | 滚动后 `top bar blur` 只在 true/false 之间切、半径不更新 | 旧逻辑只比较「是否滚动」，且只在 `OnScrollChanged` 时读 prefs；滑杆变化被吞掉 | 同时跟踪半径并每 500ms 轮询 prefs；滚动源优先 `scroll_headers`，`mListView` 取不到时回退 |
 | 搜索栏去色后完全消失 | 把 `miuix_appcompat_search_mode_edit_text_bg_light/dark` 的 fill 清掉了；它才是可见胶囊 | 保留主题胶囊；只把 shader 的 `surfaceAlpha` 置 0，不再叠 shader 表面色 |
 | 外观页预览和卡片之间有空隙 | MIUI 自己加了 margin | 保留原间距，只在预览后补一层同色同圆角的卡片背景（`AppearanceTweak`） |
+| 合成行的图标是空的（耳机/iCloud） | MIUI 的 `HeaderAdapter` 在有些版本优先读 `iconRes`，只给 `Header.icon` 不生效 | `HeaderOverlay` 在 `onBindViewHolder` 之后直接 `icon.setImageDrawable(...)` 兜底 |
+| 更新卡右侧没有红色角标 | 原生 header 行没有「角标」这个位置 | 自己在 `android.R.id.widget_frame` 里加一个 20dp 圆形 `TextView`（`HeaderOverlay`），按 tag 清理 |
+| 搜索栏进出场时出现两个胶囊 | `install()` 每次 resume 都删旧建新，旧胶囊还在播动画 | 16.0 改为同 fragment / 同夜间模式复用现有胶囊；动画状态用 `animUntil` 互斥 |
 
 ### C. 版本与回退（本仓库特有）
 
@@ -89,6 +92,21 @@
 - **根因**：那段是后续版本写的，回退时没同步。
 - **处理**：已在文件顶部加「历史全文」说明；当前指纹以 [状态](00-status.md) 为准。
 - **如何避免**：校验数据只写在一处（`00-status.md`），其它地方引用链接。
+
+#### 坑 C4：改了包名之后「模块装了但设置没变」
+
+- **现象**：16.0 把包名从 `com.abradant.iossettings` 改成 `com.Remo.ilayoutsettings`，装上后设置毫无变化。
+- **根因**：① LSPosed 的启用状态与作用域按包名存储，新包默认是**未启用**；
+  ② 旧包如果没卸载，仍然在 hook 设置（两份模块同时生效还会重复插行）。
+- **解法**：先卸载旧包，再安装新包，然后在 LSPosed 里重新启用 + 勾作用域，最后强制停止设置。
+- **如何避免**：包名变更按「破坏性升级」处理，写进 [安装 · 16.0 迁移](04-install.md#2-160-迁移必须做) 与 Release 说明。
+
+#### 坑 C5：`miui_new_version` 会被系统更新自己清掉
+
+- **现象**：手动 `settings put global miui_new_version …` 让更新卡出现，过一会儿重进设置卡片又没了。
+- **根因**：`com.android.updater` 每次检查完都会写/清这个键（见 `h0.1.v.smali` 的 `SettingsUtil.h` / `putString(..., null)`）。
+- **解释**：这不是 bug——更新卡本来就该跟着真实的更新状态走。
+- **如何避免**：调试时接受它可能被清掉；需要稳定预览就临时断网或改成假键（未实现）。
 
 ### D. 构建与环境
 
@@ -133,6 +151,8 @@
 | `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | 新旧包证书不同 | 卸载旧包再装；发布时固定 keystore |
 | 每次构建签名都变（已修复） | 旧版默认 key 放在 `build/` 里，而 `build/` 每次构建都被清空 | 现版本默认 keystore 在 `.keystore/`，构建不再清理；正式发版仍应用 `-KeyStore` 固定仓库外的密钥 |
 | `versionName` 与产物名不一致 | 手改产物名 | 产物名由 manifest 版本号生成，不要手改 |
+| `adb install` 新包报 `INSTALL_FAILED_USER_RESTRICTED`（16.0 实测） | MIUI 安全中心拦「ADB 安装新应用」：`com.miui.permcenter.install.AdbInstallActivity` 直接 finish；同包名覆盖安装不受限 | 把 APK 拷到手机手动点装，或开发者选项里允许「USB 安装」；`pm install-create/-write/-commit` 也会被拦，别浪费时间 |
+| 自动发版时 Release 正文中文乱码 / 422 | 直接用 `Invoke-RestMethod -Body` 发多行中文 | 先 `ConvertTo-Json -Compress` 写 UTF-8 无 BOM 文件，再 `curl --data-binary @file`（`tools/release.ps1` 已内置） |
 
 ---
 

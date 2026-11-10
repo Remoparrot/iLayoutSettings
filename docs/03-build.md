@@ -1,6 +1,6 @@
 # 构建指南
 
-> 状态：**现行** · 对应版本：15.5 (90)
+> 状态：**现行** · 对应版本：16.0 (91)
 
 ## 1. 为什么不走 Gradle
 
@@ -78,7 +78,7 @@ python tools\check_agsl.py
 ## 5. 成功判据
 
 ```
-package: name='com.abradant.iossettings' versionCode='90' versionName='15.5'
+package: name='com.Remo.ilayoutsettings' versionCode='91' versionName='16.0'
 sdkVersion:'29'
 targetSdkVersion:'36'
 dex version : 039

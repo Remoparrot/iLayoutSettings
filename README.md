@@ -1,9 +1,9 @@
-# iLyayot · iOS 设置布局
+# iLayoutSettings · iOS 设置布局
 
-> 把澎湃 OS（HyperOS 3）「设置」首页改成 iOS 风格：入口重排、二级页图标、搜索栏沉底、卡片细节修正。
+> 把澎湃 OS（HyperOS 3）「设置」首页改成 iOS 风格：入口重排、条件卡片（软件更新 / 耳机 / iCloud）、搜索栏沉底、卡片细节修正。
 > **全部复用 MIUI 原生控件与原生数据，模块不重绘任何页面。**
 
-[![Version](https://img.shields.io/badge/version-15.5-1f6feb)](https://github.com/abradanthawk-design/iLyayot/releases)
+[![Version](https://img.shields.io/badge/version-16.0-1f6feb)](https://github.com/abradanthawk-design/iLayoutSettings/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-HyperOS%203%20%7C%20Android%2015%2B-green)](docs/01-overview.md)
 [![LSPosed](https://img.shields.io/badge/framework-LSPosed-orange)](docs/04-install.md)
@@ -15,79 +15,53 @@
 一个运行在「设置」（`com.android.settings`）进程里的 **LSPosed 模块**。它只做三件事：
 
 1. **重排**首页入口，并按 iOS 的分组重写 `Header.groupId`，让 miuix 自己把卡片画出来；
-2. 给二级页面（通用、更多设置……）**补图标**，图标资源内置在模块里；
-3. 把原生搜索栏**移到底部**，点击行为仍然是 MIUI 自己的搜索。
+2. **按条件合成卡片**：有 OTA 时才出现的「有软件更新可用」、连着耳机时才出现的耳机卡、固定在 Game Center 下的 iCloud；
+3. 把原生搜索栏**移到底部**，进出搜索时带过渡动画，点击行为仍然是 MIUI 自己的搜索。
 
-背景、行样式、圆角、点击、动画全部是系统原生的——所以它看起来像换了一套布局，而不是套了一层主题。
+背景、行样式、圆角、点击全部是系统原生的——所以它看起来像换了一套布局，而不是套了一层主题。
 
 | 能力 | 说明 |
 | --- | --- |
 | 首页重排 / 分组 | iOS 顺序 + 独立卡片，卡片圆角与间距仍由 miuix `CardItemDecoration` 绘制 |
-| 专注模式入口 | 排在「屏幕时间」正上方，点击打开系统「勿扰模式」页；图标复用设置自己的 `ic_do_not_disturb_mode_settings`，随主题与深浅色自动解析 |
-| 相机 / 搜索入口 | 「相机」排在「外观」下方、打开小米相机设置（`ic_settings_camera`）；「搜索」排在「墙纸」下方、打开小米搜索设置（`ic_search_24dp`） |
-| 飞行模式开关 | 右侧原生 `SlidingSwitch`；图标优先用设置主题里的 `ic_airplane_mode_settings`，缺失时回退模块内置图标，随深浅色/主题自动更新 |
-| 二级页图标 | 24 个 iOS 风格图标，按 preference key 匹配，标题关键词兜底 |
-| 底部搜索栏 | `miuix_appcompat_search_stub` 原生布局 + **Kyant backdrop 2.0.1 玻璃**（模糊 + 12dp/8dp 折射；**不叠加 shader 表面色**，保留主题 `miuix_appcompat_search_mode_edit_text_bg_light/dark` 胶囊；浅色无阴影） |
+| 软件更新卡（条件） | 读 `Settings.Global.miui_new_version`，非空才显示「有软件更新可用」+ 红色「1」角标，点击进系统更新 |
+| 耳机卡（条件） | 检测已连接的蓝牙/有线/USB 耳机，标题 = 设备别名，图标内置；没连耳机整张卡不出现，点击进蓝牙设置 |
+| iCloud 入口 | 固定在「Game Center」下方，点击打开小米云服务 |
+| 专注模式 / 相机 / 搜索入口 | 分别在「屏幕时间」「外观」「墙纸」附近，复用系统或模块图标 |
+| 飞行模式开关 | 右侧原生 `SlidingSwitch`，图标优先用设置主题里的 `ic_airplane_mode_settings` |
+| 底部搜索栏 | `miuix_appcompat_search_stub` 原生布局 + **Kyant backdrop 玻璃**（模糊 + 折射；保留主题胶囊） |
+| 搜索栏过渡 | 进出搜索 220ms 滑动+缩放+淡入淡出，期间隐藏玻璃抓图层，避免拖影 |
 | 参数界面 | 应用内滑杆：搜索栏模糊 / 折射力度 / 折射厚度、顶栏模糊，滑杆即改即生效 |
 | 卡片细节修正 | 去掉每组最后一行的双层圆角/放大图标；外观页预览加卡片底 |
-| 顶部模糊 | 列表滚动时出现；半径由 `topbar_blur` 实时读取，滑杆改完回到设置即生效 |
-| 关于本机 | （历史能力）iOS 风格「关于设备」页，见 [版本记录](docs/07-changelog.md) |
+| 顶部模糊 | 列表滚动时出现；半径由 `topbar_blur` 实时读取 |
 
 ## 截图
 
-| 首页（账号 + 卡片分组） | 控制中心行的飞行模式开关（15.2 原生开关归位） | 二级页图标 |
+| 条件卡片（16.0：更新 + 耳机） | iCloud 入口（16.0） |
+| --- | --- |
+| ![条件卡片](docs/assets/home-cards-16.0.png) | ![iCloud](docs/assets/home-icloud-16.0.png) |
+
+首页（账号 + 卡片分组）与搜索栏：
+
+| 首页 | 搜索栏 · 浅色 | 搜索栏 · 深色 |
 | --- | --- | --- |
-| ![首页](docs/assets/home-15.3-light.png) | ![开关](docs/assets/row-switch-15.2.png) | ![图标](docs/assets/subpage-icons.png) |
-
-搜索栏（15.3 真机裁切；保留原生 light/dark 胶囊，去掉 shader 表面色与浅色阴影）：
-
-| 浅色 | 深色 |
-| --- | --- |
-| ![搜索栏 · 浅色](docs/assets/search-glass-15.3-light.png) | ![搜索栏 · 深色](docs/assets/search-glass-15.3-dark.png) |
-
-专注模式入口（15.4，位于「屏幕时间」上方；点击进入勿扰模式设置）：
-
-| 浅色 | 深色（图标随主题） |
-| --- | --- |
-| ![专注模式 · 浅色](docs/assets/focus-mode-15.4.png) | ![专注模式 · 深色](docs/assets/focus-mode-dark-15.4.png) |
-
-相机 / 搜索入口（15.5；「相机」在「外观」下方、「搜索」在「墙纸」下方）：
-
-| 浅色 | 深色 |
-| --- | --- |
-| ![相机与搜索 · 浅色](docs/assets/home-camera-search-15.5.png) | ![相机与搜索 · 深色](docs/assets/home-camera-search-dark-15.5.png) |
-
-点击后的目标页：
-
-| 相机设置 | 搜索设置 |
-| --- | --- |
-| ![相机设置](docs/assets/camera-settings-15.5.png) | ![搜索设置](docs/assets/search-settings-15.5.png) |
-
-顶栏滚动模糊（15.3，浅色，滚动后）：
-
-![顶栏模糊](docs/assets/topbar-blur-15.3.png)
-
-参数界面（15.3）：
-
-![参数界面](docs/assets/gui-15.3.png)
+| ![首页](docs/assets/home-15.3-light.png) | ![搜索栏 · 浅色](docs/assets/search-glass-15.3-light.png) | ![搜索栏 · 深色](docs/assets/search-glass-15.3-dark.png) |
 
 ## 安装
 
-1. 下载 [`dist/IosSettingsLayout-15.5.apk`](dist/IosSettingsLayout-15.5.apk)，或到 [Releases · v15.5](https://github.com/abradanthawk-design/iLyayot/releases/tag/v15.5) 下同名附件（207,753 B，SHA-256 `C8146210…`，与 `dist/` 同一份）；应用名 **iLyayot**，新增相机/搜索入口 + 专注模式入口 + 主题飞行图标 + 搜索栏去色/去浅色阴影 + 顶栏模糊实时生效，**已上机**；
-   旧版 14.8 仍在 [Releases · v14.8](https://github.com/abradanthawk-design/iLyayot/releases/tag/v14.8)，证书与本包不同；
-2. LSPosed 中启用模块，作用域只勾选 **设置**（`com.android.settings`）；
+1. 下载 [`dist/iLayoutSettings-16.0.apk`](dist/iLayoutSettings-16.0.apk)，或到 [Releases · v16.0](https://github.com/abradanthawk-design/iLayoutSettings/releases/tag/v16.0) 下同名附件（220,209 B，SHA-256 `8DA082CD…21A73`，与 `dist/` 同一份）；
+   **16.0 改了包名**（`com.Remo.ilayoutsettings`），必须先卸载旧的 `com.abradant.iossettings`；
+2. LSPosed 中启用 **iLayoutSettings**，作用域只勾选 **设置**（`com.android.settings`）；
 3. **强制停止「设置」**（或重启手机），再打开设置；
-4. 打开桌面上的 **iLyayot** 图标即可调参数（模糊 / 折射 / 顶栏模糊）。
+4. 打开桌面上的 **iLayoutSettings** 图标即可调参数（模糊 / 折射 / 顶栏模糊）。
 
-日志过滤 `IosSettings` 应能看到 `hooks installed`、`liquid glass shader compiled` / `liquid glass active`、
-`search glass mask=...`、`airplane icon set: settings:ic_airplane_mode_settings`、
-`focus mode row added`、`camera_entry row added below slot 14`、`search_entry row added below slot 11`、
-`airplane switch recentered by ... (frame translation)`；改滑杆后会出现 `glass tuning: ...` 与
-`top bar blur=true offset=... radius=... set=true`。
+> 本机 MIUI 会拦截 adb 安装新包（`INSTALL_FAILED_USER_RESTRICTED`）：把 APK 复制到手机后
+> 在文件管理器里点开安装即可；或在开发者选项里允许「USB 安装」。
+> 旧版本 15.5 / 14.8 仍在各自 Release 里（14.8 证书不同）。
+
+日志过滤 `iLayoutSettings` 应能看到 `hooks installed`、`icloud row added below Game Center`、
+按条件出现的 `update card added: …` / `airpods card added: …`，以及
+`liquid glass shader compiled`、`search glass mask=...`、`airplane icon set: ...`。
 详见 [安装与调试](docs/04-install.md)。
-
-> 15.x 使用同一测试密钥签名，可直接覆盖 14.9~15.2；与 14.8 发布包**证书不同**，
-> 从 14.8 升级会提示「应用未安装 / 签名不一致」，先卸载旧包再装。原因见 [踩坑记录 · 签名](docs/06-pitfalls.md#签名与升级)。
 
 ## 兼容性
 
@@ -110,7 +84,9 @@ pwsh -File module/build.ps1 `
   -AndroidJar C:\android-sdk\platforms\android-36\android.jar
 ```
 
-输出 `dist/IosSettingsLayout-15.5.apk`。完整工具链版本、可复现性说明见 [构建指南](docs/03-build.md)。
+输出 `dist/iLayoutSettings-<versionName>.apk`。
+发版用 `tools/release.ps1 -Version 16.0`：构建 → 校验 → 打 tag → 建 Release → 上传 APK，一条命令完成。
+完整工具链版本、可复现性说明见 [构建指南](docs/03-build.md)。
 
 ## 文档
 
@@ -142,4 +118,4 @@ pwsh -File module/build.ps1 `
 
 ---
 
-<sub>仓库名 `iLyayot`，应用名 **iLyayot**（iOS 设置布局），包名 `com.abradant.iossettings`。</sub>
+<sub>仓库名 `iLayoutSettings`（旧名 `iLyayot`），应用名 **iLayoutSettings**，包名 `com.Remo.ilayoutsettings`。</sub>

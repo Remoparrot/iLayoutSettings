@@ -1,6 +1,6 @@
 # 排错手册
 
-> 状态：**现行** · 对应版本：15.5 (90)
+> 状态：**现行** · 对应版本：16.0 (91)
 > 用法：先按「现象」定位，再看「下一步」。每个问题都给了判断依据，不要凭感觉重装。
 
 ## 0. 通用排查顺序
@@ -8,7 +8,7 @@
 ```
 1. 模块启用了吗？作用域只有 com.android.settings 吗？
 2. 强制停止设置了吗？          adb shell am force-stop com.android.settings
-3. 日志里有没有 hooks installed？  adb logcat -s IosSettings:V
+3. 日志里有没有 hooks installed？  adb logcat -s iLayoutSettings:V
 4. 哪一行日志缺失？→ 对照 docs/04-install.md 的日志表
 5. 还不行 → 抓日志 + 截图 + 机型版本，按 04-install 第 7 节反馈
 ```
@@ -17,7 +17,7 @@
 
 | 判断依据 | 结论 | 处理 |
 | --- | --- | --- |
-| 日志无任何 `IosSettings` | 模块没进进程 | 检查 LSPosed 启用状态、作用域、是否重启过设置 |
+| 日志无任何 `iLayoutSettings` | 模块没进进程 | 检查 LSPosed 启用状态、作用域、是否重启过设置 |
 | 有 `hooks installed` 但界面没变 | hook 跑在别的进程/页面 | 确认打开的是系统「设置」而不是第三方设置页 |
 | 有 `hooks installed` 但无 `reordered` | `SettingsFragment#buildAdapter` 没匹配上 | ROM 版本差异，抓日志反馈 |
 | 装了两个同名模块 | 旧模块抢先生效 | 卸载旧包，只留一个 |
@@ -38,7 +38,20 @@
 | 挡住最后一张卡片 | 列表 padding 没加上 | 同上，检查 `listView.setPadding` 分支 |
 | 点它没反应 | anchor 为空（未进搜索态） | 日志看 `bottom bar: vis=...`；确认 `mAnchorView` 已赋值 |
 | 搜索时还显示 | ActionMode hook 没生效 | 日志看 `onCreateActionMode` 相关行 |
+| 进出搜索时出现两个搜索栏 | 旧胶囊没被复用（16.0 之前） | 16.0 的 `install()` 在同一个 fragment / 同一夜间模式下会复用胶囊；仍有则看日志是否反复 `bottom search installed` |
+| 过渡动画期间玻璃有拖影 | 玻璃抓图层跟着移动 | 16.0 动画期间会隐藏 `SearchGlass`；如果还看到拖影说明动画没走 `animateBar` |
 | 玻璃里有重影 | `capturing` 没跳过自身 | 见 [坑 4](06-pitfalls.md#坑-4底部搜索栏把自己拍进玻璃里) |
+
+## 3.1 条件卡片（16.0）
+
+| 现象 | 可能原因 | 处理 |
+| --- | --- | --- |
+| 一直没有「有软件更新可用」 | 系统更新没发现新版本（`miui_new_version` 为空） | 正常；日志 `update card: no new version, skip` |
+| 有更新但卡片不出现 | 更新卡在 resume 时解析失败 / 更新 App 刚清空键值 | 重进设置；日志看 `update card added:` |
+| 更新卡有但没红色角标 | `HeaderOverlay` 没 hook 上 | 日志看 `hooked HeaderAdapter.onBindViewHolder (badge / airpods icon)` |
+| 连着耳机但没耳机卡 | 输出设备是 `TYPE_BLE_SPEAKER`（不是耳机）/ 耳机只做输入 | 日志看 `airpods card:` 那行；必要时补 `isHeadsetType` |
+| 耳机卡名称不对 | 蓝牙别名为空，退回了产品名 | 正常兜底；可在蓝牙设置里重新命名设备 |
+| iCloud 行没有图标 | 模块资源没加载（旧包名 / 未装模块） | 日志看 `module drawable ic_cloud unavailable` |
 
 ## 4. 控制中心行没有开关
 
@@ -67,7 +80,7 @@
 
 ## 7. 崩溃 / 卡顿 / 发热
 
-- **设置闪退**：`adb logcat -b crash` 抓堆栈，看是否 `com.abradant.iossettings` 抛异常；大概率是某个 hook 没包 try/catch；
+- **设置闪退**：`adb logcat -b crash` 抓堆栈，看是否 `com.Remo.ilayoutsettings` 抛异常；大概率是某个 hook 没包 try/catch；
 - **卡顿**：玻璃抓图是主要开销；日志里若每帧都在抓图，考虑降低抓图尺寸或触发频率；
 - **发热**：同上；先把模块停用做对照，确认是不是本模块导致。
 
@@ -75,7 +88,7 @@
 
 | 报错 | 含义 | 处理 |
 | --- | --- | --- |
-| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | 签名不一致 | `adb uninstall com.abradant.iossettings` 后重装 |
+| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | 签名不一致 | `adb uninstall com.Remo.ilayoutsettings` 后重装 |
 | `INSTALL_FAILED_VERSION_DOWNGRADE` | versionCode 比已装的小 | 卸载旧包，或提高 versionCode |
 | `INSTALL_PARSE_FAILED_NO_CERTIFICATES` | 包没签名/签名损坏 | 重新构建；不要手工改 zip |
 
@@ -88,9 +101,9 @@
 ```text
 机型：
 系统：HyperOS 3 / Android 15（设置版本：）
-模块版本：15.5 (90)
+模块版本：16.0 (91)
 现象：
 复现步骤：
-日志（adb logcat -s IosSettings:V，从打开设置开始）：
+日志（adb logcat -s iLayoutSettings:V，从打开设置开始）：
 截图：
 ```

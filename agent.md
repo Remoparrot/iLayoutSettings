@@ -33,7 +33,7 @@
 
 ```
 接手确认
-- 当前版本：15.5 (90)
+- 当前版本：16.0 (91)
 - 本次目标：<一句话>
 - 受影响文件：<预估>
 - 主要风险：<例如：改 Header 顺序可能影响卡片分组>
@@ -150,7 +150,7 @@
 2. 改版本必须一次做齐：改 manifest → 构建 → 记 sha256 → 更新 changelog 顶部 → 更新 `00-status.md` → 更新 README 徽章；
 3. `dist/` 只放**当前**发布包；历史包放 GitHub Release，不要堆在仓库；
 4. 正式包必须用**固定 keystore** 签名，换了 key 必须在 changelog 里写升级说明（用户需要先卸载）；
-5. 发布包文件名固定 `IosSettingsLayout-<versionName>.apk`。
+5. 发布包文件名固定 `iLayoutSettings-<versionName>.apk`。
 
 ---
 
@@ -168,14 +168,14 @@ $env:ANDROID_JAR         = "C:\path\to\platforms\android-36\android.jar"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File module\build.ps1
 
 # 3) 校验产物
-Get-FileHash dist\IosSettingsLayout-15.0.apk -Algorithm SHA256
-& "$env:ANDROID_BUILD_TOOLS\aapt2.exe" dump badging dist\IosSettingsLayout-15.0.apk |
+Get-FileHash dist\iLayoutSettings-16.0.apk -Algorithm SHA256
+& "$env:ANDROID_BUILD_TOOLS\aapt2.exe" dump badging dist\iLayoutSettings-16.0.apk |
   Select-String '^package:|^sdkVersion|^targetSdkVersion'
-& "$env:ANDROID_BUILD_TOOLS\apksigner.bat" verify --print-certs dist\IosSettingsLayout-15.0.apk
+& "$env:ANDROID_BUILD_TOOLS\apksigner.bat" verify --print-certs dist\iLayoutSettings-16.0.apk
 ```
 
 构建成功的判定（缺一不可）：
-`package: name='com.abradant.iossettings' versionCode='85' versionName='15.0'`、
+`package: name='com.Remo.ilayoutsettings' versionCode='91' versionName='16.0'`、
 `xposed_init : True`、`module class: True`、`reorder : True`、apksigner `Verified`。
 
 **没有设备实测的改动，必须在记录第 6 节写「未上机验证」。**
@@ -192,7 +192,7 @@ NOTICE.md                 第三方声明
 module/                   模块源码
   AndroidManifest.xml     唯一版本号来源
   build.ps1               无 Gradle 构建脚本
-  src/com/abradant/iossettings/*.java
+  src/com/Remo/ilayoutsettings/*.java
   res/ assets/
 dist/                     当前发布 APK
 lib/xposed-api-82.jar     Xposed API（编译期依赖）
