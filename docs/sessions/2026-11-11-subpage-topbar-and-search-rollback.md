@@ -113,8 +113,8 @@ adb shell dumpsys window | grep mCurrentFocus
   - 深色滚动后同位置 = `(75,75,75)`，栏上方 `(36,36,36)` → 中性灰 30% 线；
   - 回到顶部（y=500 栏底）无线，内容在栏下不再被裁。
 - 截图：`docs/assets/home-16.7-light.png`、`home-16.7-dark.png`、
-  `subpage-topbar-16.7-light.png`、`subpage-topbar-16.7-dark.png`；
-  回退前双环对照片 `docs/assets/search-glass-16.7-light-overtry.png`。
+  `subpage-topbar-16.7-light.png`、`subpage-topbar-16.7-dark.png`（另附发丝线特写
+  `subpage-topbar-16.7-hairline.png`）；回退前双环对照片 `docs/assets/search-glass-16.7-light-overtry.png`。
 - **未验证的部分**：第三方主题、平板/横屏、搜索模式下的二级页顶栏；
   非 `SettingsActivity` 子类的二级页（如系统内嵌的设置页）不保证。
 

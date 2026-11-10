@@ -60,6 +60,10 @@
 | --- | --- |
 | ![二级页顶栏 · 浅色](docs/assets/subpage-topbar-16.7-light.png) | ![二级页顶栏 · 深色](docs/assets/subpage-topbar-16.7-dark.png) |
 
+发丝线特写（浅色，列表滑到栏下时出现；回到顶部自动隐藏）：
+
+![二级页发丝线特写](docs/assets/subpage-topbar-16.7-hairline.png)
+
 ## 安装
 
 1. 下载 [`dist/iLayoutSettings-16.7.apk`](dist/iLayoutSettings-16.7.apk)，或到 [Releases · v16.7](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.7) 下同名附件（298,530 B，SHA-256 `25E0FCA8…D973`，与 `dist/` 同一份）；
