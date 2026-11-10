@@ -1,4 +1,4 @@
-package com.abradant.iossettings;
+package com.Remo.ilayoutsettings;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;
@@ -21,7 +21,7 @@ import java.util.Map;
  */
 public final class PrefsProvider extends ContentProvider {
 
-    static final String AUTHORITY = "com.abradant.iossettings.prefs";
+    static final String AUTHORITY = "com.Remo.ilayoutsettings.prefs";
     static final Uri URI = Uri.parse("content://" + AUTHORITY + "/settings");
     static final String METHOD_GET = "get";
 

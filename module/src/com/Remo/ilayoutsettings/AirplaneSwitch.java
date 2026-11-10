@@ -1,4 +1,4 @@
-package com.abradant.iossettings;
+package com.Remo.ilayoutsettings;
 
 import android.content.Context;
 import android.content.res.Resources;
@@ -462,8 +462,8 @@ final class AirplaneSwitch {
                 source = UiTweaks.isDarkMode(context) ? "module:ic_plane_dark" : "module:ic_plane_light";
                 String name = UiTweaks.isDarkMode(context) ? "ic_plane_dark" : "ic_plane_light";
                 android.content.res.Resources modRes = context.getPackageManager()
-                        .getResourcesForApplication("com.abradant.iossettings");
-                int id = modRes.getIdentifier(name, "drawable", "com.abradant.iossettings");
+                        .getResourcesForApplication("com.Remo.ilayoutsettings");
+                int id = modRes.getIdentifier(name, "drawable", "com.Remo.ilayoutsettings");
                 if (id != 0) {
                     drawable = modRes.getDrawable(id, null);
                 }

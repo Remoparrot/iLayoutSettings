@@ -1,4 +1,4 @@
-package com.abradant.iossettings;
+package com.Remo.ilayoutsettings;
 
 import android.content.Context;
 import android.content.Intent;

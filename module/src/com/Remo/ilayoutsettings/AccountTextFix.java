@@ -1,4 +1,4 @@
-package com.abradant.iossettings;
+package com.Remo.ilayoutsettings;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;

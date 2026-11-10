@@ -1,4 +1,4 @@
-package com.abradant.iossettings;
+package com.Remo.ilayoutsettings;
 
 import android.app.Activity;
 import android.graphics.drawable.GradientDrawable;

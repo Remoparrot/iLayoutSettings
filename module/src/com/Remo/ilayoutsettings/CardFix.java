@@ -1,4 +1,4 @@
-package com.abradant.iossettings;
+package com.Remo.ilayoutsettings;
 
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;

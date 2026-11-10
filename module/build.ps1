@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Build the iLyayot (iOS Settings Layout) LSPosed module without Gradle.
+    Build the iLayoutSettings LSPosed module without Gradle.
 
 .DESCRIPTION
     Pipeline: aapt2 compile/link -> javac -> d8 -> inject classes.dex
@@ -111,7 +111,7 @@ $versionName = $manifestXml.manifest.versionName
 $versionCode = $manifestXml.manifest.versionCode
 if (-not $versionName) { throw 'android:versionName missing in AndroidManifest.xml' }
 
-$out = Join-Path $OutDir "IosSettingsLayout-$versionName.apk"
+$out = Join-Path $OutDir "iLayoutSettings-$versionName.apk"
 
 Write-Host "jdk        : $jdk"
 Write-Host "buildtools : $bt"
@@ -199,8 +199,8 @@ try {
     $latin = [System.Text.Encoding]::GetEncoding('ISO-8859-1').GetString($bytes)
     Write-Host ("dex version : {0}{1}{2}" -f [char]$bytes[4], [char]$bytes[5], [char]$bytes[6])
     Write-Host ("xposed_init : " + ($names -contains 'assets/xposed_init'))
-    Write-Host ("module class: " + $latin.Contains('Lcom/abradant/iossettings/Module;'))
-    Write-Host ("reorder     : " + $latin.Contains('Lcom/abradant/iossettings/HeaderData;'))
+    Write-Host ("module class: " + $latin.Contains('Lcom/Remo/ilayoutsettings/Module;'))
+    Write-Host ("reorder     : " + $latin.Contains('Lcom/Remo/ilayoutsettings/HeaderData;'))
 } finally {
     $zipr.Dispose()
 }

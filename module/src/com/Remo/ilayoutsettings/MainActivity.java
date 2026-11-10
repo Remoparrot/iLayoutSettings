@@ -1,4 +1,4 @@
-package com.abradant.iossettings;
+package com.Remo.ilayoutsettings;
 
 import android.app.Activity;
 import android.content.SharedPreferences;
@@ -17,7 +17,7 @@ import android.widget.TextView;
 /**
  * Module settings screen.
  *
- * <p>Three sliders that write {@code /data/data/com.abradant.iossettings/
+ * <p>Three sliders that write {@code /data/data/com.Remo.ilayoutsettings/
  * shared_prefs/ios_settings.xml}, the file the hooked Settings process reads
  * through {@link Prefs}: the search glass blur, the search glass refraction
  * and the top-bar (NestedHeaderLayout) blur. Values are applied on the next

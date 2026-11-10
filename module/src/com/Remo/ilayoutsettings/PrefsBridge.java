@@ -1,4 +1,4 @@
-package com.abradant.iossettings;
+package com.Remo.ilayoutsettings;
 
 /** Public bridge so the ported dev.settingslab classes can read the module prefs. */
 public final class PrefsBridge {

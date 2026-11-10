@@ -1,4 +1,4 @@
-package com.abradant.iossettings;
+package com.Remo.ilayoutsettings;
 
 import android.app.Activity;
 
@@ -81,6 +81,8 @@ final class Hook {
 
         SubPageIcons.install(cl);
         AirplaneSwitch.install(cl);
+        // Badge on the update card + guaranteed AirPods glyph on the headset card.
+        HeaderOverlay.install(cl);
         // Last-row divider removal (home). Position is resolved by title so the
         // list's header views can no longer shift it onto a normal row.
         CardFix.install(cl);

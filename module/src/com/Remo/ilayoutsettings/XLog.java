@@ -1,4 +1,4 @@
-package com.abradant.iossettings;
+package com.Remo.ilayoutsettings;
 
 import android.util.Log;
 
@@ -14,7 +14,7 @@ import de.robv.android.xposed.XposedBridge;
 /** Logs to logcat, the LSPosed log and (best effort) to /data/local/tmp. */
 final class XLog {
 
-    static final String TAG = "IosSettings";
+    static final String TAG = "iLayoutSettings";
 
     private static PrintWriter writer;
     private static boolean fileTried;

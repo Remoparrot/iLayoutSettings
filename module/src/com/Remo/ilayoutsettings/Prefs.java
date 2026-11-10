@@ -1,4 +1,4 @@
-package com.abradant.iossettings;
+package com.Remo.ilayoutsettings;
 
 import de.robv.android.xposed.XSharedPreferences;
 
@@ -41,7 +41,7 @@ final class Prefs {
     static XSharedPreferences read() {
         try {
             XSharedPreferences prefs = new XSharedPreferences(
-                    "com.abradant.iossettings", FILE);
+                    "com.Remo.ilayoutsettings", FILE);
             prefs.reload();
             return prefs;
         } catch (Throwable t) {

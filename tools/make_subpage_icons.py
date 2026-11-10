@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw
 S = 4                     # supersample
 SIZE = 84                 # px at xxhdpi -> 28dp intrinsic (matches miuix row icon)
 W = SIZE * S
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                    "module", "res", "drawable-xxhdpi")
 os.makedirs(OUT, exist_ok=True)
 
@@ -275,6 +275,28 @@ def icon_speaker(d):
             d.ellipse([cx - rr, cy - rr, cx + rr, cy + rr], fill=WHITE)
 
 
+def icon_cloud(d):
+    """iCloud: puffy cloud on the classic blue tile (home row 15.6)."""
+    c = W // 2
+    for cx, cy, r in ((c - int(W * 0.15), int(W * 0.47), int(W * 0.085)),
+                      (c - int(W * 0.01), int(W * 0.40), int(W * 0.115)),
+                      (c + int(W * 0.16), int(W * 0.47), int(W * 0.08))):
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=WHITE)
+    d.rounded_rectangle([int(W * 0.20), int(W * 0.47), int(W * 0.80), int(W * 0.63)],
+                        radius=int(W * 0.08), fill=WHITE)
+
+
+def icon_airpods(d):
+    """AirPods: two earbuds (bud + stem), white glyph on the iOS grey tile."""
+    for cx in (int(W * 0.36), int(W * 0.64)):
+        r = int(W * 0.085)
+        cy = int(W * 0.35)
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=WHITE)
+        stem = int(W * 0.033)
+        d.rounded_rectangle([cx - stem, cy, cx + stem, int(W * 0.67)],
+                            radius=stem, fill=WHITE)
+
+
 ICONS = {
     "ic_sub_clock": ("#FF9500", icon_clock),
     "ic_sub_keyboard": ("#8E8E93", icon_keyboard),
@@ -300,6 +322,8 @@ ICONS = {
     "ic_sub_privacy": ("#34C759", icon_privacy),
     "ic_sub_edge": ("#8E8E93", icon_edge),
     "ic_sub_speaker": ("#007AFF", icon_speaker),
+    "ic_cloud": ("#3478F6", icon_cloud),
+    "ic_sub_airpods": ("#8E8E93", icon_airpods),
 }
 
 

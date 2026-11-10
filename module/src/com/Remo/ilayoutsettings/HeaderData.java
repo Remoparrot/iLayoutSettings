@@ -1,4 +1,4 @@
-package com.abradant.iossettings;
+package com.Remo.ilayoutsettings;
 
 import android.app.Activity;
 
@@ -35,6 +35,33 @@ final class HeaderData {
     private static final String SEARCH_PKG = "com.android.quicksearchbox";
     private static final String SEARCH_CLS =
             "com.android.quicksearchbox.preferences.SearchSettingsPreferenceActivity";
+
+    /** Synthetic iCloud row below Game Center; opens 小米云服务 (MiCloudMainActivity). */
+    private static final String ICLOUD_TITLE = "iCloud";
+    private static final String CLOUD_ACTION = "com.xiaomi.action.MICLOUD_MAIN";
+    private static final String CLOUD_PKG = "com.miui.cloudservice";
+    private static final String CLOUD_CLS = "com.miui.cloudservice.ui.MiCloudMainActivity";
+
+    /** Software-update card; only when the updater has stored a new version. */
+    private static final String UPDATE_TITLE = "有软件更新可用";
+    private static final String UPDATE_PKG = "com.android.updater";
+    private static final String UPDATE_CLS = "com.android.updater.MainActivity";
+    private static final String UPDATE_KEY = "miui_new_version";
+
+    /** AirPods card; only while a headset is connected, title = device name. */
+    private static final String AIRPODS_ICON = "ic_sub_airpods";
+    /** Debug override so the conditional card can be previewed without earbuds. */
+    private static final String FAKE_HEADSET_KEY = "ilayout_fake_headset";
+
+    /** Card groups 1 and 2 are unused by {@link #SLOT_GROUP}; 0 is the account card. */
+    private static final int GROUP_UPDATE = 1;
+    private static final int GROUP_AIRPODS = 2;
+
+    /** This module's package, used to borrow the bundled drawables. */
+    static final String MODULE_PKG = "com.Remo.ilayoutsettings";
+
+    /** Bundle marker so synthetic rows can be recognised after MIUI rebuilds. */
+    private static final String MARK_KEY = "ios_synthetic";
 
     /**
      * iOS groups. Each slot is a list of header id aliases; the first alias that
@@ -288,6 +315,9 @@ final class HeaderData {
         addFocusModeRow(activity, items);
         addCameraRow(activity, items);
         addSearchRow(activity, items);
+        addUpdateRow(activity, items);
+        addAirpodsRow(activity, items);
+        addICloudRow(activity, items);
         removeSyntheticAdvanced(items);
         ensureInterconnection(activity, items);
         return items;
@@ -705,6 +735,283 @@ final class HeaderData {
         }
     }
 
+    /* ------------------------ conditional cards (v16) ----------------------- */
+
+    /** Marks a synthetic header so the next {@link #apply} can drop it again. */
+    private static void mark(Object header, String tag) {
+        try {
+            android.os.Bundle extras = new android.os.Bundle();
+            extras.putString(MARK_KEY, tag);
+            setField(header, "extras", extras);
+        } catch (Throwable t) {
+            XLog.w("mark synthetic header failed: " + t);
+        }
+    }
+
+    static boolean isMarked(Object header, String tag) {
+        Object extras = field(header, "extras");
+        return extras instanceof android.os.Bundle
+                && tag.equals(((android.os.Bundle) extras).getString(MARK_KEY));
+    }
+
+    static boolean isUpdateHeader(Object header) {
+        return isMarked(header, "update");
+    }
+
+    static boolean isAirpodsHeader(Object header) {
+        return isMarked(header, "airpods");
+    }
+
+    private static boolean isSyntheticUpdate(Object header) {
+        return isUpdateHeader(header);
+    }
+
+    private static boolean isSyntheticAirpods(Object header) {
+        return isAirpodsHeader(header);
+    }
+
+    private static boolean isSyntheticICloud(Object header) {
+        return isICloudHeader(header);
+    }
+
+    static boolean isICloudHeader(Object header) {
+        return isMarked(header, "icloud");
+    }
+
+    /** Loads one of the module's own drawables (ic_cloud, ic_sub_airpods, ...). */
+    static android.graphics.drawable.Drawable moduleDrawable(android.content.Context context,
+                                                            String name) {
+        try {
+            android.content.res.Resources res = context.getPackageManager()
+                    .getResourcesForApplication(MODULE_PKG);
+            int id = res.getIdentifier(name, "drawable", MODULE_PKG);
+            return id == 0 ? null : res.getDrawable(id, null);
+        } catch (Throwable t) {
+            XLog.w("module drawable " + name + " unavailable: " + t);
+            return null;
+        }
+    }
+
+    private static Object newHeader(Activity activity, String title) throws Exception {
+        Class<?> headerClass = Class.forName(
+                "com.android.settingslib.miuisettings.preference.PreferenceActivity$Header",
+                false, activity.getClassLoader());
+        Object header = headerClass.getDeclaredConstructor().newInstance();
+        setField(header, "title", title);
+        return header;
+    }
+
+    /**
+     * "有软件更新可用" card. Xiaomi's updater stores the found version in
+     * {@code Settings.Global.miui_new_version} (and clears it when up to date),
+     * which is exactly the "update available" state iOS shows as its badge row.
+     */
+    private static void addUpdateRow(Activity activity, List<Item> items) {
+        for (Item it : items) {
+            if (isSyntheticUpdate(it.header)) {
+                return;
+            }
+        }
+        try {
+            String version = android.provider.Settings.Global.getString(
+                    activity.getContentResolver(), UPDATE_KEY);
+            if (version == null || version.trim().length() == 0) {
+                XLog.i("update card: no new version, skip");
+                return;
+            }
+            android.content.Intent intent = new android.content.Intent();
+            intent.setClassName(UPDATE_PKG, UPDATE_CLS);
+            if (activity.getPackageManager().resolveActivity(intent, 0) == null) {
+                XLog.i("update card: updater activity missing, skip");
+                return;
+            }
+            Object header = newHeader(activity, UPDATE_TITLE);
+            setField(header, "intent", intent);
+            mark(header, "update");
+            Item it = new Item();
+            it.header = header;
+            it.idName = "update_entry";
+            it.title = UPDATE_TITLE;
+            it.group = GROUP_UPDATE;
+            it.slot = 0;
+            it.originalIndex = 0;
+            items.add(it);
+            XLog.i("update card added: " + version);
+        } catch (Throwable t) {
+            XLog.e("update card failed", t);
+        }
+    }
+
+    /**
+     * "我的 AirPods" card. Only exists while a headset is connected; the row
+     * title is the device name so it matches what iOS shows above the network
+     * card. Tapping it opens Bluetooth settings.
+     */
+    private static void addAirpodsRow(Activity activity, List<Item> items) {
+        for (Item it : items) {
+            if (isSyntheticAirpods(it.header)) {
+                return;
+            }
+        }
+        try {
+            String name = connectedHeadsetName(activity);
+            if (name == null) {
+                XLog.i("airpods card: no headset connected, skip");
+                return;
+            }
+            Object header = newHeader(activity, name);
+            setField(header, "intent",
+                    new android.content.Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS));
+            android.graphics.drawable.Drawable icon =
+                    moduleDrawable(activity, AIRPODS_ICON);
+            if (icon != null) {
+                setField(header, "icon", icon);
+            } else {
+                XLog.w("airpods card: " + AIRPODS_ICON + " missing, text-only row");
+            }
+            mark(header, "airpods");
+            Item it = new Item();
+            it.header = header;
+            it.idName = "airpods_entry";
+            it.title = name;
+            it.group = GROUP_AIRPODS;
+            it.slot = 0;
+            it.originalIndex = 0;
+            items.add(it);
+            XLog.i("airpods card added: " + name);
+        } catch (Throwable t) {
+            XLog.e("airpods card failed", t);
+        }
+    }
+
+    /**
+     * iCloud row directly below Game Center, inside the same card. Opens 小米云服务
+     * through its own {@code com.xiaomi.action.MICLOUD_MAIN} entry point.
+     */
+    private static void addICloudRow(Activity activity, List<Item> items) {
+        for (Item it : items) {
+            if (isSyntheticICloud(it.header)) {
+                return;
+            }
+        }
+        try {
+            android.content.Intent intent = new android.content.Intent(CLOUD_ACTION);
+            if (activity.getPackageManager().resolveActivity(intent, 0) == null) {
+                intent = new android.content.Intent();
+                intent.setClassName(CLOUD_PKG, CLOUD_CLS);
+                if (activity.getPackageManager().resolveActivity(intent, 0) == null) {
+                    XLog.i("icloud: no MiCloud activity, skip row");
+                    return;
+                }
+            }
+            Object header = newHeader(activity, ICLOUD_TITLE);
+            setField(header, "intent", intent);
+            android.graphics.drawable.Drawable icon = moduleDrawable(activity, "ic_cloud");
+            if (icon != null) {
+                setField(header, "icon", icon);
+            } else {
+                XLog.w("icloud: ic_cloud missing, text-only row");
+            }
+            mark(header, "icloud");
+            Item it = new Item();
+            it.header = header;
+            it.idName = "icloud_entry";
+            it.title = ICLOUD_TITLE;
+            // Same card as Game Center: slot 27 is Game Center, 28 sorts after it.
+            // (Group 8 also uses slot 28 but is a different card, so no clash.)
+            it.slot = 28;
+            it.group = 7;
+            it.originalIndex = 0;
+            items.add(it);
+            XLog.i("icloud row added below Game Center");
+        } catch (Throwable t) {
+            XLog.e("icloud row failed", t);
+        }
+    }
+
+    /**
+     * Name of the currently connected headset, or {@code null} when none.
+     *
+     * <p>Bluetooth A2DP/SCO/BLE headsets carry their address, so the alias the
+     * user gave the device is available; wired and USB headsets fall back to
+     * the product name reported by audio policy.</p>
+     */
+    static String connectedHeadsetName(Activity activity) {
+        try {
+            String fake = android.provider.Settings.Global.getString(
+                    activity.getContentResolver(), FAKE_HEADSET_KEY);
+            if (fake != null && fake.trim().length() > 0) {
+                return fake.trim();
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            android.media.AudioManager am = (android.media.AudioManager)
+                    activity.getSystemService(android.content.Context.AUDIO_SERVICE);
+            if (am == null) {
+                return null;
+            }
+            android.media.AudioDeviceInfo[] devices =
+                    am.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS);
+            for (android.media.AudioDeviceInfo device : devices) {
+                if (!isHeadsetType(device.getType())) {
+                    continue;
+                }
+                String name = bluetoothDeviceName(device);
+                if (name == null || name.trim().length() == 0) {
+                    CharSequence product = device.getProductName();
+                    name = product == null ? null : product.toString();
+                }
+                if (name == null || name.trim().length() == 0) {
+                    name = "耳机";
+                }
+                return name.trim();
+            }
+        } catch (Throwable t) {
+            XLog.e("headset detection failed", t);
+        }
+        return null;
+    }
+
+    private static boolean isHeadsetType(int type) {
+        switch (type) {
+            case android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP:
+            case android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO:
+            case android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET:
+            case android.media.AudioDeviceInfo.TYPE_USB_HEADSET:
+            case android.media.AudioDeviceInfo.TYPE_HEARING_AID:
+                return true;
+            default:
+                break;
+        }
+        return android.os.Build.VERSION.SDK_INT >= 31
+                && type == android.media.AudioDeviceInfo.TYPE_BLE_HEADSET;
+    }
+
+    private static String bluetoothDeviceName(android.media.AudioDeviceInfo device) {
+        try {
+            String address = device.getAddress();
+            if (address == null || address.length() == 0) {
+                return null;
+            }
+            android.bluetooth.BluetoothAdapter adapter =
+                    android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+            if (adapter == null) {
+                return null;
+            }
+            android.bluetooth.BluetoothDevice remote = adapter.getRemoteDevice(address);
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                String alias = remote.getAlias();
+                if (alias != null && alias.length() > 0) {
+                    return alias;
+                }
+            }
+            return remote.getName();
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
     /** Index of a slot id in {@link #SLOT_IDS}, or -1 when the id is unknown. */
     private static int slotIndex(String id) {
         for (int i = 0; i < SLOT_IDS.length; i++) {
@@ -824,7 +1131,9 @@ final class HeaderData {
             for (int i = headers.size() - 1; i >= 0; i--) {
                 if (isSyntheticAirplane(headers.get(i)) || isSyntheticAdvanced(headers.get(i))
                         || isSyntheticHyperios(headers.get(i)) || isSyntheticFocus(headers.get(i))
-                        || isSyntheticCamera(headers.get(i)) || isSyntheticSearch(headers.get(i))) {
+                        || isSyntheticCamera(headers.get(i)) || isSyntheticSearch(headers.get(i))
+                        || isSyntheticUpdate(headers.get(i)) || isSyntheticAirpods(headers.get(i))
+                        || isSyntheticICloud(headers.get(i))) {
                     headers.remove(i);
                 }
             }

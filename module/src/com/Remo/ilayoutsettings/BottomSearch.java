@@ -1,4 +1,4 @@
-package com.abradant.iossettings;
+package com.Remo.ilayoutsettings;
 
 import android.app.Activity;
 import android.content.Context;
@@ -36,6 +36,14 @@ final class BottomSearch {
             java.util.Collections.newSetFromMap(new java.util.WeakHashMap<ViewGroup, Boolean>());
     private static long suppressShowUntil;
     private static int lastNightMode = -1;
+    /** While in the future the bar's enter/exit animation owns its visibility. */
+    private static long animUntil;
+    private static final int ANIM_MS = 220;
+    /** Extra head start before MIUI takes over the bar (fraction of ANIM_MS). */
+    private static final int ANIM_OPEN_DELAY = 120;
+    /** The single live bar and the anchor it was built for. */
+    private static View sWrap;
+    private static View sAnchor;
 
     private static int nightMode(android.content.Context context) {
         return context.getResources().getConfiguration().uiMode
@@ -61,11 +69,32 @@ final class BottomSearch {
             }
             final int night = nightMode(activity);
             View existing = content.findViewWithTag(TAG);
+            if (existing == sWrap && sAnchor == anchor && night == lastNightMode) {
+                // Same fragment, same theme: keep the live bar. Tearing it down
+                // on every resume killed the enter/exit animation and left two
+                // copies on screen while the old one was still finishing.
+                existing.bringToFront();
+                if (System.currentTimeMillis() >= animUntil) {
+                    if (isSearching(fragment)) {
+                        existing.setVisibility(View.GONE);
+                    } else if (existing.getVisibility() != View.VISIBLE) {
+                        animateBar(existing, true);
+                    }
+                }
+                return;
+            }
             if (existing != null) {
-                // Always drop and rebuild: after a theme/configuration change the
-                // old glass carries a stale mask, colours and click listeners.
+                // Theme / fragment changed: the old glass mask and listeners are
+                // stale, so rebuild.
                 content.removeView(existing);
             }
+            if (sWrap != null && sWrap != existing) {
+                android.view.ViewParent parent = sWrap.getParent();
+                if (parent instanceof ViewGroup) {
+                    ((ViewGroup) parent).removeView(sWrap);
+                }
+            }
+            sWrap = null;
             lastNightMode = night;
 
             String hint = "搜索";
@@ -145,18 +174,25 @@ final class BottomSearch {
                 @Override
                 public void onClick(View v) {
                     XLog.i("bottom search clicked");
-                    suppressShowUntil = System.currentTimeMillis() + 600;
-                    boolean handled = false;
-                    try {
-                        handled = anchor.performClick();
-                        XLog.i("bottom search performClick -> " + handled);
-                    } catch (Throwable t) {
-                        XLog.e("bottom search click", t);
-                    }
-                    if (!handled) {
-                        startSearch(fragment, activity);
-                    }
-                    wrap.setVisibility(View.GONE);
+                    suppressShowUntil = System.currentTimeMillis() + 1200;
+                    // Fly the bar towards the top *first*; then let MIUI swap in
+                    // its own search field, so the two do not overlap instantly.
+                    animateBar(wrap, false);
+                    v.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            boolean handled = false;
+                            try {
+                                handled = anchor.performClick();
+                                XLog.i("bottom search performClick -> " + handled);
+                            } catch (Throwable t) {
+                                XLog.e("bottom search click", t);
+                            }
+                            if (!handled) {
+                                startSearch(fragment, activity);
+                            }
+                        }
+                    }, ANIM_OPEN_DELAY);
                 }
             };
             bar.setClickable(true);
@@ -173,9 +209,11 @@ final class BottomSearch {
             lp.leftMargin = dp(activity, 8);
             lp.rightMargin = dp(activity, 8);
             lp.bottomMargin = dp(activity, 12);
-            wrap.setVisibility(View.VISIBLE);
+            wrap.setVisibility(isSearching(fragment) ? View.GONE : View.VISIBLE);
             content.addView(wrap, lp);
             wrap.bringToFront();
+            sWrap = wrap;
+            sAnchor = anchor;
             hookCallback(fragment);
             wrap.post(new Runnable() {
                 @Override
@@ -283,11 +321,20 @@ final class BottomSearch {
                             if (wrap == null) {
                                 return;
                             }
+                            long now = System.currentTimeMillis();
+                            if (now < animUntil) {
+                                return; // the enter / exit animation owns visibility
+                            }
                             boolean searching = isSearching(fragment);
-                            if (!searching && System.currentTimeMillis() < suppressShowUntil) {
+                            if (!searching && now < suppressShowUntil) {
                                 return; // search is starting; keep the bar hidden
                             }
-                            wrap.setVisibility(searching ? View.GONE : View.VISIBLE);
+                            boolean shown = wrap.getVisibility() == View.VISIBLE;
+                            if (searching && shown) {
+                                animateBar(wrap, false);
+                            } else if (!searching && !shown) {
+                                animateBar(wrap, true);
+                            }
                         } catch (Throwable ignored) {
                         }
                     }
@@ -336,9 +383,105 @@ final class BottomSearch {
             }
             ViewGroup content = (ViewGroup) activity.findViewById(android.R.id.content);
             View wrap = content == null ? null : content.findViewWithTag(TAG);
-            if (wrap != null) {
-                wrap.setVisibility(visible ? View.VISIBLE : View.GONE);
+            if (wrap == null) {
+                return;
             }
+            if (visible && wrap.getVisibility() == View.VISIBLE
+                    && wrap.getAlpha() >= 1f && wrap.getTranslationY() == 0f) {
+                return; // already at rest
+            }
+            animateBar(wrap, visible);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /**
+     * iOS-style transition between the bottom bar and the native top search
+     * field: the bar slides up a little while fading and shrinking away, and
+     * comes back with a short slide-up when the search mode is dismissed.
+     *
+     * <p>Deliberately a short travel: flying the live bar across the page
+     * smeared the captured backdrop and left a second copy visible while MIUI
+     * was still collapsing its own search field.</p>
+     */
+    private static void animateBar(final View wrap, final boolean show) {
+        if (wrap == null) {
+            return;
+        }
+        try {
+            if (!show && wrap.getVisibility() != View.VISIBLE) {
+                return; // already gone
+            }
+            wrap.animate().cancel();
+            final float travel = dp(wrap.getContext(), 28);
+            animUntil = System.currentTimeMillis() + ANIM_MS;
+            // The glass paints a captured backdrop; moving it smears that
+            // backdrop. Fall back to the native capsule while the bar moves.
+            setGlassVisible(wrap, false);
+            if (show) {
+                wrap.setVisibility(View.VISIBLE);
+                wrap.setTranslationY(travel);
+                wrap.setAlpha(0f);
+                wrap.setScaleX(0.96f);
+                wrap.setScaleY(0.96f);
+                wrap.animate().translationY(0f).alpha(1f).scaleX(1f).scaleY(1f)
+                        .setDuration(ANIM_MS)
+                        .setInterpolator(new android.view.animation.DecelerateInterpolator(1.6f))
+                        .withEndAction(new Runnable() {
+                            @Override
+                            public void run() {
+                                clearBarTransforms(wrap);
+                                setGlassVisible(wrap, true);
+                                animUntil = 0;
+                            }
+                        })
+                        .start();
+            } else {
+                wrap.animate().translationY(-travel).alpha(0f)
+                        .scaleX(0.96f).scaleY(0.96f)
+                        .setDuration(ANIM_MS)
+                        .setInterpolator(new android.view.animation.AccelerateInterpolator(1.4f))
+                        .withEndAction(new Runnable() {
+                            @Override
+                            public void run() {
+                                clearBarTransforms(wrap);
+                                wrap.setVisibility(View.GONE);
+                                setGlassVisible(wrap, true);
+                                animUntil = 0;
+                            }
+                        })
+                        .start();
+            }
+        } catch (Throwable t) {
+            XLog.w("search bar animation failed: " + t);
+            wrap.setVisibility(show ? View.VISIBLE : View.GONE);
+            clearBarTransforms(wrap);
+            setGlassVisible(wrap, true);
+            animUntil = 0;
+        }
+    }
+
+    private static void setGlassVisible(View view, boolean visible) {
+        if (!(view instanceof ViewGroup)) {
+            return;
+        }
+        ViewGroup group = (ViewGroup) view;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            View child = group.getChildAt(i);
+            if (child instanceof SearchGlass) {
+                child.setVisibility(visible ? View.VISIBLE : View.INVISIBLE);
+            } else {
+                setGlassVisible(child, visible);
+            }
+        }
+    }
+
+    private static void clearBarTransforms(View wrap) {
+        try {
+            wrap.setTranslationY(0f);
+            wrap.setAlpha(1f);
+            wrap.setScaleX(1f);
+            wrap.setScaleY(1f);
         } catch (Throwable ignored) {
         }
     }

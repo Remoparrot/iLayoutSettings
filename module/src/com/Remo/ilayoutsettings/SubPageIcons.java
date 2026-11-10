@@ -1,4 +1,4 @@
-package com.abradant.iossettings;
+package com.Remo.ilayoutsettings;
 
 import android.content.Context;
 import android.content.res.Resources;
@@ -19,7 +19,7 @@ import de.robv.android.xposed.XposedHelpers;
  */
 final class SubPageIcons {
 
-    private static final String MODULE_PKG = "com.abradant.iossettings";
+    private static final String MODULE_PKG = "com.Remo.ilayoutsettings";
     private static boolean hooked;
     private static Resources moduleResources;
 
