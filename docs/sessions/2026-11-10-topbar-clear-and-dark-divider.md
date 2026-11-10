@@ -2,7 +2,7 @@
 
 状态：已完成
 关联版本：16.2 (93) → **16.3 (94)**
-关联提交：<待发版提交后补>
+关联提交：`936a9cf`（功能 + 发版）、`<docs 修复提交>`（release.ps1 BOM 恢复）
 参与者：用户 / DSH bot（deepseek）
 
 ## 1. TL;DR
@@ -73,6 +73,22 @@
 - **根因**：控制台代码页是 GBK，文件本身是 UTF-8（不是文件坏了）。
 - **解法**：改用 read 工具读原文再 `edit`，不要复制终端输出当 `old_string`。
 - **如何避免**：凡是中文 old_string，一律来自 read 工具的输出。
+
+### 坑：`release.ps1` 被改成无 BOM，Release 正文中文乱码且 `{{SIZE}}` 没替换
+
+- **现象**：v16.3 的 Release 正文变成 `自动` 变 `鑷姩` 一类乱码，`（{{SIZE}} B）` 原样留着，
+  还被用户当场发现「打错了」。
+- **根因**：本次用编辑工具改 `release.ps1` 的正文模板，保存成了 **UTF-8 无 BOM**；
+  Windows PowerShell 5.1 按 GBK 解码 `.ps1` 源文件，中文全成乱码，且多字节序列把
+  `{{SIZE}}` 的第一个 `{` 吞掉（GBK 双字节吃掉了它），于是 `$body.Replace('{{SIZE}}', …)`
+  匹配不上，占位符留在正文里。脚本本身照常 `exit 0`，不报错。
+- **解法**：把 `release.ps1` 重写回 **UTF-8 with BOM**（`New-Object System.Text.UTF8Encoding($true)`），
+  用同一份模板重新渲染正文，再 `PATCH /repos/{owner}/{repo}/releases/{id}` 覆盖已发布的说明。
+- **如何避免**（写进 `06-pitfalls.md` E 节）：
+  1. 凡是 `release.ps1` / `build.ps1` 这类**带中文**的 `.ps1`，保存时必须带 BOM，改完
+     `git diff` 看首行是否仍以 `﻿` 开头；
+  2. 发版前先用正则抽出 `@'…'@` 模板做一次「替换 + 打印」，确认没有 `{{`、没有私用区字符；
+  3. 脚本退出码 0 不等于正文正确——Release 页要自己打开看一眼。
 
 ## 6. 验证与证据
 

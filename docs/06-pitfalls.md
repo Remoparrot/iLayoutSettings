@@ -165,6 +165,8 @@
 | `versionName` 与产物名不一致 | 手改产物名 | 产物名由 manifest 版本号生成，不要手改 |
 | `adb install` 新包报 `INSTALL_FAILED_USER_RESTRICTED`（16.0 实测） | MIUI 安全中心拦「ADB 安装新应用」：`com.miui.permcenter.install.AdbInstallActivity` 直接 finish；同包名覆盖安装不受限 | 把 APK 拷到手机手动点装，或开发者选项里允许「USB 安装」；`pm install-create/-write/-commit` 也会被拦，别浪费时间 |
 | 自动发版时 Release 正文中文乱码 / 422 | 直接用 `Invoke-RestMethod -Body` 发多行中文 | 先 `ConvertTo-Json -Compress` 写 UTF-8 无 BOM 文件，再 `curl --data-binary @file`（`tools/release.ps1` 已内置） |
+| **发出去的 Release 正文中文乱码 + 出现 `{{SIZE}}` 残留**（16.3 实测） | **`release.ps1` 被编辑器改成 UTF-8 无 BOM**：Windows PowerShell 5.1 按 GBK 解码整个脚本，中文模板变乱码，且多字节序列把 `{{SIZE}}` 的第一个 `{` 吃掉，`Replace()` 再也匹配不上 | 重写回**带 BOM 的 UTF-8**（`[IO.File]::WriteAllText($p, $t, (New-Object System.Text.UTF8Encoding($true)))`），重跑脚本或用 `PATCH /releases/{id}` 修正文；`git diff` 里确认首行是 `﻿#Requires -Version 5.1` |
+| 改 `release.ps1` 后如何自查 | 只看脚本能否运行不够——脚本能跑，但正文已错 | 用 `[regex]` 抽出 `@'...'@` 模板，替换占位符后打印前几行，确认是正常中文且无 `{{`、无 `\uE000-\uF8FF` 私用区字符 |
 
 ---
 
