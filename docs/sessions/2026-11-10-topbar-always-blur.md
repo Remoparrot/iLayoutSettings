@@ -136,6 +136,21 @@ adb shell screencap -p /sdcard/mid.png
 - 风险：清 `clipBounds` 依赖 `updateOverBgState()` 仍被调用；ROM 若换地方设 clip，
   内容会重新被裁在栏底（表现回到「没有模糊」）。
 
+## 8. 收尾：v16.5 Release 正文乱码修复（22:40）
+
+发版后核对 GitHub，发现 v16.5 Release 正文整段是乱码，还残留 `{{SIZE}}`
+（页面上显示成 `（{SIZE}} B）`）。根因和 16.3 那次完全相同：`tools/release.ps1`
+在这次会话里被编辑成 UTF-8 **无 BOM**，Windows PowerShell 5.1 按 GBK 解码脚本，
+中文模板变乱码，多字节序列又把 `{{SIZE}}` 的第一个 `{` 吃掉，`Replace()` 再也匹配不上。
+
+- 修复正文：`PATCH /repos/Remoparrot/iLayoutSettings/releases/440468316`，
+  按脚本里的模板重写（995 字符）；中文、SHA-256、大小 286069 B、包名与附件一致。
+- 根因处理：`release.ps1` 重新存成**带 BOM 的 UTF-8**，并在 POST 前加自检——
+  模板中文丢失（探针用 `[char]0x…` 拼，避免自查被同一编码问题带偏）或仍残留 `{XXX}`
+  就直接 `throw`，不发乱码。
+- 验证方式：把脚本另存成无 BOM 副本走同一套解析，探针稳定报错
+  （parse 0 error、中文丢失、`{SIZE}}` 残留）；带 BOM 版本 7 个占位符全部替换。
+
 ## 更新清单
 
 - [x] `docs/sessions/README.md` 索引已登记

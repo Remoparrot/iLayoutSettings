@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     iLayoutSettings 自动发版：构建 → 校验 → 打 tag → 建 GitHub Release → 上传 APK。
@@ -226,6 +226,22 @@ $body = $body.Replace('{{APK}}', $apkName).Replace('{{SIZE}}', [string]$size)
 $body = $body.Replace('{{SHA}}', $sha256).Replace('{{PKG}}', $packageName)
 $body = $body.Replace('{{CERT}}', $certDigest)
 if ($Notes) { $body = $body + "`n`n" + $Notes }
+
+# The body template lives in this file, so the file's encoding decides what gets
+# published. Windows PowerShell 5.1 decodes a BOM-less script as GBK: the Chinese
+# becomes mojibake and a multi-byte sequence can swallow the first '{' of a
+# placeholder ({{SIZE}} -> {SIZE}}), after which Replace() silently misses it.
+# v16.3 and v16.5 both shipped garbled release notes this way, so fail here
+# instead of publishing garbage. The probe is assembled from char codes so this
+# check itself stays ASCII-only (a mangled literal would compare equal to the
+# mangled body and pass).
+$probe = [string][char]0x81EA + [char]0x52A8 + [char]0x6784 + [char]0x5EFA
+if (-not $body.Contains($probe)) {
+    throw 'release body lost its Chinese text: tools/release.ps1 must be saved as UTF-8 WITH BOM (Windows PowerShell 5.1 reads BOM-less files as GBK).'
+}
+if ($body -match '\{[A-Z]{3,}\}') {
+    throw "release body still has an unreplaced placeholder ($($matches[0])): the template got corrupted by the file encoding."
+}
 
 $tmp = [System.IO.Path]::GetTempFileName()
 try {
