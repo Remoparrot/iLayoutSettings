@@ -19,7 +19,7 @@
 ### P0 — 发版可信度
 
 - [ ] **固定 keystore**，用同一把 key 重签并发布，确认能从 14.8 覆盖安装；
-- [ ] 明确「发布包来自哪个 commit」，在 Release 说明里写 sha256 与构建命令；
+- [x] 明确「发布包来自哪个 commit」：v15.5 Release 的 tag `v15.5` 指向 `fc25b08`，说明里写了 sha256 与证书指纹；构建命令与 keystore 说明仍未写进 Release；
 - [ ] 清理 `Hook` 未引用的遗留类（`GlassToggle` / `IntroCard` / `AboutIos` / `AboutExtras` / `TitleFix` / `TitleOverlay` / `PrefsBridge`）与 `BottomSearch` 里的 lattice 反射分支；
 - [ ] 清理后对比 dex 体积，确认与发布包量级一致。
 

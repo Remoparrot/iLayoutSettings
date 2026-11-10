@@ -50,6 +50,13 @@ sha256 : C8146210C872BB737C100FD57E598DCA73DD8F5C1134CE2AEF4C43CB6A05E535
 - 截图：`docs/assets/home-camera-search-15.5.png`、`home-camera-search-dark-15.5.png`、
   `camera-settings-15.5.png`、`search-settings-15.5.png`。
 
+## v15.5 发布
+
+- 发布到 GitHub [Release · v15.5](https://github.com/abradanthawk-design/iLyayot/releases/tag/v15.5)：
+  tag `v15.5` → 提交 `fc25b08`，附件 `IosSettingsLayout-15.5.apk`（207,753 B，
+  sha256 `C8146210C872BB737C100FD57E598DCA73DD8F5C1134CE2AEF4C43CB6A05E535`），与仓库 `dist/` 里是同一份；
+- 14.8 的 Release 保留不动（证书不同，从它升级要先卸载再装）。
+
 ---
 
 # iOS 设置布局 · LSPosed 模块（v15.4：专注模式入口）

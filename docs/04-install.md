@@ -6,7 +6,7 @@
 
 - 已 root / 已装 **LSPosed**（1.x 或 2.x，Zygisk 或 Riru 均可）；
 - 系统为澎湃 OS 3（HyperOS 3）；
-- 已安装 `dist/IosSettingsLayout-15.5.apk`（应用名 **iLyayot**；从 14.8 升级要先卸载，签名不同；14.9~15.4 可直接覆盖）。
+- 已安装 `dist/IosSettingsLayout-15.5.apk`（与 [Release v15.5](https://github.com/abradanthawk-design/iLyayot/releases/tag/v15.5) 的附件同一份；应用名 **iLyayot**；从 14.8 升级要先卸载，签名不同；14.9~15.4 可直接覆盖）。
 
 ## 2. 三步装好
 

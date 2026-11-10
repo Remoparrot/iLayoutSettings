@@ -12,18 +12,18 @@
 | 应用名 | **iLyayot**（与 GitHub 仓库名一致，桌面图标已恢复） |
 | minSdk / targetSdk | 29 / 36 |
 | 作用域 | `com.android.settings` |
-| 已发布包 | `dist/IosSettingsLayout-14.8.apk`（上一版 Release） |
-| 15.5 预览包 | `dist/IosSettingsLayout-15.5.apk`（**未发布，已上机**：2026-11-10 12:43，25053RT47C / HyperOS 3） |
+| 已发布包 | `dist/IosSettingsLayout-15.5.apk`（**Release v15.5**，2026-11-10 发布；已上机：12:43，25053RT47C / HyperOS 3） |
+| 旧发布包 | `dist/IosSettingsLayout-14.8.apk`（Release v14.8；证书不同，从它升级要先卸载） |
 
 ## 发布物指纹
 
 | 包 | 大小 | SHA-256 | 签名证书 SHA-256 |
 | --- | --- | --- | --- |
-| `dist/IosSettingsLayout-14.8.apk`（用户提供的 14.8 发布包） | 195,465 B | `8D6DC362E5FDA29B3C2B56C5A14FB71325072A4626B141CE3428B2460B9F4951` | `b6f98da57965f604ae13a2f4fc967ffc6c09f14bbdef5b9329effca65dad0f4a` |
+| `dist/IosSettingsLayout-14.8.apk`（旧发布包 v14.8） | 195,465 B | `8D6DC362E5FDA29B3C2B56C5A14FB71325072A4626B141CE3428B2460B9F4951` | `b6f98da57965f604ae13a2f4fc967ffc6c09f14bbdef5b9329effca65dad0f4a` |
 | `dist/IosSettingsLayout-15.0.apk` | 203,657 B | `3A80A921ACD695D2852346FB3F5AB9B7A5A4FDDFBBF17AE86ED7C0E8892E2A20` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
-| `dist/IosSettingsLayout-15.3.apk`（本次） | 207,753 B | `563AA37E88EC09A4D2052CB9B069DDC6312301C49967F57BD71DED2D04FB2840` | 同上 |
+| `dist/IosSettingsLayout-15.3.apk` | 207,753 B | `563AA37E88EC09A4D2052CB9B069DDC6312301C49967F57BD71DED2D04FB2840` | 同上 |
 | `dist/IosSettingsLayout-15.4.apk` | 207,753 B | `6382711418C80596D362CE727CDBE567FC486AB3FAA88EF0F44136AA5C0A02F9` | 同上 |
-| `dist/IosSettingsLayout-15.5.apk`（本次） | 207,753 B | `C8146210C872BB737C100FD57E598DCA73DD8F5C1134CE2AEF4C43CB6A05E535` | 同上 |
+| `dist/IosSettingsLayout-15.5.apk`（**Release v15.5 附件，与本地同一份**） | 207,753 B | `C8146210C872BB737C100FD57E598DCA73DD8F5C1134CE2AEF4C43CB6A05E535` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
 
 > 重编同一个 commit 的 sha256 会变（zip 条目时间戳），上表只记录仓库里这份 APK 的哈希。
 
@@ -35,7 +35,8 @@
 | --- | --- |
 | 仓库 | https://github.com/abradanthawk-design/iLyayot |
 | 默认分支 | `main` |
-| Release | https://github.com/abradanthawk-design/iLyayot/releases/tag/v14.8 |
+| Release（最新） | https://github.com/abradanthawk-design/iLyayot/releases/tag/v15.5 —— tag `v15.5` → `fc25b08`，附件 `IosSettingsLayout-15.5.apk` |
+| 旧 Release | https://github.com/abradanthawk-design/iLyayot/releases/tag/v14.8（证书不同，仅留档） |
 | 初始提交 | `173a302` |
 
 ## 现在能做什么
@@ -91,12 +92,11 @@
 
 ## 下一步（优先级从高到低）
 
-1. 把 15.5 放进 Release、更新 README 下载链接；
+1. 接 GitHub Actions：tag 触发构建 + 自动生成 Release（现在 release 是本地构建后手动 curl 上传）；
 2. 在第三方主题 / 自定义图标包上验证 `ic_airplane_mode_settings` 的自动切换；
 3. 用固定 keystore 重签并统一发布包与源码；
 4. 清理 `Hook` 未引用的遗留类（`GlassToggle` 已停用，可删）；
-5. 接 GitHub Actions：tag 触发构建 + 自动生成 Release；
-6. 平板/分屏适配。
+5. 平板/分屏适配。
 
 ## 环境事实（本机）
 

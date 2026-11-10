@@ -73,8 +73,8 @@
 
 ## 安装
 
-1. 下载 [`dist/IosSettingsLayout-15.5.apk`](dist/IosSettingsLayout-15.5.apk)（应用名 **iLyayot**，新增相机/搜索入口 + 专注模式入口 + 主题飞行图标 + 搜索栏去色/去浅色阴影 + 顶栏模糊实时生效，**已上机**）；
-   想要稳定版就到 [Releases · v14.8](https://github.com/abradanthawk-design/iLyayot/releases/tag/v14.8) 下载 14.8；
+1. 下载 [`dist/IosSettingsLayout-15.5.apk`](dist/IosSettingsLayout-15.5.apk)，或到 [Releases · v15.5](https://github.com/abradanthawk-design/iLyayot/releases/tag/v15.5) 下同名附件（207,753 B，SHA-256 `C8146210…`，与 `dist/` 同一份）；应用名 **iLyayot**，新增相机/搜索入口 + 专注模式入口 + 主题飞行图标 + 搜索栏去色/去浅色阴影 + 顶栏模糊实时生效，**已上机**；
+   旧版 14.8 仍在 [Releases · v14.8](https://github.com/abradanthawk-design/iLyayot/releases/tag/v14.8)，证书与本包不同；
 2. LSPosed 中启用模块，作用域只勾选 **设置**（`com.android.settings`）；
 3. **强制停止「设置」**（或重启手机），再打开设置；
 4. 打开桌面上的 **iLyayot** 图标即可调参数（模糊 / 折射 / 顶栏模糊）。
