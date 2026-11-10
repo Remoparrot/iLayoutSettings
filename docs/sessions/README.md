@@ -14,6 +14,7 @@
 
 | 日期 | 标题 | 一句话结论 | 状态 |
 | --- | --- | --- | --- |
+| 2026-11-10 | [顶栏近乎全透明 + 深色灰色发丝线](2026-11-10-topbar-clear-and-dark-divider.md) | 16.3：顶栏默认改 5% 模糊 / 2% 透明度（近乎全透明）；深色发丝线由白 15% 改为中性灰 30%（`0x4DAAAAAA`，实拍 `(58,58,59)`）；`pm clear` 复验默认值 | 已完成 |
 | 2026-11-10 | [指定图标 + 顶栏透明度/发丝线 + 自动清理](2026-11-10-icons-topbar-opacity-and-release-cleanup.md) | 16.2：耳机/iCloud 改用指定主题图标；顶栏透明度与「滚动后才出现」的发丝线；顶栏模糊改为 0–100%（原生 `NestedHeaderLayout` 半径）并真正可调；搜索栏折射默认 19/12、模糊 0.1dp；构建自动清 `dist/` 旧包，release 自动提交/推送发版 | 已完成 |
 | 2026-11-10 | [耳机卡即时刷新 / 详情页 / 搜索退出时序](2026-11-10-headset-card-live-and-search-exit.md) | 16.1：耳机连/断即时刷新卡片（AudioDeviceCallback）、点击进 MIUI 耳机详情页（MiuiHeadsetActivity）、退出搜索不再短暂两个搜索栏（等 ActionMode 收起动画结束）、修二级页返回底部栏消失 | 已完成 |
 | 2026-11-10 | [改名 iLayoutSettings + 条件卡片 + 搜索栏过渡](2026-11-10-rename-and-conditional-cards.md) | 16.0：应用/仓库改名 iLayoutSettings、包名 `com.Remo.ilayoutsettings`；新增 iCloud 行、条件式「有软件更新可用」卡（红色 1 角标）与耳机卡；搜索栏进出场加 220ms 过渡；新增 `tools/release.ps1` 自动发版 | 已完成（正式包待手动安装验证） |

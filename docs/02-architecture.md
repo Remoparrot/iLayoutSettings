@@ -1,6 +1,6 @@
 # 架构与 Hook 链路
 
-> 状态：**现行** · 对应版本：16.2 (93)
+> 状态：**现行** · 对应版本：16.3 (94)
 > 源码：`module/src/com/Remo/ilayoutsettings/`
 
 ## 1. 从加载到生效
@@ -153,7 +153,7 @@ LSPosed
 
 - 滚动源优先取 `com.android.settings:id/scroll_headers` 的 RecyclerView，取不到才回退 `fragment.mListView`；
   原因是部分 HyperOS 3 版本里 `mListView` 不一定是真正滚动的那个 View，`computeVerticalScrollOffset()` 会一直是 0；
-- 滚动超过 4dp：顶栏底色按 `topbar_alpha`（0–100%，默认 45）算半透明；
+- 滚动超过 4dp：顶栏底色按 `topbar_alpha`（0–100%，16.3 默认 2）算半透明；
   `MiuiBlurUtils.setBackgroundBlur(view, radius)` + `setBackgroundBlurRadius(view, radius)`；
   回顶部恢复实色并 `clearBackgroundBlur`；
 - **16.2 模糊真正可调**：可见的模糊来自 `NestedHeaderLayout.mOverBgView` 的
@@ -161,10 +161,12 @@ LSPosed
   只对父级是 `NestedHeaderLayout` 的 `mViewApplyBlur` 把半径换成 `topbar_blur`；
   `UiTweaks` 同时把同一值写进 helper 的 `mBlurEffect` 并 `refreshBlur()`，拖动滑杆即生效。
   `topbar_blur` 是 **0–100%**，内部映射到 0–150dp（MIUI 在 400px 处截断，2.75x 屏约 145dp）；
-  默认 **30% / 45% 透明度**，即参考图的低模糊淡磨砂；16.1 的旧值（>100）读取时按 150dp 折算，
-  110dp → 73%，不会归零。
-- **发丝线**：`ActionBarContainer` 底部的 `ViewOverlay` 里放一个 0.5dp 黑色 12%
-  `ColorDrawable`（深色模式白色 15%）；用 `NestedHeaderLayout.isHeaderOpen()` 判断大标题是否仍展开，
+  默认 **5% / 2% 透明度**——滚动后顶栏近乎全透明（8dp 极淡模糊 + 发丝线），和 iOS 一致；
+  16.1 的旧值（>100）读取时按 150dp 折算，110dp → 73%，不会归零。
+- **发丝线**：`ActionBarContainer` 底部的 `ViewOverlay` 里放一个 0.5dp 的 `ColorDrawable`：
+  浅色黑色 12%（`0x1F000000`），深色中性灰 30%（`0x4DAAAAAA`，16.3 由白 15% 改来——浅层白线
+  在近乎全透明的黑栏上看不见，中性灰在深色底和亮模糊内容上都读得出）；用
+  `NestedHeaderLayout.isHeaderOpen()` 判断大标题是否仍展开，
   只有折叠栏出现后才显示，回到顶部隐藏。用 overlay 而不是子 View，避免 padding / 布局 / 点击影响。
 - 15.3 用**设置进程的 classloader** 解析 `miuix.core.util.MiuiBlurUtils`。LSPosed 把模块类放在独立 loader 里，
   之前的 `UiTweaks.class.getClassLoader()` 会 `ClassNotFoundException`，所以滑杆写进去了但从未生效；

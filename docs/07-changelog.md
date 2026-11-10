@@ -3,10 +3,53 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前主线是 **16.2（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前主线是 **16.3（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
+
+---
+
+# iLayoutSettings · LSPosed 模块（v16.3：顶栏近乎全透明 + 深色灰发丝线）
+
+## v16.3 变更
+
+- **顶栏默认改成「近乎全透明」**：模糊默认 30% → **5%**（内部 8dp），透明度默认 45% → **2%**。
+  滚动后的顶栏只剩一层极淡的模糊 + 底部发丝线，内容直接透上来，这是 iOS 滚动导航栏的样子；
+  两个滑杆范围和逻辑都不变（0–100%），想要 16.2 的淡磨砂把滑杆拖回去即可。
+  已有安装不会被覆盖：存过的 `topbar_blur` / `topbar_alpha` 继续生效，点「恢复默认值」才回到 5% / 2%。
+- **深色模式发丝线改成灰色半透明**：16.2 的 `0x26FFFFFF`（白 15%）压在近乎全透明的黑栏上
+  几乎看不见；现在改成中性灰 `0x4DAAAAAA`（30% 灰），实拍线色 `(58,58,59)`，
+  黑栏和亮内容上都能读出「一条灰线」；浅色模式仍是黑色 12%（实拍 `(222,222,223)`）。
+  线依旧只在折叠顶栏出现后显示，大标题展开 / 回到顶部时隐藏，深浅色都如此。
+- **版本**：16.3 / versionCode **94**；APK `dist/iLayoutSettings-16.3.apk`，236,593 B。
+
+## v16.3 校验
+
+```
+package: name='com.Remo.ilayoutsettings' versionCode='94' versionName='16.3'
+sdkVersion:'29'
+targetSdkVersion:'36'
+launchable-activity: name='com.Remo.ilayoutsettings.MainActivity'  label='iLayoutSettings'
+dex version : 039
+xposed_init : True
+module class: True
+reorder     : True
+size   : 236593 bytes
+sha256 : ED0C383E5A91DC4F054ED3C362AAF4AAE3F44506CE80F4078CD3C36439402873
+```
+
+真机 25053RT47C / HyperOS 3 / Android 16（2026-11-10 19:41–19:46）：
+
+- 默认值：`pm clear` 清空模块数据（等价全新安装）后重开设置，日志
+  `top bar blur=true offset=69 blur=5% radius=8dp alpha=2% set=true radiusResult=true`
+  与 `native header blur applied: 8 dp`——默认确实落到 5% / 2%；
+- 深色线：滚动折叠后 `y=329–330` 为 `(58,58,59)`，其上黑栏 `(11,11,11)`、其下卡片 `(28,28,30)`，
+  是一条清楚的中性灰发丝线，不再像 16.2 那样混进黑栏；
+- 浅色线：同一位置 `(222,222,223)`，上方栏底 `(253,253,254)`、下方卡片 `(255,255,255)`，
+  深浅两张截图里线都在栏的最底边、宽度 1–2px（0.5dp）；
+- 参数页：`iLayoutSettings` 标题下 `LSPosed 模块 · v16.3`，顶栏「模糊 5%」「透明度 2%」；
+- 回归：首页条件卡片（耳机 / iCloud / 更新）、底部搜索栏、二级页跳转均无变化。
 
 ---
 

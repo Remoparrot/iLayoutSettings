@@ -39,11 +39,12 @@ final class Prefs {
     /** Native blur is capped at 400 px, ~145 dp on a 2.75x screen. */
     static final int MAX_TOPBAR_BLUR_DP = 150;
     /**
-     * 16.2 default: the reference screenshot is a low-blur, low-opacity bar
-     * (soft colour blobs, no readable text), not the old 110 dp / 80 % slab.
+     * 16.3 default: an almost clear bar — 5 % blur + 2 % opacity. iOS' scrolled
+     * navigation bar is basically the page content with a hairline on top, so
+     * the 16.2 low-blur slab (30 % / 45 %) was still too milky.
      */
-    static final int DEFAULT_TOPBAR_BLUR_PCT = 30;
-    static final int DEFAULT_TOPBAR_ALPHA = 45;
+    static final int DEFAULT_TOPBAR_BLUR_PCT = 5;
+    static final int DEFAULT_TOPBAR_ALPHA = 2;
 
     private Prefs() {
     }

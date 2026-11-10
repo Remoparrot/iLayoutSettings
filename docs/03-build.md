@@ -1,10 +1,10 @@
 # 构建指南
 
-> 状态：**现行** · 对应版本：16.2 (93)
+> 状态：**现行** · 对应版本：16.3 (94)
 
 ## 1. 为什么不走 Gradle
 
-模块只有一个 dex、没有第三方运行时依赖、资源极少。用 `aapt2 → javac → d8 → zipalign → apksigner` 五步就够，构建一次几秒，产物体积可控（16.2 约 231 KiB），也避免了 AGP 与 JDK/AGP 版本互相绑架。
+模块只有一个 dex、没有第三方运行时依赖、资源极少。用 `aapt2 → javac → d8 → zipalign → apksigner` 五步就够，构建一次几秒，产物体积可控（16.3 约 231 KiB），也避免了 AGP 与 JDK/AGP 版本互相绑架。
 
 代价是**工具链要自己准备**，见下。
 
@@ -71,7 +71,7 @@ python tools\check_agsl.py
 ### 一键发版
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -Version 16.2
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -Version 16.3
 ```
 
 16.2 起默认自动 `git add -A` → commit → push 当前分支 → 打 tag → 建 Release → 上传 APK；
@@ -92,7 +92,7 @@ Release 正文在脚本里的 `$bodyTemplate`，发版前先改成本版内容�
 ## 5. 成功判据
 
 ```
-package: name='com.Remo.ilayoutsettings' versionCode='93' versionName='16.2'
+package: name='com.Remo.ilayoutsettings' versionCode='94' versionName='16.3'
 sdkVersion:'29'
 targetSdkVersion:'36'
 dex version : 039

@@ -7,19 +7,20 @@
 
 | 项 | 值 |
 | --- | --- |
-| versionName / versionCode | **16.2 / 93**（唯一来源：`module/AndroidManifest.xml`） |
+| versionName / versionCode | **16.3 / 94**（唯一来源：`module/AndroidManifest.xml`） |
 | 包名 | **`com.Remo.ilayoutsettings`**（16.0 由 `com.abradant.iossettings` 改名，属于破坏性变更） |
 | 应用名 / 仓库名 | **iLayoutSettings**（GitHub 仓库同步改名，旧地址会 301 跳转） |
 | minSdk / targetSdk | 29 / 36 |
 | 作用域 | `com.android.settings` |
-| 当前包 | `dist/iLayoutSettings-16.2.apk`（236,593 B，SHA-256 `2D2F068C…EC3B`；**已在 25053RT47C 上覆盖安装并实测**） |
+| 当前包 | `dist/iLayoutSettings-16.3.apk`（236,593 B，SHA-256 `ED0C383E…2873`；**已在 25053RT47C 上覆盖安装并实测**） |
 | 旧包 | `dist/` 只保留当前包；16.1 / 16.0 / 15.x / 14.8 在各自 GitHub Release |
 
 ## 发布物指纹
 
 | 包 | 大小 | SHA-256 | 签名证书 SHA-256 |
 | --- | --- | --- | --- |
-| `iLayoutSettings-16.2.apk`（**当前**） | 236,593 B | `2D2F068C8DEC1A5D5B982F6347F71580F6C4800B8BE89F4286C2836E945AEC3B` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-16.3.apk`（**当前**） | 236,593 B | `ED0C383E5A91DC4F054ED3C362AAF4AAE3F44506CE80F4078CD3C36439402873` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-16.2.apk`（历史，Release） | 236,593 B | `2D2F068C8DEC1A5D5B982F6347F71580F6C4800B8BE89F4286C2836E945AEC3B` | 同上 |
 | `iLayoutSettings-16.1.apk`（历史，Release） | 224,305 B | `83BE73357A1AD29DCB57EC8BCF217127BEA7B7461A18DF70E0189EC83571F77F` | 同上 |
 | `iLayoutSettings-16.0.apk`（历史，Release） | 220,209 B | `8DA082CD8FC578676EB5138F7150BDCFB40C4DBE45CD3625E8B0521923921A73` | 同上 |
 
@@ -33,9 +34,9 @@
 | --- | --- |
 | 仓库 | https://github.com/Remoparrot/iLayoutSettings （旧 `iLyayot` 自动跳转） |
 | 默认分支 | `main` |
-| 最新 Release | [v16.2](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.2)（附件 `iLayoutSettings-16.2.apk`，236,593 B，SHA-256 `2D2F068C…EC3B`） |
+| 最新 Release | [v16.3](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.3)（附件 `iLayoutSettings-16.3.apk`，236,593 B，SHA-256 `ED0C383E…2873`） |
 | 自动发版 | `tools/release.ps1`：构建 → 校验 → **自动 add/commit/push 当前分支** → 打 tag → 建 Release → 上传附件 |
-| 旧 Release | v16.1、v16.0、v15.5、v14.8 保留（本地 `dist/` 不再保留旧包） |
+| 旧 Release | v16.2、v16.1、v16.0、v15.5、v14.8 保留（本地 `dist/` 不再保留旧包） |
 
 ## 现在能做什么
 
@@ -63,12 +64,15 @@
   退出时底部栏保持隐藏，等 MIUI 收起顶部搜索框（`ActionModeAnimationListener#onStop(open=false)`）
   后才出现，不再短暂同时显示两个搜索栏
 - ✅ 控制中心行右侧飞行模式开关（`AirplaneSwitch`）
-- ✅ **顶栏透明度（16.2）**：参数页「顶栏 · 透明度」0–100%，只作用于滚动后的半透明底色
-- ✅ **顶栏发丝线（16.2）**：折叠顶栏出现时，在 `ActionBarContainer` 底部画 0.5dp、黑色 12%
-  半透明线（深色模式白色 15%）；大标题展开/回到顶部时隐藏
-- ✅ **顶栏模糊可调（16.2 修）**：`topbar_blur` 改为 0–100%，默认 **30%**、透明度 **45%**
-  （低模糊淡磨砂，参考图效果）；直接改 `NestedHeaderLayout` 原生 `mBlurEffect`，
-  不再只改被盖住的 action bar 背景。旧 110dp 读取时折算为 73%
+- ✅ **顶栏透明度（16.2）**：参数页「顶栏 · 透明度」0–100%，只作用于滚动后的半透明底色；
+  16.3 起默认 **2%**
+- ✅ **顶栏发丝线（16.2，16.3 改深色色值）**：折叠顶栏出现时，在 `ActionBarContainer` 底部画
+  0.5dp 半透明线——浅色模式黑色 12%，深色模式**中性灰 30%（`0x4DAAAAAA`）**；
+  大标题展开/回到顶部时隐藏
+- ✅ **顶栏模糊可调（16.2 修，16.3 改默认）**：`topbar_blur` 改为 0–100%，默认 **5%**
+  （内部 8dp），透明度默认 **2%**——滚动后顶栏近乎全透明，只留极淡模糊 + 发丝线；
+  直接改 `NestedHeaderLayout` 原生 `mBlurEffect`，不再只改被盖住的 action bar 背景。
+  旧 110dp 读取时折算为 73%
 - ✅ 二级页图标、卡片末行修正、应用内参数界面（搜索栏模糊支持 0.1dp）
 - ✅ 无 Gradle 构建脚本（`module/build.ps1`，成功后自动清 `dist/` 旧包）
   + 一键发版脚本（`tools/release.ps1`，默认自动提交/推送/发 Release）
@@ -84,7 +88,7 @@
 3. **图标优先级（16.2 起）**：耳机 / iCloud 以模块内置 PNG（用户提供的主题资源）为准，
    `com.android.settings` 同名 drawable 只在模块内置资源缺失时兜底；主题不能再覆盖这两张图。
 4. **顶栏发丝线只在滚动后显示**：`NestedHeaderLayout.isHeaderOpen()` 在部分主题/ROM 上语义变化时，
-   可能出现过早/过晚显示；深色模式的白色 15% 线还未实拍确认。
+   可能出现过早/过晚显示；深浅色线色 16.3 已实拍确认（浅色 `(222,222,223)`、深色 `(58,58,59)`）。
 5. **顶栏模糊依赖 MIUI 私有 API**：`MiuiBlurUiHelper.setBlurParams` / `NestedHeaderLayout.mBlurEffect`
    在 ROM 升级改名时 hook 会软失败，表现回到「模糊固定、不可调」。
 6. **仅在默认主题 / 默认图标包上验证**；第三方主题替换 `ic_*` / 分割线颜色时需要再确认。
@@ -93,11 +97,10 @@
 
 ## 下一步（优先级从高到低）
 
-1. 深色模式实拍顶栏发丝线 / 透明度，必要时把黑色 12% 调到 8%；
-2. 观察耳机卡在真实「开盖自动连」场景下的出现时机，必要时把防抖从 350ms 调到 200ms；
-3. 接 GitHub Actions：tag 触发 `tools/release.ps1` 的只读版本（构建 + 上传）；
-4. 清理 `Hook` 未引用的遗留类（`GlassToggle`、`IntroCard`、`AboutIos` 等）；
-5. 平板/分屏适配。
+1. 观察耳机卡在真实「开盖自动连」场景下的出现时机，必要时把防抖从 350ms 调到 200ms；
+2. 接 GitHub Actions：tag 触发 `tools/release.ps1` 的只读版本（构建 + 上传）；
+3. 清理 `Hook` 未引用的遗留类（`GlassToggle`、`IntroCard`、`AboutIos` 等）；
+4. 平板/分屏适配。
 
 ## 环境事实（本机）
 

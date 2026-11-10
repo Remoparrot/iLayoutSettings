@@ -334,9 +334,12 @@ final class UiTweaks {
             final boolean dark = isDark(activity);
             final int base = dark ? 0x000000 : 0x00F2F2F7;
             final int solid = dark ? 0xFF000000 : 0xFFF2F2F7;
-            // iOS uses a hairline under the navigation bar: 12 % black on light,
-            // 15 % white on dark (a black line is invisible on a black bar).
-            final int dividerColor = dark ? 0x26FFFFFF : 0x1F000000;
+            // iOS draws a hairline under the collapsed navigation bar: 12 % black
+            // on light. Dark mode cannot use black (invisible on a black bar) and
+            // 15 % white was lost on the 16.3 almost-clear bar, so it uses a
+            // semi-transparent grey: a neutral grey at 30 % reads as a hairline
+            // over both the black bar and bright blurred content.
+            final int dividerColor = dark ? 0x4DAAAAAA : 0x1F000000;
             final int[] state = {-1};
             final int[] appliedRadius = {-1};
             final int[] appliedAlpha = {-1};

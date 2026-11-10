@@ -1,6 +1,6 @@
 # 踩坑记录
 
-> 状态：**现行** · 对应版本：16.2 (93)
+> 状态：**现行** · 对应版本：16.3 (94)
 > 规则：每踩一个新坑就追加一条，写清 **现象 → 根因 → 解法 → 如何避免**。旧结论被推翻时保留原文并标「已过时」。
 
 ## 最贵的五个坑（先看这五条）
@@ -63,8 +63,9 @@
 | 顶栏模糊滑杆完全没反应 | `Class.forName("miuix.core.util.MiuiBlurUtils", UiTweaks.class.getClassLoader())` 在 LSPosed 下抛 `ClassNotFoundException`（模块类与设置类不在同一 loader） | 改用 `appBar.getContext().getClassLoader()`，并以 `XposedHelpers.findClassIfExists(..., loader)` 兜底 |
 | 滚动后 `top bar blur` 只在 true/false 之间切、半径不更新 | 旧逻辑只比较「是否滚动」，且只在 `OnScrollChanged` 时读 prefs；滑杆变化被吞掉 | 同时跟踪半径并每 500ms 轮询 prefs；滚动源优先 `scroll_headers`，`mListView` 取不到时回退 |
 | **顶栏模糊滑杆拖了没反应**（16.1） | `setBackgroundBlur(actionBar, r)` 返回 true，但可见模糊来自 `NestedHeaderLayout.mOverBgView` 的 `MiuiBlurUiHelper`，半径被主题 `Blur.ExtraHeavy` 固定；改 action bar 等于在它下面加了一层看不见的 | 16.2 hook `MiuiBlurUiHelper.setBlurParams`，只替换 `NestedHeaderLayout` over-bg 的半径；同时写 `mBlurEffect` 并 `refreshBlur()` |
-| 顶栏模糊拖到后半段不变 | `MiuiBlurUtils` 把半径 cap 到 400px，2.75x 屏约 145dp；旧 0–300dp 后半段全饱和 | 滑杆改 0–100%，内部映射 0–150dp；默认 30%，旧 110dp 折算 73% |
-| 默认太实、不像参考图的淡磨砂 | 16.1 默认 110dp / 80% 透明度，白底上看起来就是一条实色栏 | 16.2 默认改为 30% 模糊 / 45% 透明度，低模糊+低透明度 |
+| 顶栏模糊拖到后半段不变 | `MiuiBlurUtils` 把半径 cap 到 400px，2.75x 屏约 145dp；旧 0–300dp 后半段全饱和 | 滑杆改 0–100%，内部映射 0–150dp；16.3 默认 5%，旧 110dp 折算 73% |
+| 默认太实、不像参考图的淡磨砂 | 16.1 默认 110dp / 80% 透明度，白底上看起来就是一条实色栏 | 16.2 默认 30% / 45%；16.3 再降到 **5% / 2%**（近乎全透明，只留发丝线），淡磨砂仍可用滑杆选回 |
+| 深色模式顶栏「没有线」 | 16.2 用白 15%（`0x26FFFFFF`）画线，压在 2% 透明度的黑栏上只剩 `#262626`，和黑底几乎同色 | 16.3 深色改中性灰 30%（`0x4DAAAAAA`），实拍 `(58,58,59)`，黑栏/亮内容上都读得出；浅色仍黑 12% |
 | 顶栏发丝线在大标题还没折叠时就出现 | 只看 `scroll offset > 4dp`，而大标题要滚过一段才收起 | 读 `NestedHeaderLayout.isHeaderOpen()`，为 true 时隐藏线；回到顶部也隐藏 |
 | 耳机 / iCloud 图标被第三方主题换掉 | 16.1 的 `cardDrawable` 是 settings 优先，主题同名 `ic_*` 会赢 | 16.2 改为模块内置优先，settings 只作兜底 |
 | `R.string.*` 编译报「找不到符号 R」 | `build.ps1` 只把 `module/src` 传给 javac，aapt2 生成的 `build/gen/**/R.java` 从未参与编译 | 避免在 Java 引用 `R`；标题用 `loadLabel()`，版本用 `getPackageInfo().versionName` |
