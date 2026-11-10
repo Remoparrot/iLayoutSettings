@@ -1,6 +1,6 @@
 # 架构与 Hook 链路
 
-> 状态：**现行** · 对应版本：15.3 (88)
+> 状态：**现行** · 对应版本：15.4 (89)
 > 源码：`module/src/com/abradant/iossettings/`
 
 ## 1. 从加载到生效
@@ -54,10 +54,13 @@ LSPosed
 3. `assign()`：按 `SLOT_IDS[slot]` 里的资源 id 别名逐槽匹配，第一个存在的赢；没匹配上的再按标题（`SLOT_TITLES`）兜底；
 4. `overrideSlots()`：处理「同一个 id 在不同机型上归属不同卡片」的特例（如把某些行塞进指定卡片）；
 5. `addAirplaneRow()`：在「网络」卡片最前面**合成**一条飞行模式行（系统原生没有这个 entry）；
-6. `ensureInterconnection()`：设备有 MiLink 服务但列表里没有对应 entry 时补一条；
-7. 按 `(group, slot, 原下标)` 排序；
-8. 给每个 header 写 `groupId = 101 + group`（`GROUP_ID_BASE`），让 miuix 画出卡片；
-9. 回写 `mHeaders`（不可变列表时改为替换字段 + `mHeaderAdapter.mHeaders`），再 `notifyDataSetChanged` / `updateGroupInfo` / `invalidateItemDecorations`。
+6. `addFocusModeRow()`：在「屏幕时间」正上方**合成**「专注模式」行（`android.settings.ZEN_MODE_SETTINGS`，
+   图标取设置自己的 `ic_do_not_disturb_mode_settings`）；`apply()` 每次重排前用 `isSyntheticFocus()` 把上次合成的行删掉，
+   避免 resume 越积越多；
+7. `ensureInterconnection()`：设备有 MiLink 服务但列表里没有对应 entry 时补一条；
+8. 按 `(group, slot, 原下标)` 排序；
+9. 给每个 header 写 `groupId = 101 + group`（`GROUP_ID_BASE`），让 miuix 画出卡片；
+10. 回写 `mHeaders`（不可变列表时改为替换字段 + `mHeaderAdapter.mHeaders`），再 `notifyDataSetChanged` / `updateGroupInfo` / `invalidateItemDecorations`。
 
 **为什么不用自绘**：卡片圆角、间距、按压反馈、深色模式全在 miuix 的 `CardItemDecoration` 里。改 `groupId` 就能白嫖这一整套，自绘反而要重写一遍且容易和系统动画打架。
 

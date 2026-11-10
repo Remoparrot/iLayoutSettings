@@ -3,7 +3,7 @@
 > 把澎湃 OS（HyperOS 3）「设置」首页改成 iOS 风格：入口重排、二级页图标、搜索栏沉底、卡片细节修正。
 > **全部复用 MIUI 原生控件与原生数据，模块不重绘任何页面。**
 
-[![Version](https://img.shields.io/badge/version-15.3-1f6feb)](https://github.com/abradanthawk-design/iLyayot/releases)
+[![Version](https://img.shields.io/badge/version-15.4-1f6feb)](https://github.com/abradanthawk-design/iLyayot/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-HyperOS%203%20%7C%20Android%2015%2B-green)](docs/01-overview.md)
 [![LSPosed](https://img.shields.io/badge/framework-LSPosed-orange)](docs/04-install.md)
@@ -23,6 +23,7 @@
 | 能力 | 说明 |
 | --- | --- |
 | 首页重排 / 分组 | iOS 顺序 + 独立卡片，卡片圆角与间距仍由 miuix `CardItemDecoration` 绘制 |
+| 专注模式入口 | 排在「屏幕时间」正上方，点击打开系统「勿扰模式」页；图标复用设置自己的 `ic_do_not_disturb_mode_settings`，随主题与深浅色自动解析 |
 | 飞行模式开关 | 右侧原生 `SlidingSwitch`；图标优先用设置主题里的 `ic_airplane_mode_settings`，缺失时回退模块内置图标，随深浅色/主题自动更新 |
 | 二级页图标 | 24 个 iOS 风格图标，按 preference key 匹配，标题关键词兜底 |
 | 底部搜索栏 | `miuix_appcompat_search_stub` 原生布局 + **Kyant backdrop 2.0.1 玻璃**（模糊 + 12dp/8dp 折射；**不叠加 shader 表面色**，保留主题 `miuix_appcompat_search_mode_edit_text_bg_light/dark` 胶囊；浅色无阴影） |
@@ -43,6 +44,12 @@
 | --- | --- |
 | ![搜索栏 · 浅色](docs/assets/search-glass-15.3-light.png) | ![搜索栏 · 深色](docs/assets/search-glass-15.3-dark.png) |
 
+专注模式入口（15.4，位于「屏幕时间」上方；点击进入勿扰模式设置）：
+
+| 浅色 | 深色（图标随主题） |
+| --- | --- |
+| ![专注模式 · 浅色](docs/assets/focus-mode-15.4.png) | ![专注模式 · 深色](docs/assets/focus-mode-dark-15.4.png) |
+
 顶栏滚动模糊（15.3，浅色，滚动后）：
 
 ![顶栏模糊](docs/assets/topbar-blur-15.3.png)
@@ -53,7 +60,7 @@
 
 ## 安装
 
-1. 下载 [`dist/IosSettingsLayout-15.3.apk`](dist/IosSettingsLayout-15.3.apk)（应用名 **iLyayot**，主题飞行图标 + 搜索栏去色/去浅色阴影 + 顶栏模糊实时生效，**已上机**）；
+1. 下载 [`dist/IosSettingsLayout-15.4.apk`](dist/IosSettingsLayout-15.4.apk)（应用名 **iLyayot**，新增专注模式入口 + 主题飞行图标 + 搜索栏去色/去浅色阴影 + 顶栏模糊实时生效，**已上机**）；
    想要稳定版就到 [Releases · v14.8](https://github.com/abradanthawk-design/iLyayot/releases/tag/v14.8) 下载 14.8；
 2. LSPosed 中启用模块，作用域只勾选 **设置**（`com.android.settings`）；
 3. **强制停止「设置」**（或重启手机），再打开设置；
@@ -61,7 +68,7 @@
 
 日志过滤 `IosSettings` 应能看到 `hooks installed`、`liquid glass shader compiled` / `liquid glass active`、
 `search glass mask=...`、`airplane icon set: settings:ic_airplane_mode_settings`、
-`airplane switch recentered by ... (frame translation)`；改滑杆后会出现 `glass tuning: ...` 与
+`focus mode row added`、`airplane switch recentered by ... (frame translation)`；改滑杆后会出现 `glass tuning: ...` 与
 `top bar blur=true offset=... radius=... set=true`。
 详见 [安装与调试](docs/04-install.md)。
 
@@ -89,7 +96,7 @@ pwsh -File module/build.ps1 `
   -AndroidJar C:\android-sdk\platforms\android-36\android.jar
 ```
 
-输出 `dist/IosSettingsLayout-15.3.apk`。完整工具链版本、可复现性说明见 [构建指南](docs/03-build.md)。
+输出 `dist/IosSettingsLayout-15.4.apk`。完整工具链版本、可复现性说明见 [构建指南](docs/03-build.md)。
 
 ## 文档
 

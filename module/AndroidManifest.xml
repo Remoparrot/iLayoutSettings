@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  iOS Settings Layout — LSPosed module for HyperOS 3 Settings (v15.3).
+  iOS Settings Layout — LSPosed module for HyperOS 3 Settings (v15.4).
   Reorders the native header list, adds icons to second-level rows and moves
   the native search bar to the bottom. Nothing is redrawn by the module.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.abradant.iossettings"
-    android:versionCode="88"
-    android:versionName="15.3">
+    android:versionCode="89"
+    android:versionName="15.4">
 
     <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="36" />
 

@@ -21,6 +21,10 @@ final class HeaderData {
     /** Extra card with every header that has no iOS slot. */
     static final int EXTRAS = 9;
 
+    /** Synthetic row above 屏幕时间; opens the system Do Not Disturb settings. */
+    private static final String FOCUS_TITLE = "专注模式";
+    private static final String FOCUS_ACTION = "android.settings.ZEN_MODE_SETTINGS";
+
     /**
      * iOS groups. Each slot is a list of header id aliases; the first alias that
      * exists in the live list wins. Group 0 keeps the native order
@@ -53,9 +57,10 @@ final class HeaderData {
             {"xiao_mi_hyperos_ai", "hyperos_ai"},
             {"voice_assist"},
 
-            // 4: notifications / sounds / screen time
+            // 4: notifications / sounds / focus / screen time
             {"notification_status_bar", "notification_settings", "notifications"},
             {"sound_settings", "sound_haptic_settings"},
+            {"focus_mode_settings", "focus_mode"},
             {"app_timer", "digital_wellbeing"},
 
             // 5: face id / accessibility / sos / privacy
@@ -77,7 +82,7 @@ final class HeaderData {
             4,
             3, 3, 3, 3, 3, 3,
             4, 4, 4, 4, 4, 4, 4, 4, 4,
-            5, 5, 5,
+            5, 5, 5, 5,
             6, 6, 6, 6,
             7, 7,
             8
@@ -105,6 +110,7 @@ final class HeaderData {
             {"Siri", "语音助手"},
             {"通知"},
             {"声音", "触感", "振动"},
+            {"专注模式", "专注"},
             {"屏幕时间", "屏幕使用时间"},
             {"面容", "密码与安全", "指纹", "生物识别"},
             {"无障碍"},
@@ -268,6 +274,7 @@ final class HeaderData {
         assign(items);
         overrideSlots(items);
         addAirplaneRow(activity, items);
+        addFocusModeRow(activity, items);
         removeSyntheticAdvanced(items);
         ensureInterconnection(activity, items);
         return items;
@@ -528,6 +535,83 @@ final class HeaderData {
         }
     }
 
+    private static boolean isSyntheticFocus(Object header) {
+        if (header == null) {
+            return false;
+        }
+        Object title = field(header, "title");
+        if (title == null || !FOCUS_TITLE.equals(title.toString())) {
+            return false;
+        }
+        Object intent = field(header, "intent");
+        return intent instanceof android.content.Intent
+                && FOCUS_ACTION.equals(((android.content.Intent) intent).getAction());
+    }
+
+    /**
+     * Synthetic "专注模式" row directly above 屏幕时间. iOS has a standalone
+     * Focus entry there; MIUI has no such header, so the row opens the system
+     * Do Not Disturb page and reuses Settings' own
+     * {@code ic_do_not_disturb_mode_settings} icon (theme-overridable and
+     * density-aware, exactly like the airplane row).
+     */
+    private static void addFocusModeRow(Activity activity, List<Item> items) {
+        for (Item it : items) {
+            if (FOCUS_TITLE.equals(it.title) || "focus_mode".equals(it.idName)) {
+                return; // already present (native entry or previous insert)
+            }
+        }
+        try {
+            android.content.Intent intent = new android.content.Intent(FOCUS_ACTION);
+            if (activity.getPackageManager().resolveActivity(intent, 0) == null) {
+                XLog.i("focus mode: no activity for " + FOCUS_ACTION + ", skip row");
+                return;
+            }
+            android.content.res.Resources res = activity.getResources();
+            Class<?> headerClass = Class.forName(
+                    "com.android.settingslib.miuisettings.preference.PreferenceActivity$Header",
+                    false, activity.getClassLoader());
+            Object header = headerClass.getDeclaredConstructor().newInstance();
+            setField(header, "title", FOCUS_TITLE);
+            int iconId = res.getIdentifier("ic_do_not_disturb_mode_settings",
+                    "drawable", "com.android.settings");
+            if (iconId == 0) {
+                iconId = res.getIdentifier("ic_do_not_disturb_mode",
+                        "drawable", "com.android.settings");
+            }
+            if (iconId != 0) {
+                setField(header, "iconRes", iconId);
+            } else {
+                XLog.w("focus mode: ic_do_not_disturb_mode_settings missing, text-only row");
+            }
+            setField(header, "intent", intent);
+            int slot = slotIndex("focus_mode_settings");
+            Item it = new Item();
+            it.header = header;
+            it.idName = "focus_mode";
+            it.title = FOCUS_TITLE;
+            it.slot = slot >= 0 ? slot : 20;
+            it.group = slot >= 0 ? SLOT_GROUP[slot] : 5;
+            it.originalIndex = Integer.MAX_VALUE - 2;
+            items.add(it);
+            XLog.i("focus mode row added");
+        } catch (Throwable t) {
+            XLog.e("focus mode row failed", t);
+        }
+    }
+
+    /** Index of a slot id in {@link #SLOT_IDS}, or -1 when the id is unknown. */
+    private static int slotIndex(String id) {
+        for (int i = 0; i < SLOT_IDS.length; i++) {
+            for (String alias : SLOT_IDS[i]) {
+                if (alias.equals(id)) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
     /**
      * MIUI drops the "隔空播放与连续互通" header on devices where the MiLink
      * service is missing. When the user has the service installed but the header
@@ -634,7 +718,7 @@ final class HeaderData {
             // time so they do not accumulate at the bottom of the list.
             for (int i = headers.size() - 1; i >= 0; i--) {
                 if (isSyntheticAirplane(headers.get(i)) || isSyntheticAdvanced(headers.get(i))
-                        || isSyntheticHyperios(headers.get(i))) {
+                        || isSyntheticHyperios(headers.get(i)) || isSyntheticFocus(headers.get(i))) {
                     headers.remove(i);
                 }
             }

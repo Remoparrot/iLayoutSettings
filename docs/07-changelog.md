@@ -3,10 +3,43 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前主线是 **15.3**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前主线是 **15.4**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
+
+---
+
+# iOS 设置布局 · LSPosed 模块（v15.4：专注模式入口）
+
+## v15.4 变更
+
+- **首页新增「专注模式」入口**（`HeaderData`）：
+  - 位置固定在「屏幕时间」正上方：通知 → 声音与触感反馈 → **专注模式** → 屏幕时间，沿用这几行所在的卡片 `groupId`；
+  - 点击走 `android.settings.ZEN_MODE_SETTINGS`，打开系统「勿扰模式」页（`Settings$ModesSettingsActivity`）；
+  - 图标用设置自己的 `ic_do_not_disturb_mode_settings`：主题可覆盖、深浅色与密度由资源系统自动解析，缺失时保留纯文字行；
+  - 合成行用「标题 + action」双条件识别，每次 `onResume` 先移除旧行再插入，不会重复累积；
+  - 设备上解析不到勿扰页时（非 HyperOS）不加这一行，仅记日志。
+- **版本**：15.4 / versionCode **89**；APK `dist/IosSettingsLayout-15.4.apk`，207,753 B。
+
+## v15.4 校验
+
+```
+package: name='com.abradant.iossettings' versionCode='89' versionName='15.4'
+dex version : 039
+xposed_init : True
+module class: True
+reorder     : True
+size   : 207753 bytes
+sha256 : 6382711418C80596D362CE727CDBE567FC486AB3FAA88EF0F44136AA5C0A02F9
+```
+
+真机 25053RT47C / HyperOS 3 / Android 16（2026-11-10 12:28）：
+
+- 日志 `focus mode row added`；行顺序为 通知 → 声音与触感反馈 → 专注模式 → 屏幕时间；
+- 点击后 `topResumedActivity=com.android.settings/.Settings$ModesSettingsActivity`，页面标题「勿扰模式」；
+- 冷启动、从勿扰页返回后仍只有一行；深色模式下图标随主题解析为紫色月亮；
+- 截图：`docs/assets/focus-mode-15.4.png`、`focus-mode-dark-15.4.png`、`focus-mode-page-15.4.png`。
 
 ---
 
