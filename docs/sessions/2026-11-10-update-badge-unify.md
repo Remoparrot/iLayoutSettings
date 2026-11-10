@@ -81,7 +81,8 @@
 | 浅色 | 同上 | 同上（箭头为浅色 tint） |
 | 无更新（`settings delete global miui_new_version`） | 整张卡消失 | 蓝色/红色角标都不出现，箭头回到原生位置 |
 
-截图：[更新卡](../assets/update-badge-16.6.png)、[通用行](../assets/general-badge-16.6.png)。
+截图：[更新卡](../assets/update-badge-16.6.png)、[通用行](../assets/general-badge-16.6.png)、
+[改前 / 改后对照](../assets/badge-before-after-16.6.png)（上：旧的蓝 1 与贴底红 1；下：统一后的红 1 + 箭头）。
 
 ## 7. 遗留 / 注意
 
