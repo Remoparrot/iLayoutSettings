@@ -2,7 +2,7 @@
 
 状态：已完成
 关联版本：16.4 → 16.5（versionCode 95 → 96）
-关联提交：发版提交（`tools/release.ps1 -Version 16.5` 自动生成）
+关联提交：`184ea97` feat(topbar): 顶栏始终模糊、发丝线随折叠出现（16.5 / 96）
 参与者：AbradantHawk / DeepSeek Harness
 
 ## 1. TL;DR
