@@ -1,6 +1,6 @@
 # 架构与 Hook 链路
 
-> 状态：**现行** · 对应版本：16.7 (98)
+> 状态：**现行** · 对应版本：16.8 (99)
 > 源码：`module/src/com/Remo/ilayoutsettings/`
 
 ## 1. 从加载到生效
@@ -216,29 +216,53 @@ LSPosed
 - 16.4 仍保留 700ms 的空闲轮询（`ensurePoll`，`attach` 时启动、detach 时停），
   让 GUI 滑杆改完回到设置后即使不滚动也能重新套用新值；滚动过程中则完全由类钩子驱动。
 
-### 4.3 二级页顶栏（`SubPageTopBar`，16.7）
+### 4.3 二级页顶栏（`SubPageTopBar`，16.7 引入，16.8 收尾）
 
 二级页（`Settings$WifiSettingsActivity` 这类）是普通 `ActionBar` Activity，不走 `NestedHeaderLayout`，
 所以首页那套顶栏逻辑完全够不着它。`SubPageTopBar.install(cl)` 在 `SettingsActivity` /
 `SettingsBaseActivity` 的 `onResume` 上挂钩，对 `com.android.settings:id/action_bar_container` 做四件事：
 
 1. **半透明底色**：与首页同一公式 `(alpha << 24) | (dark ? 0x000000 : 0xF2F2F7)`，
-   alpha 来自 `topbar_alpha`；`APPLIED_BG` 去重，滚动帧里只做比较；
+   alpha 来自 `topbar_alpha`。16.8 起同一只 `ColorDrawable` 常驻（`BAR_BG`），refresh 时只
+   `setColor`；`OnPreDraw` 里发现被 MIUI 换掉就换回来；
 2. **原生模糊**：`MiuiBlurUtils.setBackgroundBlur(bar, px)` + `setBackgroundBlurRadius`，
-   半径 = `topbar_blur` 按 density 换算的像素（该 API 收的是 px，不是 dp）；底色变了必须重发一次
-   （`setBackgroundColor` 会盖掉 blur 层），`APPLIED_BLUR` 记上次值；
-3. **让内容滑进栏下**：二级页本来 `list.top == bar.bottom`，只清 clip 没用。反射调
-   `ActionBarOverlayLayout.setOverlayMode(true)` 让内容铺到窗口顶部，再给列表 `paddingTop = 栏高`
-   并 `setClipToPadding(false)`；`padListUnderBar` 只做一次（`LIST_PADDING` 记录），
-   否则滚动中栏高变化会把 padding 越加越大；
-4. **发丝线**：直接复用 `UiTweaks.applyDivider(appBar, color, visible)`（16.7 起包内可见）。
-   显示条件 = 列表 `canScrollVertically(-1)`（第一行已经滑到栏下）；**不要用
-   `computeVerticalScrollOffset()`**——部分 MIUI 列表恒 0。线宿主是栏的父级
+   半径 = `topbar_blur` 按 density 换算的像素（该 API 收的是 px，不是 dp）；`APPLIED_BLUR` 记上次值，
+   半径没变就不重发。**模糊采样的是栏后面真实绘制的内容**——内容进不了栏下时，栏后面只有页面底色，
+   再大的半径也看不出模糊；
+3. **让内容滑进栏下**：
+   - `findScrollable(decor)` 取**最外层**的竖向滚动容器（RecyclerView / ListView /
+     `miui.core.widget.NestedScrollView` / ScrollView；横向 RecyclerView 跳过，AboutIos 自绘页跳过）；
+     再由 `ensureOverlay` 反射调 `ActionBarOverlayLayout.setOverlayMode(true)`；
+   - `padListUnderBar` 给列表加 `paddingTop = 栏高` 并 `setClipToPadding(false)`。ScrollView 自己的
+     padding 会被 MIUI 的 inset pass 重置，所以改加在它唯一的内容子 View（`LinearLayout`）上；
+   - 加完 padding 立刻 `scrollToPosition(0)` / `scrollTo(0,0)`（`resetScrollToTop`）：padding 变化后
+     `LinearLayoutManager` 会把已 attach 的第 0 行按旧局部坐标重排，`padding - childTop` 读出来
+     就像「已经滚了 500px」，进入页面时顶栏和发丝线会提前出现（16.8 修）；
+   - padding 只加一次（`LIST_PADDING`，按被 padded 的 View 记）。MIUI 二次 inflate 把 padding 丢掉时，
+     按记下的值恢复，不再从当前栏高重算（栏折叠时重算会把 inset 越改越小）；
+4. **发丝线**：直接复用 `UiTweaks.applyDivider(appBar, color, visible)`。
+   显示条件 = 列表 `canScrollVertically(-1)` **且** 列表确实在栏下（`overlapUnderBar > 0`）；
+   **不要用 `computeVerticalScrollOffset()`**——部分 MIUI 列表恒 0。线宿主是栏的父级
    `ActionBarOverlayLayout` 的 `ViewOverlay`（`ActionBarContainer` 自己的 overlay 不绘制），
    颜色每帧按 `uiMode` 取：浅色黑 12%、深色中性灰 30%，并受 `topbar_divider` 开关控制。
 
+**「我的设备 / 通用」的特殊情况（16.8）**：这一页把滚动容器包在一个 `FrameLayout` wrapper 里，
+wrapper 的 top 正好在栏底（`main_content` 给了栏高的 padding），MIUI 的
+`miui_version_card_view` 作为兄弟盖在上面；`ActionBarOverlayLayout` 的 overlay 对这份布局无效，
+内容永远到不了栏下。识别方式：从列表向上找「子树里包含 `miui_version_card_view`」的容器
+（即 `main_content`），路径上的直接子 View 就是 wrapper；还要求 `wrapper.top == 栏底`，否则不动。
+随后：
+
+- wrapper 的 `topMargin -= 栏高`（`MATCH_PARENT` 的高度会跟着长高），列表加同样的顶部 padding；
+- miuix 的 FrameLayout 只把负 margin 用在高度上、不移动 top，子 View 会伸到父级 bounds 之外，
+  所以把 wrapper→host 一路的 `clipChildren` / `clipToPadding` 关掉，并在 **`OnPreDraw`**
+  里每帧重关一次（MIUI 每次 layout 都会改回来）；
+- 该页数据异步落地后会二次 inflate，`watch` 里再排 700/1600/3200ms 三次延迟 refresh，
+  对新树重新套用 padding / 抬升。
+
 视图在 `onResume` 后 post 两次（activity 自己的 resume 工作、MIUI 重建折叠标题都在其后），
-滚动回调只重算发丝线（`clearListClip` + `applyDivider`），不做整套 refresh。
+滚动回调只做 `clearListClip` + `applyDivider`，不做整套 refresh。监听器按**列表实例**登记
+（`SCROLL_WATCHED`），这样二次 inflate 出来的新列表也会被挂上。
 
 ## 5. 二级页图标（`SubPageIcons`）
 

@@ -216,20 +216,22 @@ $bodyTemplate = @'
 
 > 本机 MIUI 可能拦截 adb 安装新包（`INSTALL_FAILED_USER_RESTRICTED`），请把 APK 拷到手机手动安装。
 
-### 本版内容（16.7）
+### 本版内容（16.8）
 
-- **二级页顶栏（新）**：无线局域网、应用等二级页的顶栏与首页同一套——半透明底色 + 原生模糊，
-  列表内容滑进栏下就是糊的；离开顶部时出现 0.5dp 半透明发丝线（浅色黑 12%、深色中性灰 30%），
-  回到顶部自动隐藏；
-- **控制中心上移**：首页「控制中心」行移到「墙纸」上方；
-- **搜索栏**：浅色高光保持 16.6 的效果（本版试过加灰色描边，真机读成双线、偏重，已回退）；
-- 版本 16.7 / versionCode 98。
+- **进入二级页不再自带滚动偏移**：16.7 的二级页一进入就处于「已滚动」状态、顶栏和发丝线提前出现；
+  本版在加 padding 后把列表锚回顶部，二级页一律从顶部开始；
+- **「我的设备 / 通用」卡片留白修复**：不再把内层 `description_grid` 当成列表加 padding，
+  下方「REDMI Turbo 4 Pro」卡上方的巨大空白消失；
+- **「通用」顶栏共用模糊**：设备详情页的内容现在会滑进栏下，被同一套半透明底色 + 原生模糊处理，
+  发丝线也正常出现（浅色黑 12%、深色中性灰 30%）；
+- **发丝线条件收紧**：只有内容真的到了栏下才画线，内容到不了栏底的页面不再出现悬空的线；
+- 版本 16.8 / versionCode 99。
 
 ### 截图
 
-| 首页 · 16.7（控制中心在墙纸上方） | 二级页顶栏 · 浅色 | 二级页顶栏 · 深色 |
+| 通用 · 浅色（滚动后） | 通用 · 深色（滚动后） | 我的设备 · 卡片留白已修 |
 | --- | --- | --- |
-| ![首页](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/main/docs/assets/home-16.7-light.png) | ![二级页顶栏 · 浅色](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/main/docs/assets/subpage-topbar-16.7-light.png) | ![二级页顶栏 · 深色](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/main/docs/assets/subpage-topbar-16.7-dark.png) |
+| ![通用 · 浅色](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/main/docs/assets/general-16.8-light.png) | ![通用 · 深色](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/main/docs/assets/general-16.8-dark.png) | ![我的设备](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/main/docs/assets/devinfo-16.8-light.png) |
 
 完整变更见 [docs/07-changelog.md](../blob/main/docs/07-changelog.md)。
 '@

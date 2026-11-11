@@ -3,7 +3,7 @@
 > 把澎湃 OS（HyperOS 3）「设置」首页改成 iOS 风格：入口重排、条件卡片（软件更新 / 耳机 / iCloud）、搜索栏沉底、卡片细节修正。
 > **全部复用 MIUI 原生控件与原生数据，模块不重绘任何页面。**
 
-[![Version](https://img.shields.io/badge/version-16.7-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
+[![Version](https://img.shields.io/badge/version-16.8-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-HyperOS%203%20%7C%20Android%2015%2B-green)](docs/01-overview.md)
 [![LSPosed](https://img.shields.io/badge/framework-LSPosed-orange)](docs/04-install.md)
@@ -35,7 +35,7 @@
 | 参数界面 | 应用内滑杆：搜索栏模糊（0.1dp）/ 折射 19dp / 厚度 12dp；顶栏模糊 0–100%、顶栏透明度 0–100%、显示顶栏分割线（16.6 删除「高级设置」总开关，全部常显） |
 | 卡片细节修正 | 去掉每组最后一行的双层圆角/放大图标；外观页预览加卡片底 |
 | 顶部模糊 / 发丝线 | 默认 5% 模糊 + 2% 透明度，**顶栏始终带模糊**——账户卡等内容滑到栏下面就是糊的，不再被不透明栏切掉；发丝线跟着栏一起出现（浅色黑 12%，深色中性灰 30%）；**设置内切换深浅色后线不消失**，折叠栏第一次出现就带模糊 |
-| 二级页顶栏（16.7） | 二级页顶栏与首页同一套参数：半透明底色 + 原生模糊 + 内容滑进栏下；0.5dp 半透明发丝线只在滚动时出现，回顶部即隐藏 |
+| 二级页顶栏（16.7 / 16.8） | 二级页顶栏与首页同一套参数：半透明底色 + 原生模糊 + 内容滑进栏下；0.5dp 半透明发丝线只在滚动时出现，回顶部即隐藏。**16.8：进入二级页不再自带滚动偏移（顶栏/发丝线不会提前出现）；「我的设备 / 通用」的内容也滑进栏下、共用同一套模糊** |
 | 应用图标 | 蓝紫渐变 + 半透明玻璃盘 + 白齿轮（[预览](docs/assets/icon-16.4.png)）；`tools/make_launcher_icon.py` 生成五档 mipmap，脚本内另有两套候选（[并排对比](docs/assets/icon-candidates-16.4.png)） |
 
 ## 截图
@@ -64,9 +64,15 @@
 
 ![二级页发丝线特写](docs/assets/subpage-topbar-16.7-hairline.png)
 
+16.8：进入二级页不再自带滚动偏移，「我的设备 / 通用」卡片留白修复、内容滑进栏下共用同一套模糊：
+
+| 通用 · 浅色（滚动后） | 通用 · 深色（滚动后） | 我的设备 · 卡片留白已修 |
+| --- | --- | --- |
+| ![通用 · 浅色](docs/assets/general-16.8-light.png) | ![通用 · 深色](docs/assets/general-16.8-dark.png) | ![我的设备](docs/assets/devinfo-16.8-light.png) |
+
 ## 安装
 
-1. 下载 [`dist/iLayoutSettings-16.7.apk`](dist/iLayoutSettings-16.7.apk)，或到 [Releases · v16.7](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.7) 下同名附件（298,530 B，SHA-256 `25E0FCA8…D973`，与 `dist/` 同一份）；
+1. 下载 [`dist/iLayoutSettings-16.8.apk`](dist/iLayoutSettings-16.8.apk)，或到 [Releases · v16.8](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.8) 下同名附件（302,626 B，SHA-256 `9F9004AA…1094`，与 `dist/` 同一份）；
    **16.0 起包名是** `com.Remo.ilayoutsettings`，从 16.0 升级可直接覆盖（同一签名）；
 2. LSPosed 中启用 **iLayoutSettings**，作用域只勾选 **设置**（`com.android.settings`）；
 3. **强制停止「设置」**（或重启手机），再打开设置；
@@ -106,7 +112,7 @@ pwsh -File module/build.ps1 `
 ```
 
 输出 `dist/iLayoutSettings-<versionName>.apk`。
-发版用 `tools/release.ps1 -Version 16.7`：构建 → 校验 → 自动提交/推送 → 打 tag → 建 Release → 上传 APK，一条命令完成。
+发版用 `tools/release.ps1 -Version 16.8`：构建 → 校验 → 自动提交/推送 → 打 tag → 建 Release → 上传 APK，一条命令完成。
 完整工具链版本、可复现性说明见 [构建指南](docs/03-build.md)。
 
 ## 文档

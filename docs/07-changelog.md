@@ -3,12 +3,37 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前主线是 **16.7（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前主线是 **16.8（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
 
 ---
+
+# iLayoutSettings · LSPosed 模块（v16.8：二级页顶栏收尾 + 「通用」共用模糊）
+
+## v16.8 变更
+
+- **进入二级页不再自带滚动偏移**：16.7 在 overlay 打开后改列表 padding，`LinearLayoutManager`
+  会把已 attach 的第 0 行按旧局部坐标重排，`padding - childTop` 被读成「已经滚了 500px」——
+  进入页面时顶栏和发丝线已经出现。16.8 加完 padding 立刻 `scrollToPosition(0)` / `scrollTo(0,0)`，
+  二级页一律从顶部开始。
+- **「我的设备」下方卡片留白修复**：`findScrollable` 之前取 DFS 里第一个 RecyclerView，
+  而这页真正的滚动容器是外层 `NestedScrollView`，内层 `description_grid` 是个非滚动 grid；
+  被当成列表加 331px padding 后，下方「REDMI Turbo 4 Pro」卡上方留下巨大空白。16.8 只认最外层
+  竖向滚动容器（RecyclerView / ListView / NestedScrollView / ScrollView），横向 RecyclerView
+  和 AboutIos 自绘页跳过。
+- **「我的设备 / 通用」内容滑进栏下、共用模糊**：这类页把列表放在 top == 栏底的 wrapper 里，
+  MIUI 的 `miui_version_card_view` 盖在上面，overlay 模式对这份布局无效，所以内容一直进不了栏下、
+  栏后面只有页面底色，模糊等于没有。16.8 识别到 version card 后抬升 wrapper
+  （`topMargin -= 栏高`）、给列表加同高 padding，并在 `OnPreDraw` 里每帧清掉父级
+  `clipChildren/clipBounds`（MIUI 每次 layout 会重设），内容因此能滑进栏下，被同一套
+  `topbar_alpha` + `topbar_blur` 模糊，发丝线也正常出现。
+- **二次 inflate 兜底**：设备详情页数据异步落地后会重建视图树，padding/抬升会丢；`watch` 里
+  排 700/1600/3200ms 三次延迟 refresh，对当前树重新套用（幂等）。
+- **发丝线条件收紧**：除 `canScrollVertically(-1)` 外，还要求列表确实在栏下
+  （`overlapUnderBar > 0`），内容永远到不了栏底的页面不再画出悬空的线。
+- **版本**：16.8 / versionCode **99**；APK `dist/iLayoutSettings-16.8.apk`，302,626 B。
 
 # iLayoutSettings · LSPosed 模块（v16.7：二级页顶栏 + 控制中心上移）
 

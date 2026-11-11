@@ -14,6 +14,7 @@
 
 | 日期 | 标题 | 一句话结论 | 状态 |
 | --- | --- | --- | --- |
+| 2026-11-11 | [二级页顶栏收尾：进入偏移 / 我的设备留白 / 「通用」共用模糊](2026-11-11-subpage-topbar-fixes.md) | 16.8：二级页加完 padding 立刻把第 0 行锚回顶部（进入不再自带滚动偏移）；`findScrollable` 只认最外层竖向滚动容器（修「我的设备」331px 卡片留白）；「我的设备 / 通用」抬 wrapper + 预绘制清 clip，内容滑进栏下共用同一套模糊 | 已完成 |
 | 2026-11-11 | [二级页顶栏（模糊/半透明/发丝线）+ 控制中心上移 + 浅色搜索栏高光回退](2026-11-11-subpage-topbar-and-search-rollback.md) | 16.7：「控制中心」移到「墙纸」上方；二级页顶栏改成首页同款半透明 + 原生模糊，靠 `ActionBarOverlayLayout.setOverlayMode` + 列表栏高 padding 让内容滑进栏下；发丝线复用 `applyDivider`，条件 `canScrollVertically(-1)`；浅色搜索栏的灰边试验按用户要求整段回退 16.6 | 已完成 |
 | 2026-11-10 | [红 1 角标统一 + 补箭头 + 更新卡标题左移](2026-11-10-update-badge-unify.md) | 16.6：「通用」行的蓝 1 换成与更新卡同一颗 24dp 红角标；带角标的行补上系统自带箭头（克隆 `arrow_right` drawable）；角标在 `widget_frame`（竖直 LinearLayout + 空占位）里本来贴底，改由 `OnPreDraw` 隐藏同帧其它子 View 才与箭头齐平；更新卡标题左移到 16dp 内边距 | 已完成 |
 | 2026-11-10 | [搜索栏 iOS 27 液态玻璃 + 小爱麦克风](2026-11-10-search-glass-ios27-rim-mic.md) | 16.6：搜索栏不再叠 MIUI 9-patch，改为自绘 Kyant 液态玻璃 + G2 连续圆角；光边只在上下且等亮、无内阴影；换成指定 iOS 27 图标（随深浅色、缩小内收）；点麦克风走 `VoiceService` 唤醒小爱；删除高级设置总开关 | 已完成 |

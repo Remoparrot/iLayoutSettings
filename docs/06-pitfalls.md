@@ -1,6 +1,6 @@
 # 踩坑记录
 
-> 状态：**现行** · 对应版本：16.7 (98)
+> 状态：**现行** · 对应版本：16.8 (99)
 > 规则：每踩一个新坑就追加一条，写清 **现象 → 根因 → 解法 → 如何避免**。旧结论被推翻时保留原文并标「已过时」。
 
 ## 最贵的五个坑（先看这五条）
@@ -98,6 +98,12 @@
 | **二级页顶栏半透明了，但内容不会滑到栏下**（16.7） | 二级页是普通列布局（`list.top == bar.bottom`），只清 `clipBounds` 也没东西可模糊；`setBackgroundBlur` 不改变布局 | 反射 `ActionBarOverlayLayout.setOverlayMode(true)` 让内容铺到窗口顶部，再给列表加**栏高** `paddingTop` + `clipToPadding=false`；padding 只加一次（`LIST_PADDING`），滚动中栏高变化不能重复加，否则越滚越空 |
 | **二级页顶栏没有发丝线**（16.7） | 首页的线挂在 `NestedHeaderLayout` 上；二级页不走这个类，而 `UiTweaks.refreshTopBar()` 在首页不可见时会主动跳过 | `SubPageTopBar` 直接复用 `UiTweaks.applyDivider()`：滚动回调里按 `canScrollVertically(-1)` 更新显隐，宿主仍是栏父级 `ActionBarOverlayLayout` 的 `ViewOverlay`；别用 `computeVerticalScrollOffset()`（部分 MIUI 列表恒 0） |
 | **16.7 给浅色搜索栏加灰边后变成「两条线」** | 灰色描边 + 内移的白色高光叠在浅灰胶囊上，白底上读成灰环 + 白环，比 16.6 重 | 按用户反馈整段回退 16.6（`SearchGlass` 与 HEAD 一致）。「浅色纯白页高光不明显」属 16.6 已知问题，未看图确认前不要再自动加灰边 |
+| **「我的设备」下方卡片留白很大**（16.8） | `findScrollable` 取的是 DFS 里第一个 RecyclerView；这页真正的滚动容器是外层 `NestedScrollView`，内层 `description_grid` 是 `nestedScrollingEnabled=false` 的非滚动 grid，被加 331px padding 后整张卡被推下去 | `findScrollable` 改成「最外层、可竖向滚动」的容器（含 NestedScrollView / ScrollView；横向 RecyclerView 与 `ios_about_page` 跳过） |
+| **进入二级页时顶栏 / 发丝线已经出现**（16.8） | overlay 打开 + padding 改变后，`LinearLayoutManager` 把已 attach 的第 0 行按旧局部坐标重排，`offset = padding - childTop`，`canScrollVertically(-1)` 直接为 true | padding 之后立刻 `scrollToPosition(0)` / `scrollTo(0,0)`，把第 0 行锚回 padding 顶部；别等下一帧 |
+| **「通用 / 我的设备」内容滑不进栏下**（16.8） | 页面把列表放在 top == 栏底的 wrapper 里（`miui_version_card_view` 是兄弟），overlay 模式对这份布局无效；`topMargin -= 栏高` 在 miuix FrameLayout 里只加高、不移动 top，子 View 被 `clipChildren` 裁在栏底 | 抬 wrapper（负 margin）+ 给列表/内容加同高 padding；`clipChildren/clipToPadding/clipBounds` 在 `OnPreDraw` 里每帧清一次（MIUI 每次 layout 会重设）；只对含 `miui_version_card_view` 的页面做 |
+| **「通用」的顶栏没有模糊**（16.8 修） | 模糊采样的是栏后面**真实绘制**的内容；内容被裁在栏底时栏后面只有页面底色，5% 的模糊看不出来（把半径调到 100px 也一样平） | 先让内容能进栏下（上一条），`setBackgroundBlur` 自然就采到行；不需要另画一层模糊 |
+| **设备详情页二次 inflate 丢 padding**（16.8） | 异步设备数据落地后 MIUI 重建了页面视图树，旧树的 padding/抬升随旧 View 一起丢弃（log 里的 View 树 bounds 会突然回到 331） | `watch` 里排 700/1600/3200ms 三次延迟 refresh，每次都重新 `findScrollable` 并对新树套用；`LIST_PADDING` 按 View 记录，天然幂等 |
+| **ScrollView 的 padding 被重置**（16.8） | `NestedScrollView` 在 MIUI 的 inset pass 里会重设 padding，加在它自己身上会被清 0 | 加在它唯一的内容子 View（`LinearLayout`）上，padding 随内容一起滚动 |
 
 ### C. 版本与回退（本仓库特有）
 

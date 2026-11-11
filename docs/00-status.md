@@ -7,19 +7,20 @@
 
 | 项 | 值 |
 | --- | --- |
-| versionName / versionCode | **16.7 / 98**（唯一来源：`module/AndroidManifest.xml`） |
+| versionName / versionCode | **16.8 / 99**（唯一来源：`module/AndroidManifest.xml`） |
 | 包名 | **`com.Remo.ilayoutsettings`**（16.0 由 `com.abradant.iossettings` 改名，属于破坏性变更） |
 | 应用名 / 仓库名 | **iLayoutSettings**（GitHub 仓库同步改名，旧地址会 301 跳转） |
 | minSdk / targetSdk | 29 / 36 |
 | 作用域 | `com.android.settings` |
-| 当前包 | `dist/iLayoutSettings-16.7.apk`（298,530 B，SHA-256 `25E0FCA8…D973`；**已在 25053RT47C 上覆盖安装并实测**） |
+| 当前包 | `dist/iLayoutSettings-16.8.apk`（302,626 B，SHA-256 `9F9004AA…1094`；**已在 25053RT47C 上覆盖安装并实测**） |
 | 旧包 | `dist/` 只保留当前包；16.6 / 16.5 / 16.4 / 16.3 / 16.2 / 16.1 / 16.0 / 15.x / 14.8 在各自 GitHub Release |
 
 ## 发布物指纹
 
 | 包 | 大小 | SHA-256 | 签名证书 SHA-256 |
 | --- | --- | --- | --- |
-| `iLayoutSettings-16.7.apk`（**当前**） | 298,530 B | `25E0FCA8A39256DFCEC726DCEEC50CB8B268427CDE27A0C18F61589E11CDD973` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-16.8.apk`（**当前**） | 302,626 B | `9F9004AA9F19E8AED94CA05269396A223E775CDC155614CAB03108FC8EC71094` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-16.7.apk`（历史，Release） | 298,530 B | `25E0FCA8A39256DFCEC726DCEEC50CB8B268427CDE27A0C18F61589E11CDD973` | 同上 |
 | `iLayoutSettings-16.6.apk`（历史，Release） | 294,434 B | `F167D3820FEEAF83FED1B8C7FFDF8CD006BF9ADB38EFE4C24E4E9116076BE6FE` | 同上 |
 | `iLayoutSettings-16.5.apk`（历史，Release） | 286,069 B | `8449352927AD053BD49FDDF3505AADE4532F90933E680CDF94AE72257854B566` | 同上 |
 | `iLayoutSettings-16.4.apk`（历史，Release） | 286,069 B | `EE68C55D05E9567831C3DE3327544A3D9AB2EBAD426B907EEC9C17329368B3C0` | 同上 |
@@ -38,7 +39,7 @@
 | --- | --- |
 | 仓库 | https://github.com/Remoparrot/iLayoutSettings （旧 `iLyayot` 自动跳转） |
 | 默认分支 | `main` |
-| 最新 Release | [v16.7](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.7)（附件 `iLayoutSettings-16.7.apk`，298,530 B，SHA-256 `25E0FCA8…D973`） |
+| 最新 Release | [v16.8](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.8)（附件 `iLayoutSettings-16.8.apk`，302,626 B，SHA-256 `9F9004AA…1094`） |
 | 自动发版 | `tools/release.ps1`：构建 → 校验 → **自动 add/commit/push 当前分支** → 打 tag → 建 Release → 上传附件；脚本必须是 UTF-8 **带 BOM**，且在发 POST 前自检正文（中文丢失 / 占位符残留即中止） |
 | 旧 Release | v16.5、16.4、16.3、16.2、16.1、16.0、15.5、14.8 保留（本地 `dist/` 不再保留旧包） |
 
@@ -89,11 +90,15 @@
   就带模糊；**16.5 起不再按「是否滚动」开关模糊和底色，并且清掉 MIUI 给滚动容器的
   `clipBounds`**——账户卡等内容滑进栏下就是模糊的，不再被不透明栏硬切。
   旧 110dp 读取时折算为 73%
-- ✅ **二级页顶栏（16.7 新增，`SubPageTopBar`）**：二级页的 `action_bar_container` 与首页同一套参数——
+- ✅ **二级页顶栏（16.7 新增，16.8 收尾，`SubPageTopBar`）**：二级页的 `action_bar_container` 与首页同一套参数——
   底色按 `topbar_alpha`、模糊按 `topbar_blur`（像素换算后走 `MiuiBlurUtils.setBackgroundBlur`）。
   二级页是普通列布局，需把 `ActionBarOverlayLayout` 切到 overlay 模式并给列表加**栏高 padding**，
   内容才滑得进栏下；发丝线复用首页的 `applyDivider`（宿主是栏父级的 `ViewOverlay`），
-  显示条件 = 列表 `canScrollVertically(-1)`，回顶部即消失。实测无线局域网 / 所有应用两页均生效。
+  显示条件 = 列表 `canScrollVertically(-1)` **且列表确实在栏下**，回顶部即消失。
+  **16.8**：`findScrollable` 只认页面最外层的滚动容器（不再给「我的设备」内层 `description_grid` 加 padding）；
+  加完 padding 后把第 0 行重新锚回 padding 顶部，进入二级页不再自带滚动偏移；
+  「我的设备 / 通用」的 version-card 页会抬升列表 wrapper（`topMargin -= 栏高`）并在预绘制里清父级 clip，
+  内容因此能滑进栏下；实测显示 / 无线局域网 / 通知 / 通用 / 关于手机 五类页均生效（浅色 + 深色）。
 - ✅ **GUI（16.6 简化）**：删除「高级设置」总开关，搜索栏玻璃与顶栏两组滑杆直接显示；
   发丝线开关只控制是否显示/隐藏。搜索栏玻璃滑杆仍支持 0.1dp 步进
 - ✅ **应用图标（16.4 换风格）**：蓝紫渐变 + 半透明玻璃盘 + 白齿轮，`tools/make_launcher_icon.py`
@@ -141,6 +146,14 @@
     `setOverlayMode(true)` + 列表 padding 让内容滑进栏下；若 ROM 改名/去掉该模式，或二级页不是
     `SettingsActivity` / `SettingsBaseActivity` 子类，表现退回「栏有半透明底色，但内容不会滑到栏下、
     也不会出现发丝线」。线宿主仍是栏父级 overlay，宿主不绘制时线不可见（同第 4 条）。
+15. **「我的设备 / 通用」的栏下内容依赖 `miui_version_card_view` + wrapper 位置**：16.8 靠
+    「wrapper.top == 栏底」识别这类页，做 `topMargin -= 栏高` 抬升并在预绘制里清父级
+    `clipChildren`/`clipBounds`；ROM 改 id/层级、MIUI 换掉 version-card 容器，或该页不再把内容
+    放在栏下方时，抬升会软失败——表现退回 16.7（栏半透明，但内容仍被裁在栏底、没有模糊）。
+    另外 MIUI 会在数据落地后二次 inflate，所以加了 700/1600/3200ms 的三次延迟 refresh 兜底。
+16. **二级页顶栏的 tint 是同一只 `ColorDrawable`**（16.8）：`MiuiBlurUtils.setBackgroundBlur`
+    依赖 view 背景层，若某主题给 `action_bar_container` 换了自带模糊的 drawable，会被模块的
+    纯色 drawable 覆盖，模糊只剩 `setBackgroundBlur` 这一路。
 
 ## 下一步（优先级从高到低）
 
@@ -150,10 +163,12 @@
    可配置，或改走 `ACTION_ASSIST`；
 3. 观察 16.5 的「常开模糊」在**搜索模式**、第三方主题、平板/横屏下的表现（栏高变化会不会
    让线提前出现）；必要时把发丝线的显示条件收紧到「折叠进度 > 阈值」；
-4. 图标如需跟随系统主题，补 `mipmap-anydpi-v26` adaptive icon（前景 = 齿轮+玻璃盘，背景 = 渐变）；
-5. 接 GitHub Actions：tag 触发 `tools/release.ps1` 的只读版本（构建 + 上传）；
-6. 清理 `Hook` 未引用的遗留类（`GlassToggle`、`IntroCard`、`AboutIos` 等）；
-7. 平板/分屏适配。
+4. 16.8 的延迟 refresh 目前是 700/1600/3200ms 三次；若「我的设备」在慢设备上仍偶发丢
+   padding，改成 hook fragment `onCreateView` 重挂更稳（代价是多一个类钩子）；
+5. 图标如需跟随系统主题，补 `mipmap-anydpi-v26` adaptive icon（前景 = 齿轮+玻璃盘，背景 = 渐变）；
+6. 接 GitHub Actions：tag 触发 `tools/release.ps1` 的只读版本（构建 + 上传）；
+7. 清理 `Hook` 未引用的遗留类（`GlassToggle`、`IntroCard`、`AboutIos` 等）；
+8. 平板/分屏适配。
 
 ## 环境事实（本机）
 
