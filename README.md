@@ -72,7 +72,7 @@
 
 ## 安装
 
-1. 下载 [`dist/iLayoutSettings-16.8.apk`](dist/iLayoutSettings-16.8.apk)，或到 [Releases · v16.8](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.8) 下同名附件（302,626 B，SHA-256 `9F9004AA…1094`，与 `dist/` 同一份）；
+1. 下载 [`dist/iLayoutSettings-16.8.apk`](dist/iLayoutSettings-16.8.apk)，或到 [Releases · v16.8](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.8) 下同名附件（302,626 B，SHA-256 `6D543EAB…0F3A`，与 `dist/` 同一份）；
    **16.0 起包名是** `com.Remo.ilayoutsettings`，从 16.0 升级可直接覆盖（同一签名）；
 2. LSPosed 中启用 **iLayoutSettings**，作用域只勾选 **设置**（`com.android.settings`）；
 3. **强制停止「设置」**（或重启手机），再打开设置；

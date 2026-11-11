@@ -128,7 +128,7 @@ adb shell input swipe 640 1900 640 1200 400
 ```
 
 - 构建：`OK -> dist/iLayoutSettings-16.8.apk`，**302,626 B**，
-  SHA-256 `9F9004AA9F19E8AED94CA05269396A223E775CDC155614CAB03108FC8EC71094`；
+  SHA-256 `6D543EABA02906A665787A4207FE72464A18E4EA895501C33D05028520B80F3A`；
   badging `versionCode='99' versionName='16.8'`，`xposed_init / module class / reorder` 均 True。
 - 安装：`Success` + `Install command complete`，`dumpsys package` 显示 `versionName=16.8`。
 - 日志：
