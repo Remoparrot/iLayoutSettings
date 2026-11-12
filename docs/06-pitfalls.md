@@ -111,6 +111,7 @@
 | **OS4：主题 16.5dp 卡片边距失效**（17.0） | OS4 新增 `updateCardGroupMarginForSmallScreen()`，用设置自己的 `card_group_margin_horizontal`（12dp）`setCardMarginStart/End`，覆盖 miuix 的主题化边距 | `CardMargins` hook 该方法，之后把 `miuix_recyclerview_card_group_margin_start/end` 写回；实测卡片左右 38px → 53px |
 | **OS4：搜索栏玻璃背景冻结**（17.0） | OS4 列表在硬件层里，`root.draw(software canvas)` 每帧返回同一帧（滚动 400ms、捕获 101 次只有 1 次「变化」），`backdropChanged()` 永远判「没变」 | SDK≥37 改 `PixelCopy` 抓窗口 surface（诊断 `cap=242 chg=192`）；`pixelCopyInFlight` 防重入，失败保留上一帧 |
 | **HyperOS 4 的 logcat main 缓冲区对 shell 不可读**（17.0） | `adb logcat -d` 全空，`logcat -g` 显示 `0 B readable`，模块日志拿不到 | 诊断改走 `uiautomator dump` 读 `content-desc`：把捕获次数/变化次数/硬件加速/backdrop 状态写进 contentDescription，比日志可靠；发布前把 `DEBUG_DIAG` 关掉 |
+| **OS4：麦克风图标消失、无法唤起小爱**（17.0） | `styleGlassContent()` 的 `addView(mic, FrameLayout.LayoutParams)` 在 OS4 的 `LinearLayout` stub 上抛 `ClassCastException` 被 catch 吞掉；`VoiceService.startService` 在 OS4 被接受但不弹 `voice_assist_root` | mic 改挂内层 `search_mode_stub` 并按宿主类型构造 LayoutParams（右边距 36dp→23dp 补偿宿主差）；SDK≥37 的唤起改 `ACTION_ASSIST` + `setPackage`（真机焦点切到 `voice_assist_root`），OS3 保留 `VoiceService` |
 
 ### C. 版本与回退（本仓库特有）
 

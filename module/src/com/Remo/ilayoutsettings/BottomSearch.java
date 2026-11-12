@@ -940,7 +940,11 @@ final class BottomSearch {
             FrameLayout.LayoutParams flp = new FrameLayout.LayoutParams(
                     dp(activity, 12), dp(activity, 16),
                     Gravity.END | Gravity.CENTER_VERTICAL);
-            flp.rightMargin = dp(activity, 36);
+            // OS4 hosts the mic on search_mode_stub (26..1254), whose right edge
+            // is 26px left of the bar root the OS3 build measured against, so
+            // the OS3 36dp margin lands 38px too far left. 23dp puts the glyph
+            // back at the OS3 x centre (measured 1137 vs 1099 px right edge).
+            flp.rightMargin = dp(activity, 23);
             lp = flp;
         } else if (micHost instanceof android.widget.LinearLayout) {
             android.widget.LinearLayout.LayoutParams llp =
@@ -995,6 +999,22 @@ final class BottomSearch {
      * the first tap after a cold start takes a few seconds to show the overlay.
      */
     private static void wakeXiaoAi(Activity activity) {
+        // HyperOS 4 accepts the VoiceService start but never raises the
+        // voice_assist_root overlay (verified: focus stays on Settings). The
+        // assist intent is the one that actually opens Xiao Ai there; keep the
+        // VoiceService path for OS3, where it is the power-key short cut.
+        if (Build.VERSION.SDK_INT >= 37) {
+            try {
+                Intent assist = new Intent(Intent.ACTION_ASSIST);
+                assist.setPackage(XIAOAI_PKG);
+                assist.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                activity.startActivity(assist);
+                XLog.i("xiaoai: ACTION_ASSIST (OS4)");
+                return;
+            } catch (Throwable t) {
+                XLog.w("xiaoai: assist intent failed: " + t);
+            }
+        }
         try {
             Intent intent = new Intent(XIAOAI_ACTION);
             intent.setComponent(new ComponentName(XIAOAI_PKG, XIAOAI_SERVICE));

@@ -34,13 +34,18 @@
   列表子树取不到时才退回 `PixelCopy`。OS3 仍走原软件捕获。
 - **麦克风图标恢复**：OS4 把搜索 stub 的根 inflate 成 `LinearLayout`，16.8 用
   `addView(mic, FrameLayout.LayoutParams)` 抛 `ClassCastException` 被外层 catch 吞掉，图标静默消失。
-  现在麦克风挂到内层 `search_mode_stub`（FrameLayout），并按宿主类型构造 LayoutParams。
+  现在麦克风挂到内层 `search_mode_stub`（FrameLayout），并根据宿主类型构造 LayoutParams；
+  宿主右边缘和 OS3 的 bar 根差 26px，右边距从 36dp 改为 **23dp**，图标回到 OS3 的横向位置
+  （实测右边缘 1141 vs OS3 的 1137 px）。
+- **小爱可用**：OS4 接受 `VoiceService` 的 startService 但**不再弹出 `voice_assist_root`**
+  （实测焦点仍停留在设置页）；SDK≥37 改为 `ACTION_ASSIST` + `setPackage("com.miui.voiceassist")`，
+  真机点击后焦点切到 `voice_assist_root`。OS3 仍走原 `VoiceService` 路径。
 - **布局不变**：曾把「电池 / VPN」从网络卡移到隐私卡让「通用」紧跟「个人热点」，
   用户要求「不要改布局」后整段回退——首页分组与 16.8 完全一致。
 - **兼容**：所有 OS4 专用路径按 `Build.VERSION.SDK_INT >= 37` 门控，OS3（Android 16）保持 16.8 行为；
   **OS3 分支本会话未上机验证**。
 - **版本**：17.0 / versionCode **100**；APK `dist/iLayoutSettings-17.0.apk`，302,626 B，
-  SHA-256 `B1A972C49A64741BE2343CE4F9E8310D466AA121A7D09CD6CBC8539F85596CD5`。
+  SHA-256 `26E2FAF27B811CE06A2ACC8B8B01F47D150AB9000586088A9A5A358C2ACC9279`。
 
 # iLayoutSettings · LSPosed 模块（v16.8：二级页顶栏收尾 + 「通用」共用模糊）
 
