@@ -40,7 +40,7 @@
 - **兼容**：所有 OS4 专用路径按 `Build.VERSION.SDK_INT >= 37` 门控，OS3（Android 16）保持 16.8 行为；
   **OS3 分支本会话未上机验证**。
 - **版本**：17.0 / versionCode **100**；APK `dist/iLayoutSettings-17.0.apk`，302,626 B，
-  SHA-256 `55A35F55105CD489D7B972003D11FB1310A8241355DC9BB860297A13EB743E6F`。
+  SHA-256 `B1A972C49A64741BE2343CE4F9E8310D466AA121A7D09CD6CBC8539F85596CD5`。
 
 # iLayoutSettings · LSPosed 模块（v16.8：二级页顶栏收尾 + 「通用」共用模糊）
 

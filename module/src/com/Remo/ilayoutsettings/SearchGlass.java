@@ -229,9 +229,12 @@ final class SearchGlass extends FrameLayout {
             int h = Math.max(1, Math.round((getHeight() + pad * 2) * CAPTURE_SCALE));
             if (backdrop == null || backdrop.getWidth() != w || backdrop.getHeight() != h) {
                 backdrop = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-            } else {
-                backdrop.eraseColor(0);
             }
+            // The list subtree has no background of its own: rows scrolled away
+            // leave transparent pixels, and the lens shader then mixes them into
+            // a dark slate. Paint the page background first so an empty area
+            // under the glass still looks like the page.
+            backdrop.eraseColor(UiTweaks.isDarkMode(getContext()) ? 0xFF1C1C1E : 0xFFF2F2F7);
             Canvas canvas = new Canvas(backdrop);
             canvas.scale(CAPTURE_SCALE, CAPTURE_SCALE);
             int[] viewLoc = new int[2];

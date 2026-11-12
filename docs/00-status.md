@@ -12,14 +12,14 @@
 | 应用名 / 仓库名 | **iLayoutSettings**（GitHub 仓库同步改名，旧地址会 301 跳转） |
 | minSdk / targetSdk | 29 / 36 |
 | 作用域 | `com.android.settings` |
-| 当前包 | `dist/iLayoutSettings-17.0.apk`（302,626 B，SHA-256 `55A35F55…3E6F`；**已在 25053RT47C（OS4.0.2.0.XOLCNXM / Android 17）上覆盖安装并实测**） |
+| 当前包 | `dist/iLayoutSettings-17.0.apk`（302,626 B，SHA-256 `B1A972C4…96CD`；**已在 25053RT47C（OS4.0.2.0.XOLCNXM / Android 17）上覆盖安装并实测**） |
 | 旧包 | `dist/` 只保留当前包；16.8 / 16.7 / 16.6 / 16.5 / 16.4 / 16.3 / 16.2 / 16.1 / 16.0 / 15.x / 14.8 在各自 GitHub Release |
 
 ## 发布物指纹
 
 | 包 | 大小 | SHA-256 | 签名证书 SHA-256 |
 | --- | --- | --- | --- |
-| `iLayoutSettings-17.0.apk`（**当前**） | 302,626 B | `55A35F55105CD489D7B972003D11FB1310A8241355DC9BB860297A13EB743E6F` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-17.0.apk`（**当前**） | 302,626 B | `B1A972C49A64741BE2343CE4F9E8310D466AA121A7D09CD6CBC8539F85596CD5` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
 | `iLayoutSettings-16.8.apk`（历史，Release） | 302,626 B | `6D543EABA02906A665787A4207FE72464A18E4EA895501C33D05028520B80F3A` | 同上 |
 | `iLayoutSettings-16.7.apk`（历史，Release） | 298,530 B | `25E0FCA8A39256DFCEC726DCEEC50CB8B268427CDE27A0C18F61589E11CDD973` | 同上 |
 | `iLayoutSettings-16.6.apk`（历史，Release） | 294,434 B | `F167D3820FEEAF83FED1B8C7FFDF8CD006BF9ADB38EFE4C24E4E9116076BE6FE` | 同上 |
@@ -40,7 +40,7 @@
 | --- | --- |
 | 仓库 | https://github.com/Remoparrot/iLayoutSettings （旧 `iLyayot` 自动跳转） |
 | 默认分支 | `main` |
-| 最新 Release | [v17.0](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v17.0)（附件 `iLayoutSettings-17.0.apk`，302,626 B，SHA-256 `55A35F55…3E6F`） |
+| 最新 Release | [v17.0](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v17.0)（附件 `iLayoutSettings-17.0.apk`，302,626 B，SHA-256 `B1A972C4…96CD`） |
 | 自动发版 | `tools/release.ps1`：构建 → 校验 → **自动 add/commit/push 当前分支** → 打 tag → 建 Release → 上传附件；脚本必须是 UTF-8 **带 BOM**，且在发 POST 前自检正文（中文丢失 / 占位符残留即中止） |
 | 旧 Release | v16.8、16.5、16.4、16.3、16.2、16.1、16.0、15.5、14.8 保留（本地 `dist/` 不再保留旧包） |
 
