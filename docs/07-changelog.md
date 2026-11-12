@@ -28,14 +28,19 @@
   `theme_values.xml` 里的 `miuix_recyclerview_card_group_margin_*`（16.5dp）失效。17.0 hook
   该方法后把主题值写回 `CardItemDecoration`（实测卡片左右 38px → 53px）。
 - **搜索栏玻璃背景不再冻结**：OS4 把列表放进硬件层，`root.draw(software canvas)` 每帧返回同一帧
-  （诊断：滚动 400ms 捕获 101 次只有 1 次「变化」），玻璃背景就停在滚动结束前那一屏。SDK≥37 改
-  `PixelCopy` 直接从窗口 surface 抓帧（诊断计数变为 `cap=242 chg=192`），OS3 仍走原软件捕获。
+  （诊断：滚动 400ms 捕获 101 次只有 1 次「变化」），玻璃背景就停在滚动结束前那一屏。SDK≥37 改为
+  **只绘制 `scroll_headers` 列表子树**作为玻璃背景 —— 既绕开冻结层，又不会把玻璃自己拍进去
+  （`PixelCopy` 抓窗口 surface 会拍到自己，逐帧叠加后玻璃发白、麦克风图标被淹、卡片像消失）；
+  列表子树取不到时才退回 `PixelCopy`。OS3 仍走原软件捕获。
+- **麦克风图标恢复**：OS4 把搜索 stub 的根 inflate 成 `LinearLayout`，16.8 用
+  `addView(mic, FrameLayout.LayoutParams)` 抛 `ClassCastException` 被外层 catch 吞掉，图标静默消失。
+  现在麦克风挂到内层 `search_mode_stub`（FrameLayout），并按宿主类型构造 LayoutParams。
 - **布局不变**：曾把「电池 / VPN」从网络卡移到隐私卡让「通用」紧跟「个人热点」，
   用户要求「不要改布局」后整段回退——首页分组与 16.8 完全一致。
 - **兼容**：所有 OS4 专用路径按 `Build.VERSION.SDK_INT >= 37` 门控，OS3（Android 16）保持 16.8 行为；
   **OS3 分支本会话未上机验证**。
 - **版本**：17.0 / versionCode **100**；APK `dist/iLayoutSettings-17.0.apk`，302,626 B，
-  SHA-256 `562F3151AFEEA2300896FFEC673F30F205FA3FF9785655A6964DD8B64635A67E`。
+  SHA-256 `55A35F55105CD489D7B972003D11FB1310A8241355DC9BB860297A13EB743E6F`。
 
 # iLayoutSettings · LSPosed 模块（v16.8：二级页顶栏收尾 + 「通用」共用模糊）
 

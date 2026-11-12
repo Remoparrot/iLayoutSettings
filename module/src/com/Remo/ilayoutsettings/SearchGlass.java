@@ -204,6 +204,56 @@ final class SearchGlass extends FrameLayout {
     private boolean tintGradientDark;
 
     /**
+     * OS4 capture path #1: draw only the scrolling list into the backdrop.
+     * The list is outside the frozen layer that made {@code root.draw()} return
+     * a still frame, and the search bar is not part of its subtree, so the
+     * backdrop follows the scroll and never contains the glass itself.
+     */
+    private boolean captureListOnly() {
+        try {
+            android.app.Activity activity = activityOf(getContext());
+            if (activity == null || getWidth() <= 0 || getHeight() <= 0) {
+                return false;
+            }
+            int listId = getResources().getIdentifier(
+                    "scroll_headers", "id", "com.android.settings");
+            if (listId == 0) {
+                return false;
+            }
+            View list = activity.findViewById(listId);
+            if (list == null || list.getWidth() <= 0 || list.getHeight() <= 0) {
+                return false;
+            }
+            int pad = dp(CAPTURE_PAD_DP);
+            int w = Math.max(1, Math.round((getWidth() + pad * 2) * CAPTURE_SCALE));
+            int h = Math.max(1, Math.round((getHeight() + pad * 2) * CAPTURE_SCALE));
+            if (backdrop == null || backdrop.getWidth() != w || backdrop.getHeight() != h) {
+                backdrop = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            } else {
+                backdrop.eraseColor(0);
+            }
+            Canvas canvas = new Canvas(backdrop);
+            canvas.scale(CAPTURE_SCALE, CAPTURE_SCALE);
+            int[] viewLoc = new int[2];
+            int[] listLoc = new int[2];
+            getLocationInWindow(viewLoc);
+            list.getLocationInWindow(listLoc);
+            canvas.translate(pad - (viewLoc[0] - listLoc[0]),
+                    pad - (viewLoc[1] - listLoc[1]));
+            captureCount++;
+            list.draw(canvas);
+            lastCenterColor = backdrop.getPixel(w / 2, h / 2);
+            if (backdropChanged()) {
+                invalidate();
+            }
+            return true;
+        } catch (Throwable t) {
+            lastCaptureError = "list:" + t.getClass().getSimpleName();
+            return false;
+        }
+    }
+
+    /**
      * OS4 capture path: copy the glass rectangle out of the window surface.
      * The result is scaled back to the backdrop bitmap the lens shader expects.
      */
@@ -453,11 +503,14 @@ final class SearchGlass extends FrameLayout {
 
     private void capture() {
         // HyperOS 4 keeps the Settings list inside a hardware layer, so drawing
-        // the view tree into a software bitmap returns the same frozen frame on
-        // every pass (the glass backdrop stopped following the scroll). Read
-        // the window surface instead: PixelCopy always returns the frame that
-        // is actually on screen, including the scrolled list.
+        // the whole view tree into a software bitmap returns the same frozen
+        // frame on every pass (the glass backdrop stopped following the scroll).
+        // Drawing only the list subtree avoids that layer *and* keeps the glass
+        // itself out of the backdrop (no self-feedback / no washed-out glass).
         if (Build.VERSION.SDK_INT >= 37) {
+            if (captureListOnly()) {
+                return;
+            }
             captureWithPixelCopy();
             return;
         }

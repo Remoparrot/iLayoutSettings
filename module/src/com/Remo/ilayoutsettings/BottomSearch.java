@@ -921,13 +921,39 @@ final class BottomSearch {
         mic.setContentDescription("小爱同学");
         mic.setClickable(true);
         mic.setFocusable(true);
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-                dp(activity, 12), dp(activity, 16),
-                Gravity.END | Gravity.CENTER_VERTICAL);
+        // HyperOS 4 inflates the search stub as a LinearLayout, so a
+        // FrameLayout.LayoutParams addView() throws and the mic silently
+        // disappeared (the whole styling call was caught). Host it on the
+        // inner search_mode_stub (a FrameLayout) and pick the params by type.
+        ViewGroup micHost = bar instanceof ViewGroup ? (ViewGroup) bar : null;
+        int stubId = activity.getResources().getIdentifier(
+                "search_mode_stub", "id", "com.android.settings");
+        View stub = stubId == 0 ? null : bar.findViewById(stubId);
+        if (stub instanceof FrameLayout) {
+            micHost = (FrameLayout) stub;
+        }
+        if (micHost == null) {
+            return;
+        }
+        ViewGroup.LayoutParams lp;
+        if (micHost instanceof FrameLayout) {
+            FrameLayout.LayoutParams flp = new FrameLayout.LayoutParams(
+                    dp(activity, 12), dp(activity, 16),
+                    Gravity.END | Gravity.CENTER_VERTICAL);
+            flp.rightMargin = dp(activity, 36);
+            lp = flp;
+        } else if (micHost instanceof android.widget.LinearLayout) {
+            android.widget.LinearLayout.LayoutParams llp =
+                    new android.widget.LinearLayout.LayoutParams(
+                            dp(activity, 12), dp(activity, 16));
+            llp.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
+            lp = llp;
+        } else {
+            lp = new ViewGroup.LayoutParams(dp(activity, 12), dp(activity, 16));
+        }
         // The stub root has no padding (the inner stub layout is the one that is
         // inset), so 36dp from the root's right edge puts the smaller mic 3dp
         // further inside than the first pass, matching the reference.
-        lp.rightMargin = dp(activity, 36);
         mic.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -941,7 +967,7 @@ final class BottomSearch {
                 wakeXiaoAi(activity);
             }
         });
-        ((ViewGroup) bar).addView(mic, lp);
+        micHost.addView(mic, lp);
         XLog.i("mic icon added (tap -> Xiao Ai)");
     }
 

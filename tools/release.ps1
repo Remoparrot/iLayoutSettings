@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     iLayoutSettings 自动发版：构建 → 校验 → 打 tag → 建 GitHub Release → 上传 APK。
@@ -58,6 +58,12 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
+
+# curl.exe emits UTF-8; Windows PowerShell 5.1 otherwise decodes native-command
+# output with the console code page (GBK on this machine). The mangled bytes
+# made `$resp | ConvertFrom-Json` throw *after* the Release POST had already
+# succeeded, so v17.0 was created without its APK asset (manually recovered).
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 
 $here = $PSScriptRoot
 $root = Split-Path -Parent $here
@@ -216,16 +222,19 @@ $bodyTemplate = @'
 
 > 本机 MIUI 可能拦截 adb 安装新包（`INSTALL_FAILED_USER_RESTRICTED`），请把 APK 拷到手机手动安装。
 
-### 本版内容（16.8）
+### 本版内容（17.0）
 
-- **进入二级页不再自带滚动偏移**：16.7 的二级页一进入就处于「已滚动」状态、顶栏和发丝线提前出现；
-  本版在加 padding 后把列表锚回顶部，二级页一律从顶部开始；
-- **「我的设备 / 通用」卡片留白修复**：不再把内层 `description_grid` 当成列表加 padding，
-  下方「REDMI Turbo 4 Pro」卡上方的巨大空白消失；
-- **「通用」顶栏共用模糊**：设备详情页的内容现在会滑进栏下，被同一套半透明底色 + 原生模糊处理，
-  发丝线也正常出现（浅色黑 12%、深色中性灰 30%）；
-- **发丝线条件收紧**：只有内容真的到了栏下才画线，内容到不了栏底的页面不再出现悬空的线；
-- 版本 16.8 / versionCode 99。
+- **HyperOS 4 适配**：顶栏模糊/发丝线恢复（`isSupport()`/`mIsSupport` 三级探测、`mBlurRadius`、
+  `hasMaterialPermission` 门槛、`applyBlur(true)`；列表随栏收缩上移，内容真进栏下）；
+- **退出搜索不再出现两条搜索栏**：OS4 会重新显示原生顶部栏，本版每次布局幂等隐藏；
+- **卡片左右边距重新跟随主题**：OS4 用 12dp 的 `card_group_margin_horizontal` 覆盖 miuix 主题化边距，
+  本版在 `updateCardGroupMarginForSmallScreen` 之后把主题值写回（16.5dp 实测生效）；
+- **搜索栏玻璃不再冻结、麦克风图标恢复**：OS4 软件画布抓帧冻结 → 改为只绘制 `scroll_headers`
+  子树（不含玻璃自身）；mic 改挂内层 `search_mode_stub` 并按宿主类型构造 LayoutParams；
+- **布局不变**：首页分组与 16.8 一致（电池 / VPN 仍在网络卡）。
+- 版本 17.0 / versionCode 100。
+- **兼容**：HyperOS 3（Android 16）与 HyperOS 4（Android 17）；OS4 专用路径按 SDK≥37 门控，
+  本版真机验证在 OS4.0.2.0.XOLCNXM 上完成，**OS3 未上机回归**。
 
 ### 截图
 

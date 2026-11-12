@@ -12,14 +12,14 @@
 | 应用名 / 仓库名 | **iLayoutSettings**（GitHub 仓库同步改名，旧地址会 301 跳转） |
 | minSdk / targetSdk | 29 / 36 |
 | 作用域 | `com.android.settings` |
-| 当前包 | `dist/iLayoutSettings-17.0.apk`（302,626 B，SHA-256 `562F3151…A67E`；**已在 25053RT47C（OS4.0.2.0.XOLCNXM / Android 17）上覆盖安装并实测**） |
+| 当前包 | `dist/iLayoutSettings-17.0.apk`（302,626 B，SHA-256 `55A35F55…3E6F`；**已在 25053RT47C（OS4.0.2.0.XOLCNXM / Android 17）上覆盖安装并实测**） |
 | 旧包 | `dist/` 只保留当前包；16.8 / 16.7 / 16.6 / 16.5 / 16.4 / 16.3 / 16.2 / 16.1 / 16.0 / 15.x / 14.8 在各自 GitHub Release |
 
 ## 发布物指纹
 
 | 包 | 大小 | SHA-256 | 签名证书 SHA-256 |
 | --- | --- | --- | --- |
-| `iLayoutSettings-17.0.apk`（**当前**） | 302,626 B | `562F3151AFEEA2300896FFEC673F30F205FA3FF9785655A6964DD8B64635A67E` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-17.0.apk`（**当前**） | 302,626 B | `55A35F55105CD489D7B972003D11FB1310A8241355DC9BB860297A13EB743E6F` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
 | `iLayoutSettings-16.8.apk`（历史，Release） | 302,626 B | `6D543EABA02906A665787A4207FE72464A18E4EA895501C33D05028520B80F3A` | 同上 |
 | `iLayoutSettings-16.7.apk`（历史，Release） | 298,530 B | `25E0FCA8A39256DFCEC726DCEEC50CB8B268427CDE27A0C18F61589E11CDD973` | 同上 |
 | `iLayoutSettings-16.6.apk`（历史，Release） | 294,434 B | `F167D3820FEEAF83FED1B8C7FFDF8CD006BF9ADB38EFE4C24E4E9116076BE6FE` | 同上 |
@@ -40,7 +40,7 @@
 | --- | --- |
 | 仓库 | https://github.com/Remoparrot/iLayoutSettings （旧 `iLyayot` 自动跳转） |
 | 默认分支 | `main` |
-| 最新 Release | [v17.0](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v17.0)（附件 `iLayoutSettings-17.0.apk`，302,626 B，SHA-256 `562F3151…A67E`） |
+| 最新 Release | [v17.0](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v17.0)（附件 `iLayoutSettings-17.0.apk`，302,626 B，SHA-256 `55A35F55…3E6F`） |
 | 自动发版 | `tools/release.ps1`：构建 → 校验 → **自动 add/commit/push 当前分支** → 打 tag → 建 Release → 上传附件；脚本必须是 UTF-8 **带 BOM**，且在发 POST 前自检正文（中文丢失 / 占位符残留即中止） |
 | 旧 Release | v16.8、16.5、16.4、16.3、16.2、16.1、16.0、15.5、14.8 保留（本地 `dist/` 不再保留旧包） |
 
@@ -51,7 +51,8 @@
   - 顶栏模糊/发丝线/透明度恢复：`ForceBlur` 的能力探测改三级（`SUPPORT_HYPER_MATERIAL` → `mIsSupport` → `isSupport()`），半径同时写 `mBlurEffect`（OS3）/`mBlurRadius`（OS4），强制 `hasMaterialPermission` 与 `applyBlur(true)`；`UiTweaks` 放开 `getScrollableView()` 父链裁剪，并（仅 OS4）把列表按「展开栏高 − 当前栏高」`translationY` 上移——内容是真正滑进栏下被模糊的；
   - 退出搜索不再出现两条搜索栏：`BottomSearch.hideAnchor()` 在每次布局/恢复时幂等隐藏 MIUI 原生顶部栏；
   - 卡片左右边距重新跟随主题 `theme_values.xml`：OS4 的 `updateCardGroupMarginForSmallScreen()` 用 `card_group_margin_horizontal`（12dp）覆盖 miuix 主题化边距，`CardMargins` hook 后写回 `miuix_recyclerview_card_group_margin_start/end`（实测 38px→53px，即 16.5dp）；
-  - 搜索栏玻璃背景不再冻结：OS4 的列表在硬件层里，软件画布 `root.draw()` 每帧返回同一帧；`SearchGlass` 在 SDK≥37 改 `PixelCopy` 抓窗口 surface（诊断计数从 `cap=101 chg=1` 变 `cap=242 chg=192`）。
+  - 搜索栏玻璃背景不再冻结：OS4 的列表在硬件层里，软件画布 `root.draw()` 每帧返回同一帧；`SearchGlass` 在 SDK≥37 改为**只绘制 `scroll_headers` 列表子树**作为背景（绕开冻结层、且不含玻璃自身；`PixelCopy` 会把玻璃拍进去、逐帧叠加发白），取不到列表才退回 `PixelCopy`（诊断计数从 `cap=101 chg=1` 变 `cap=562 chg=947`）；
+  - 搜索栏麦克风图标恢复：OS4 的 stub 根是 `LinearLayout`，16.8 的 `addView(mic, FrameLayout.LayoutParams)` 抛异常被吞；现在挂到内层 `search_mode_stub` 并按宿主类型构造 LayoutParams。
 - ✅ **控制中心上移（16.7）**：首页「控制中心」行移到「墙纸」上方（组 4 内调槽位，卡片不变）
 - ✅ 首页「专注模式」「相机」「搜索」合成入口（15.4 / 15.5 起）
 - ✅ **iCloud 入口（16.0，16.2 图标更新）**：固定在「Game Center」下方、同一张卡片；
