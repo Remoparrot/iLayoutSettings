@@ -291,3 +291,34 @@ MIUI 会给每一行再叠一层「卡片形状」的 9-patch 背景/前景，�
 | `SearchGlass` / `SearchHost` | 底部搜索的玻璃层 | **在用**（`BottomSearch` 引用） |
 
 清理计划见 [路线图](09-roadmap.md)。
+
+## 8. HyperOS 4 兼容层（17.0）
+
+OS4（Android 17）改了一批 miuix 的字段与门槛。所有 OS4 专用路径都用
+`Build.VERSION.SDK_INT >= 37` 门控，OS3（36）继续走 16.8 的代码。
+
+| OS3（16.8 假设） | OS4 实际 | 适配 |
+| --- | --- | --- |
+| `HyperMaterialUtils.SUPPORT_HYPER_MATERIAL`（静态字段） | 无；改 `mIsSupport`（private static）+ `isSupport()` | `ForceBlur.probeSupport()` 三级探测，读不到也继续装 hook |
+| `MiuiBlurUiHelper.mBlurEffect` | `mBlurRadius`（`refreshBlur()` 读它） | 两处都写，读的时候 `mBlurEffect` 空则读 `mBlurRadius` |
+| `setEnableBlur(true)` 直接生效 | 还要 `HyperMaterialUtils.hasMaterialPermission(view, pkg, 2)` 为 true，否则 `setEnableInner(false)` | `forceTrue(material, "hasMaterialPermission")` |
+| `setEnableBlur()` 会把模糊应用 | 只记 `mExpectedEnable`，应用发生在 `applyBlur(Z)` | `forceHeaderBlur()` 追加 `applyBlur(true)` |
+| `NestedHeaderLayout.mScrollableView` | 无；`getScrollableView()` | `unclip()` 反射回退 |
+| 栏折叠时列表跟随上移 | `action_bar_container` 缩到 331px，列表仍锚在 506px | `refreshTopBar()` 里 `list.setTranslationY(-(openHeight - barHeight))` |
+| miuix `CardItemDecoration` 直接读主题化 `miuix_recyclerview_card_group_margin_*` | `SettingsFragment.updateCardGroupMarginForSmallScreen()` 用 `card_group_margin_horizontal`（12dp）覆盖 | `CardMargins` hook 之后把主题值写回 |
+| 搜索栏玻璃 `root.draw(software canvas)` 能拿到当前帧 | 列表在硬件层里，软件画布每帧返回同一帧 | SDK≥37 用 `PixelCopy` 抓窗口 surface |
+| 退出搜索后原生顶部栏保持 GONE | ActionMode 销毁时把 `mAnchorView` 重新 VISIBLE | `BottomSearch.hideAnchor()` 幂等隐藏 |
+
+新增/修改的类：
+
+- `CardMargins.java`（新）：`updateCardGroupMarginForSmallScreen` 的 after hook，
+  按 `miuix_recyclerview_card_group_margin_start/end` 重设 `CardItemDecoration`，
+  在 `Hook.buildAdapter` / `onResume` 后也会再调一次（`CardMargins.apply`）；
+- `ForceBlur`：能力探测与半径字段兼容，见上表；
+- `UiTweaks.unclip()`：`clearClipUp()` 沿列表父链清 `clipBounds` 并关 `clipChildren`；
+- `SearchGlass.capture()`：SDK≥37 走 `captureWithPixelCopy()`，`pixelCopyInFlight` 防重入，
+  回调里缩放成 backdrop 再走原来的 `backdropChanged()` → `drawLens()`。
+
+调试提示：HyperOS 4 的 `logcat` main 缓冲区对 shell 是 `0 B readable`。临时诊断写在
+`contentDescription` 里（`GL cap/chg/bd`、`TB scrolled/appBarH`），用 `uiautomator dump` 读；
+发布前把 `SearchGlass.DEBUG_DIAG` 置回 false 并移除 `UiTweaks.publishTopBarDiag` 的调用。

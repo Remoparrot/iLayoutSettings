@@ -1,25 +1,26 @@
 # 项目状态快照
 
-> 状态：**现行** · 最后更新：2026-11-11
+> 状态：**现行** · 最后更新：2026-11-12
 > 每次会话结束必须更新本文件。只写「现在是什么样」，历史过程放 `sessions/`。
 
 ## 当前版本
 
 | 项 | 值 |
 | --- | --- |
-| versionName / versionCode | **16.8 / 99**（唯一来源：`module/AndroidManifest.xml`） |
+| versionName / versionCode | **17.0 / 100**（唯一来源：`module/AndroidManifest.xml`） |
 | 包名 | **`com.Remo.ilayoutsettings`**（16.0 由 `com.abradant.iossettings` 改名，属于破坏性变更） |
 | 应用名 / 仓库名 | **iLayoutSettings**（GitHub 仓库同步改名，旧地址会 301 跳转） |
 | minSdk / targetSdk | 29 / 36 |
 | 作用域 | `com.android.settings` |
-| 当前包 | `dist/iLayoutSettings-16.8.apk`（302,626 B，SHA-256 `6D543EAB…0F3A`；**已在 25053RT47C 上覆盖安装并实测**） |
-| 旧包 | `dist/` 只保留当前包；16.6 / 16.5 / 16.4 / 16.3 / 16.2 / 16.1 / 16.0 / 15.x / 14.8 在各自 GitHub Release |
+| 当前包 | `dist/iLayoutSettings-17.0.apk`（302,626 B，SHA-256 `562F3151…A67E`；**已在 25053RT47C（OS4.0.2.0.XOLCNXM / Android 17）上覆盖安装并实测**） |
+| 旧包 | `dist/` 只保留当前包；16.8 / 16.7 / 16.6 / 16.5 / 16.4 / 16.3 / 16.2 / 16.1 / 16.0 / 15.x / 14.8 在各自 GitHub Release |
 
 ## 发布物指纹
 
 | 包 | 大小 | SHA-256 | 签名证书 SHA-256 |
 | --- | --- | --- | --- |
-| `iLayoutSettings-16.8.apk`（**当前**） | 302,626 B | `6D543EABA02906A665787A4207FE72464A18E4EA895501C33D05028520B80F3A` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-17.0.apk`（**当前**） | 302,626 B | `562F3151AFEEA2300896FFEC673F30F205FA3FF9785655A6964DD8B64635A67E` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-16.8.apk`（历史，Release） | 302,626 B | `6D543EABA02906A665787A4207FE72464A18E4EA895501C33D05028520B80F3A` | 同上 |
 | `iLayoutSettings-16.7.apk`（历史，Release） | 298,530 B | `25E0FCA8A39256DFCEC726DCEEC50CB8B268427CDE27A0C18F61589E11CDD973` | 同上 |
 | `iLayoutSettings-16.6.apk`（历史，Release） | 294,434 B | `F167D3820FEEAF83FED1B8C7FFDF8CD006BF9ADB38EFE4C24E4E9116076BE6FE` | 同上 |
 | `iLayoutSettings-16.5.apk`（历史，Release） | 286,069 B | `8449352927AD053BD49FDDF3505AADE4532F90933E680CDF94AE72257854B566` | 同上 |
@@ -39,13 +40,18 @@
 | --- | --- |
 | 仓库 | https://github.com/Remoparrot/iLayoutSettings （旧 `iLyayot` 自动跳转） |
 | 默认分支 | `main` |
-| 最新 Release | [v16.8](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.8)（附件 `iLayoutSettings-16.8.apk`，302,626 B，SHA-256 `6D543EAB…0F3A`） |
+| 最新 Release | [v17.0](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v17.0)（附件 `iLayoutSettings-17.0.apk`，302,626 B，SHA-256 `562F3151…A67E`） |
 | 自动发版 | `tools/release.ps1`：构建 → 校验 → **自动 add/commit/push 当前分支** → 打 tag → 建 Release → 上传附件；脚本必须是 UTF-8 **带 BOM**，且在发 POST 前自检正文（中文丢失 / 占位符残留即中止） |
-| 旧 Release | v16.5、16.4、16.3、16.2、16.1、16.0、15.5、14.8 保留（本地 `dist/` 不再保留旧包） |
+| 旧 Release | v16.8、16.5、16.4、16.3、16.2、16.1、16.0、15.5、14.8 保留（本地 `dist/` 不再保留旧包） |
 
 ## 现在能做什么
 
 - ✅ 首页入口按 iOS 分组重排（`HeaderData`），卡片仍由 miuix 绘制
+- ✅ **HyperOS 4 适配（17.0）**：
+  - 顶栏模糊/发丝线/透明度恢复：`ForceBlur` 的能力探测改三级（`SUPPORT_HYPER_MATERIAL` → `mIsSupport` → `isSupport()`），半径同时写 `mBlurEffect`（OS3）/`mBlurRadius`（OS4），强制 `hasMaterialPermission` 与 `applyBlur(true)`；`UiTweaks` 放开 `getScrollableView()` 父链裁剪，并（仅 OS4）把列表按「展开栏高 − 当前栏高」`translationY` 上移——内容是真正滑进栏下被模糊的；
+  - 退出搜索不再出现两条搜索栏：`BottomSearch.hideAnchor()` 在每次布局/恢复时幂等隐藏 MIUI 原生顶部栏；
+  - 卡片左右边距重新跟随主题 `theme_values.xml`：OS4 的 `updateCardGroupMarginForSmallScreen()` 用 `card_group_margin_horizontal`（12dp）覆盖 miuix 主题化边距，`CardMargins` hook 后写回 `miuix_recyclerview_card_group_margin_start/end`（实测 38px→53px，即 16.5dp）；
+  - 搜索栏玻璃背景不再冻结：OS4 的列表在硬件层里，软件画布 `root.draw()` 每帧返回同一帧；`SearchGlass` 在 SDK≥37 改 `PixelCopy` 抓窗口 surface（诊断计数从 `cap=101 chg=1` 变 `cap=242 chg=192`）。
 - ✅ **控制中心上移（16.7）**：首页「控制中心」行移到「墙纸」上方（组 4 内调槽位，卡片不变）
 - ✅ 首页「专注模式」「相机」「搜索」合成入口（15.4 / 15.5 起）
 - ✅ **iCloud 入口（16.0，16.2 图标更新）**：固定在「Game Center」下方、同一张卡片；
@@ -154,21 +160,35 @@
 16. **二级页顶栏的 tint 是同一只 `ColorDrawable`**（16.8）：`MiuiBlurUtils.setBackgroundBlur`
     依赖 view 背景层，若某主题给 `action_bar_container` 换了自带模糊的 drawable，会被模块的
     纯色 drawable 覆盖，模糊只剩 `setBackgroundBlur` 这一路。
+17. **OS4 首页「通用」仍排在「电池 / VPN」之后**：这是 16.8 的分组（网络卡 6 行），
+    17.0 曾把电池/VPN 移到隐私卡让「通用」紧跟「个人热点」，**用户明确否决「不要改布局」后整段回退**。
+    要再动必须先给用户看两种布局的对比图。
+18. **OS4 的列表上移依赖记录的「展开栏高」**（`OPEN_BAR_HEIGHT`，实测 506px）：某主题若把展开态
+    栏高改得和折叠态接近，`shift` 偏小，栏下会重新出现留白。上移只在 SDK≥37 生效，OS3 不走这段。
+19. **搜索栏玻璃模糊默认只有 1.0dp**（`DEFAULT_GLASS_BLUR`，用户要求保持不动）：浅色页面上基本
+    看不出「糊」，看起来更像半透明色块；要更明显需在 GUI 里调大「搜索栏玻璃 · 模糊」
+    （实测 15.6dp 时黑图标会被糊成色团）。
+20. **OS4 的 `PixelCopy` 偶发 `pixelcopy:3`（`ERROR_SOURCE_INVALID`）**：回调里已忽略并保留上一帧，
+    表现为那一帧玻璃背景不刷新；连续滚动时暂未观察到可见抖动。
 
 ## 下一步（优先级从高到低）
 
-1. 观察 16.6 搜索栏在**第三方主题/彩色壁纸/浅色纯白页**下的光边与折射。16.7 已试过给浅色加
+1. **OS3 真机回归 17.0**：本机已升 OS4，17.0 的 OS3 分支（软件捕获、miuix 默认边距、无 translationY）
+   **未上机验证**，是当前最大的发布风险；
+2. 观察 17.0 的 `PixelCopy` 在长滚动/搜索切换时的功耗与 `pixelcopy:3` 频率；
+   必要时降到 30fps 或复用 bitmap；
+3. 观察 16.6 搜索栏在**第三方主题/彩色壁纸/浅色纯白页**下的光边与折射。16.7 已试过给浅色加
    1px 灰色轮廓 + 内移白高光，实测偏重（灰环 + 白环），按反馈回退——**要再动先让用户看对比图**；
-2. 观察小爱入口在 ROM 升级后的可用性；必要时把 `VoiceService` 的 `ComponentName` 做成
+4. 观察小爱入口在 ROM 升级后的可用性；必要时把 `VoiceService` 的 `ComponentName` 做成
    可配置，或改走 `ACTION_ASSIST`；
-3. 观察 16.5 的「常开模糊」在**搜索模式**、第三方主题、平板/横屏下的表现（栏高变化会不会
+5. 观察 16.5 的「常开模糊」在**搜索模式**、第三方主题、平板/横屏下的表现（栏高变化会不会
    让线提前出现）；必要时把发丝线的显示条件收紧到「折叠进度 > 阈值」；
-4. 16.8 的延迟 refresh 目前是 700/1600/3200ms 三次；若「我的设备」在慢设备上仍偶发丢
+6. 16.8 的延迟 refresh 目前是 700/1600/3200ms 三次；若「我的设备」在慢设备上仍偶发丢
    padding，改成 hook fragment `onCreateView` 重挂更稳（代价是多一个类钩子）；
-5. 图标如需跟随系统主题，补 `mipmap-anydpi-v26` adaptive icon（前景 = 齿轮+玻璃盘，背景 = 渐变）；
-6. 接 GitHub Actions：tag 触发 `tools/release.ps1` 的只读版本（构建 + 上传）；
-7. 清理 `Hook` 未引用的遗留类（`GlassToggle`、`IntroCard`、`AboutIos` 等）；
-8. 平板/分屏适配。
+7. 图标如需跟随系统主题，补 `mipmap-anydpi-v26` adaptive icon（前景 = 齿轮+玻璃盘，背景 = 渐变）；
+8. 接 GitHub Actions：tag 触发 `tools/release.ps1` 的只读版本（构建 + 上传）；
+9. 清理 `Hook` 未引用的遗留类（`GlassToggle`、`IntroCard`、`AboutIos` 等）；
+10. 平板/分屏适配。
 
 ## 环境事实（本机）
 
@@ -177,5 +197,5 @@
 | JDK | 21.0.2（`D:\Android\jdk21\jdk-21.0.2`，16.4 构建实测；17 亦可） |
 | build-tools | 37.0.0（`D:\Android\Sdk\build-tools\37.0.0`，aapt2 / d8 / zipalign / apksigner 实测可用） |
 | android.jar | API 37（`D:\Android\Sdk\platforms\android-37.0\android.jar`，构建显式传 `-AndroidJar`） |
-| 设备 | 25053RT47C / HyperOS 3 / Android 16，adb `D:\platform-tools\adb.exe` |
+| 设备 | 25053RT47C / HyperOS 4（OS4.0.2.0.XOLCNXM） / Android 17，adb `D:\platform-tools\adb.exe` |
 | 调试产物目录 | 手机上统一放 `/sdcard/Download/iLayoutSettings/`（不要散落在存储根目录；测试截图拉回后即删） |

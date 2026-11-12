@@ -52,7 +52,17 @@ final class UiTweaks {
      */
     private static void unclip(View header, Context context) {
         try {
+            // HyperOS 4 removed mScrollableView from NestedHeaderLayout and
+            // keeps the scroll shell behind getScrollableView(); without the
+            // fallback the list stays clipped at the bar's lower edge, so no
+            // content ever reaches the blur layer and the bar looks flat.
             Object shell = HeaderData.field(header, "mScrollableView");
+            if (!(shell instanceof View)) {
+                Object viaMethod = call(header, "getScrollableView");
+                if (viaMethod instanceof View) {
+                    shell = viaMethod;
+                }
+            }
             if (shell instanceof View && ((View) shell).getClipBounds() != null) {
                 ((View) shell).setClipBounds(null);
             }
@@ -60,8 +70,37 @@ final class UiTweaks {
             if (list instanceof View && ((View) list).getClipBounds() != null) {
                 ((View) list).setClipBounds(null);
             }
+            // HyperOS 4 wraps the list in a SpringBackLayout that clips its own
+            // children at the bar edge; clearing the whole header subtree is the
+            // ROM-agnostic way to let rows draw under the blur.
+            if (list instanceof View) {
+                clearClipUp((View) list, header, 0);
+            }
         } catch (Throwable t) {
             XLog.w("top bar unclip failed: " + t);
+        }
+    }
+
+    /** Clears clipBounds and lets children overdraw on the list's ancestors. */
+    private static void clearClipUp(View from, View header, int depth) {
+        if (from == null || depth > 6) {
+            return;
+        }
+        try {
+            if (from != header) {
+                if (from.getClipBounds() != null) {
+                    from.setClipBounds(null);
+                }
+                if (from instanceof android.view.ViewGroup
+                        && ((android.view.ViewGroup) from).getClipChildren()) {
+                    ((android.view.ViewGroup) from).setClipChildren(false);
+                }
+            }
+            android.view.ViewParent parent = from.getParent();
+            if (parent instanceof View && parent != header) {
+                clearClipUp((View) parent, header, depth + 1);
+            }
+        } catch (Throwable ignored) {
         }
     }
 
@@ -461,10 +500,17 @@ final class UiTweaks {
             int radius = Prefs.topBarBlurRadius(context);
             Object helper = HeaderData.field(header, "mBlurUiHelper");
             if (helper != null) {
+                // OS3 stores the radius in mBlurEffect; OS4 renamed it to
+                // mBlurRadius. Reading the wrong one made every pass look like
+                // "not applied yet" and rebuilt the blur node each frame.
                 Object current = HeaderData.field(helper, "mBlurEffect");
+                if (!(current instanceof Integer)) {
+                    current = HeaderData.field(helper, "mBlurRadius");
+                }
                 int applied = current instanceof Integer ? (Integer) current : Integer.MIN_VALUE;
                 if (applied != radius) {
                     HeaderData.setIntField(helper, "mBlurEffect", radius);
+                    HeaderData.setIntField(helper, "mBlurRadius", radius);
                     call(helper, "refreshBlur");
                 }
             }
@@ -473,6 +519,24 @@ final class UiTweaks {
             // account card used to be cut off at the bar's lower edge instead
             // of sliding under a blurred bar.
             unclip(header, context);
+            // HyperOS 4 shrinks action_bar_container from the open height to the
+            // condensed one, but leaves the RecyclerView anchored at the open
+            // height: rows never reach the bar, so the blur has nothing to
+            // sample and a blank gap opens between bar and content. Slide the
+            // list up by the collapsed amount instead of relayouting it, so the
+            // nested-scroll offsets stay MIUI's own. HyperOS 3 lays the list out
+            // under the bar itself, so this must not run there.
+            if (android.os.Build.VERSION.SDK_INT >= 37) {
+                Object listToShift = scrollList(header, context);
+                if (listToShift instanceof View) {
+                    int shift = Math.max(0, openHeight - barHeight);
+                    View list = (View) listToShift;
+                    if (shift != lastListShift) {
+                        lastListShift = shift;
+                        list.setTranslationY(-shift);
+                    }
+                }
+            }
             // Keep the action bar's own background blur in sync too. It sits
             // behind the native over-bg layer, but some themes show it alone.
             // The radius is in pixels: MiuiBlurUtils caps it at 400 px.
@@ -484,7 +548,7 @@ final class UiTweaks {
                 APPLIED_APPBAR_BLUR.put(appBar, radiusPx);
                 ClassLoader hostLoader = context.getClassLoader();
                 if (radiusPx > 0) {
-                    callStatic(hostLoader, BLUR, "setBackgroundBlur", appBar,
+                    lastBlurApply = callStatic(hostLoader, BLUR, "setBackgroundBlur", appBar,
                             Integer.valueOf(radiusPx));
                     callStatic(hostLoader, BLUR, "setBackgroundBlurRadius", appBar,
                             Integer.valueOf(radiusPx));
@@ -497,6 +561,54 @@ final class UiTweaks {
             XLog.w("top bar refresh failed: " + t);
         }
     }
+
+    /** Temporary diagnostics: uiautomator dump shows why the bar is not blurring. */
+    private static void publishTopBarDiag(View header, View appBar, boolean scrolled,
+                                          boolean condensed, int radius, Object helper) {
+        long now = android.os.SystemClock.uptimeMillis();
+        if (now - diagAtTopBar < 1500L) {
+            return;
+        }
+        diagAtTopBar = now;
+        try {
+            Object overBg = HeaderData.field(header, "mOverBgView");
+            String overInfo = "null";
+            if (overBg instanceof View) {
+                View v = (View) overBg;
+                overInfo = v.getVisibility() + "/" + v.getAlpha() + "/" + v.getWidth()
+                        + "x" + v.getHeight();
+            }
+            Object target = HeaderData.field(helper, "mTargetView");
+            String targetInfo = target instanceof View
+                    ? ((View) target).getClass().getSimpleName() + ":" + ((View) target).getWidth()
+                    + "x" + ((View) target).getHeight()
+                    : String.valueOf(target);
+            View innerBar = appBar.findViewById(
+                    appBar.getContext().getResources().getIdentifier(
+                            "action_bar", "id", "com.android.settings"));
+            String barInfo = innerBar == null ? "null" : innerBar.getTop() + ".." + innerBar.getBottom();
+            header.setContentDescription("TB scrolled=" + scrolled
+                    + " cond=" + condensed
+                    + " radius=" + radius
+                    + " applyRet=" + lastBlurApply
+                    + " overlay=" + call(header, "isOverlayMode")
+                    + " appBarH=" + appBar.getHeight()
+                    + " innerBar=" + barInfo
+                    + " support=" + HeaderData.field(helper, "mIsSupportBlur")
+                    + " actualEnable=" + HeaderData.field(helper, "mActualEnable")
+                    + " actualApply=" + HeaderData.field(helper, "mActualApply")
+                    + " overBg=" + HeaderData.field(header, "mIsShowOverBg")
+                    + " overView=" + overInfo
+                    + " target=" + targetInfo
+                    + " targetA=" + (target instanceof View ? ((View) target).getAlpha() : -1));
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static long diagAtTopBar;
+    private static Object lastBlurApply;
+    /** Last translationY applied to the home list (0 = header fully open). */
+    private static int lastListShift;
 
     /** Slow poll so slider changes land even while the list does not scroll. */
     private static void ensurePoll(final View header) {

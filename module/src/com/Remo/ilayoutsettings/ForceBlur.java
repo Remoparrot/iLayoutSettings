@@ -41,16 +41,27 @@ final class ForceBlur {
             return;
         }
         installed = true;
-        boolean supported = readSupport(material);
+        // HyperOS 3 exposed the capability as the static field
+        // SUPPORT_HYPER_MATERIAL; HyperOS 4 replaced it with the private
+        // static field mIsSupport and the public isSupport() accessor, and
+        // dropped the field entirely. Probe every shape, and when the probe
+        // is inconclusive keep going instead of bailing out (the old check
+        // silently disabled every blur hook on OS4).
+        boolean supported = probeSupport(material);
         XLog.i("hyper material supported=" + supported);
-        if (!supported) {
-            XLog.w("device does not support hyper material, keep blur as-is");
-            return;
-        }
         setStaticBoolean(material, "isForceEnable", true);
+        setStaticBoolean(material, "SUPPORT_HYPER_MATERIAL", true);
+        setStaticBoolean(material, "mIsSupport", true);
+        forceTrue(material, "isSupport");
         forceTrue(material, "isEnable");
         forceTrue(material, "isFeatureEnable");
+        forceTrue(material, "isDefaultFeatureEnable");
+        // HyperOS 4: MiuiBlurUiHelper.setEnableBlur() only turns the real blur
+        // on when hasMaterialPermission(view, package, 2) returns true, so the
+        // header stayed flat even with every other switch forced.
+        forceTrue(material, "hasMaterialPermission");
         if (blur != null) {
+            forceTrue(blur, "isEnable");
             forceTrue(blur, "isEffectEnable");
             // The action bar's own background blur was not what the header shows:
             // NestedHeaderLayout paints a separate over-background view, and its
@@ -101,8 +112,12 @@ final class ForceBlur {
                         if (view == null) {
                             return;
                         }
-                        HeaderData.setIntField(param.thisObject, "mBlurEffect",
-                                Prefs.topBarBlurRadius(view.getContext()));
+                        int radius = Prefs.topBarBlurRadius(view.getContext());
+                        // HyperOS 3 kept the radius in mBlurEffect; HyperOS 4
+                        // renamed it to mBlurRadius and reads that field in
+                        // refreshBlur(). Write both, ignore the missing one.
+                        HeaderData.setIntField(param.thisObject, "mBlurEffect", radius);
+                        HeaderData.setIntField(param.thisObject, "mBlurRadius", radius);
                     } catch (Throwable t) {
                         XLog.w("header blur refresh hook failed: " + t);
                     }
@@ -139,22 +154,57 @@ final class ForceBlur {
             }
             call(layout, "setSupportBlur", true);
             call(layout, "setEnableBlur", true);
+            // OS4 only records mExpectedEnable in setEnableBlur(); the blur is
+            // applied from applyBlur(), which MIUI calls later on its own. Ask
+            // for it explicitly so the first condensed frame is already blurred.
+            call(layout, "applyBlur", true);
             call(layout, "setOverlayMode", true);
+            // OS4's setOverlayMode() only flips a flag; without a fresh layout
+            // the list keeps its non-overlay position (content never reaches the
+            // bar, so the bar has nothing to blur).
+            if (layout instanceof View) {
+                View view = (View) layout;
+                view.requestLayout();
+                view.invalidate();
+            }
             XLog.i("nested header blur forced on");
         } catch (Throwable t) {
             XLog.e("force header blur failed", t);
         }
     }
 
-    private static boolean readSupport(Class<?> material) {
-        try {
-            Field f = material.getDeclaredField("SUPPORT_HYPER_MATERIAL");
-            f.setAccessible(true);
-            Object v = f.get(null);
-            return Boolean.TRUE.equals(v);
-        } catch (Throwable t) {
-            return false;
+    /**
+     * Best-effort "does this ROM support hyper material" probe. OS3: static
+     * field SUPPORT_HYPER_MATERIAL. OS4: private static mIsSupport + public
+     * isSupport(). Returns true when nothing can be read so the caller still
+     * installs the hooks — a wrong "false" here silently turns every blur
+     * effect off (the OS4 regression).
+     */
+    private static boolean probeSupport(Class<?> material) {
+        for (String name : new String[]{"SUPPORT_HYPER_MATERIAL", "mIsSupport"}) {
+            try {
+                Field f = material.getDeclaredField(name);
+                f.setAccessible(true);
+                Object v = f.get(null);
+                if (v instanceof Boolean) {
+                    return (Boolean) v;
+                }
+            } catch (Throwable ignored) {
+                // try the next shape
+            }
         }
+        try {
+            Method m = material.getDeclaredMethod("isSupport");
+            m.setAccessible(true);
+            Object v = m.invoke(null);
+            if (v instanceof Boolean) {
+                return (Boolean) v;
+            }
+        } catch (Throwable ignored) {
+            // OS3 only
+        }
+        XLog.i("hyper material support probe inconclusive, forcing hooks anyway");
+        return true;
     }
 
     private static void setStaticBoolean(Class<?> cls, String name, boolean value) {

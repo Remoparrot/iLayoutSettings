@@ -104,6 +104,13 @@
 | **「通用」的顶栏没有模糊**（16.8 修） | 模糊采样的是栏后面**真实绘制**的内容；内容被裁在栏底时栏后面只有页面底色，5% 的模糊看不出来（把半径调到 100px 也一样平） | 先让内容能进栏下（上一条），`setBackgroundBlur` 自然就采到行；不需要另画一层模糊 |
 | **设备详情页二次 inflate 丢 padding**（16.8） | 异步设备数据落地后 MIUI 重建了页面视图树，旧树的 padding/抬升随旧 View 一起丢弃（log 里的 View 树 bounds 会突然回到 331） | `watch` 里排 700/1600/3200ms 三次延迟 refresh，每次都重新 `findScrollable` 并对新树套用；`LIST_PADDING` 按 View 记录，天然幂等 |
 | **ScrollView 的 padding 被重置**（16.8） | `NestedScrollView` 在 MIUI 的 inset pass 里会重设 padding，加在它自己身上会被清 0 | 加在它唯一的内容子 View（`LinearLayout`）上，padding 随内容一起滚动 |
+| **OS4：顶栏模糊整套失效**（17.0） | `ForceBlur` 探测 `HyperMaterialUtils.SUPPORT_HYPER_MATERIAL`，OS4 删了这个字段 → 读到 false 直接 `return`，后面的 `setBlurParams` / `refreshBlur` / `isEffectEnable` hook 一个都没装 | 能力探测改三级（`SUPPORT_HYPER_MATERIAL` 字段 → `mIsSupport` 字段 → `isSupport()`），读不到也继续装 hook；同时强制 OS4 新增的 `hasMaterialPermission(view,pkg,2)` 门槛，否则 `setEnableBlur()` 仍会 `setEnableInner(false)` |
+| **OS4：栏折叠后内容进不了栏下，栏下留 175px 空白**（17.0） | OS4 把 `action_bar_container` 从 506px 缩到 331px，但 `NestedHeaderLayout` 没重新布局列表（RecyclerView top 仍是 506），清 `clipBounds` 也没用 | 仅在 SDK≥37 时按「展开栏高 − 当前栏高」对列表 `setTranslationY(-shift)`；不改 LayoutParams，避免和 MIUI 的 nested-scroll offset 冲突。**OS3 列表本来就在栏下，必须门控，否则二次位移** |
+| **OS4：`mScrollableView` 字段没了**（17.0） | `UiTweaks.unclip()` 用 `HeaderData.field(header,"mScrollableView")` 清 clip，OS4 该字段不存在 → 永远返回 null | 回退 `call(header,"getScrollableView")`；并沿列表父链清 `clipBounds` + `clipChildren=false` |
+| **OS4：退出搜索后原生顶部搜索栏常驻**（17.0） | OS4 在 ActionMode 销毁时把 `mAnchorView` 重新设为 VISIBLE，16.8 只在 install 时设过一次 GONE | `BottomSearch.hideAnchor()` 在 `setBarVisible()` 与每次 global layout（非搜索态）幂等隐藏 |
+| **OS4：主题 16.5dp 卡片边距失效**（17.0） | OS4 新增 `updateCardGroupMarginForSmallScreen()`，用设置自己的 `card_group_margin_horizontal`（12dp）`setCardMarginStart/End`，覆盖 miuix 的主题化边距 | `CardMargins` hook 该方法，之后把 `miuix_recyclerview_card_group_margin_start/end` 写回；实测卡片左右 38px → 53px |
+| **OS4：搜索栏玻璃背景冻结**（17.0） | OS4 列表在硬件层里，`root.draw(software canvas)` 每帧返回同一帧（滚动 400ms、捕获 101 次只有 1 次「变化」），`backdropChanged()` 永远判「没变」 | SDK≥37 改 `PixelCopy` 抓窗口 surface（诊断 `cap=242 chg=192`）；`pixelCopyInFlight` 防重入，失败保留上一帧 |
+| **HyperOS 4 的 logcat main 缓冲区对 shell 不可读**（17.0） | `adb logcat -d` 全空，`logcat -g` 显示 `0 B readable`，模块日志拿不到 | 诊断改走 `uiautomator dump` 读 `content-desc`：把捕获次数/变化次数/硬件加速/backdrop 状态写进 contentDescription，比日志可靠；发布前把 `DEBUG_DIAG` 关掉 |
 
 ### C. 版本与回退（本仓库特有）
 

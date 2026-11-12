@@ -1,11 +1,11 @@
 # iLayoutSettings · iOS 设置布局
 
-> 把澎湃 OS（HyperOS 3）「设置」首页改成 iOS 风格：入口重排、条件卡片（软件更新 / 耳机 / iCloud）、搜索栏沉底、卡片细节修正。
+> 把澎湃 OS（HyperOS 3 / 4）「设置」首页改成 iOS 风格：入口重排、条件卡片（软件更新 / 耳机 / iCloud）、搜索栏沉底、卡片细节修正。
 > **全部复用 MIUI 原生控件与原生数据，模块不重绘任何页面。**
 
-[![Version](https://img.shields.io/badge/version-16.8-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
+[![Version](https://img.shields.io/badge/version-17.0-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-HyperOS%203%20%7C%20Android%2015%2B-green)](docs/01-overview.md)
+[![Platform](https://img.shields.io/badge/platform-HyperOS%203%20%2F%204%20%7C%20Android%2015%2B-green)](docs/01-overview.md)
 [![LSPosed](https://img.shields.io/badge/framework-LSPosed-orange)](docs/04-install.md)
 
 ---
@@ -36,6 +36,7 @@
 | 卡片细节修正 | 去掉每组最后一行的双层圆角/放大图标；外观页预览加卡片底 |
 | 顶部模糊 / 发丝线 | 默认 5% 模糊 + 2% 透明度，**顶栏始终带模糊**——账户卡等内容滑到栏下面就是糊的，不再被不透明栏切掉；发丝线跟着栏一起出现（浅色黑 12%，深色中性灰 30%）；**设置内切换深浅色后线不消失**，折叠栏第一次出现就带模糊 |
 | 二级页顶栏（16.7 / 16.8） | 二级页顶栏与首页同一套参数：半透明底色 + 原生模糊 + 内容滑进栏下；0.5dp 半透明发丝线只在滚动时出现，回顶部即隐藏。**16.8：进入二级页不再自带滚动偏移（顶栏/发丝线不会提前出现）；「我的设备 / 通用」的内容也滑进栏下、共用同一套模糊** |
+| HyperOS 4 适配（17.0） | 澎湃 4 上顶栏模糊/发丝线恢复（`SUPPORT_HYPER_MATERIAL`→`isSupport()`、`mBlurEffect`→`mBlurRadius`、`hasMaterialPermission` 门槛，外加列表随栏收缩上移让内容真的进栏下）；退出搜索不再出现第二条原生顶部搜索栏；卡片左右边距重新跟随主题 `theme_values.xml`（`card_group_margin_horizontal` 覆盖问题）；搜索栏玻璃背景改 `PixelCopy` 抓帧，滚动时不再冻结 |
 | 应用图标 | 蓝紫渐变 + 半透明玻璃盘 + 白齿轮（[预览](docs/assets/icon-16.4.png)）；`tools/make_launcher_icon.py` 生成五档 mipmap，脚本内另有两套候选（[并排对比](docs/assets/icon-candidates-16.4.png)） |
 
 ## 截图

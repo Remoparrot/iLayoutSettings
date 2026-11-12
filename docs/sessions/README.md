@@ -14,6 +14,7 @@
 
 | 日期 | 标题 | 一句话结论 | 状态 |
 | --- | --- | --- | --- |
+| 2026-11-12 | [HyperOS 4 适配：顶栏模糊 / 双搜索栏 / 卡片边距 / 玻璃冻结](2026-11-12-hyperos4-17.0.md) | 17.0：OS4 删字段（`SUPPORT_HYPER_MATERIAL`/`mBlurEffect`/`mScrollableView`）导致顶栏 blur 整套 hook 没装、列表进不了栏下；改 `isSupport()/mBlurRadius/getScrollableView()` + `hasMaterialPermission` 强制 + 列表 translationY 补栏高差；退出搜索后重复隐藏原生顶部栏；`updateCardGroupMarginForSmallScreen` 覆盖主题 16.5dp 边距 → 重新写回；OS4 软件画布捕获冻结 → SDK37+ 改 PixelCopy。电池/VPN 重分组按用户否决已回退 | 已完成（OS3 未上机） |
 | 2026-11-11 | [二级页顶栏收尾：进入偏移 / 我的设备留白 / 「通用」共用模糊](2026-11-11-subpage-topbar-fixes.md) | 16.8：二级页加完 padding 立刻把第 0 行锚回顶部（进入不再自带滚动偏移）；`findScrollable` 只认最外层竖向滚动容器（修「我的设备」331px 卡片留白）；「我的设备 / 通用」抬 wrapper + 预绘制清 clip，内容滑进栏下共用同一套模糊 | 已完成 |
 | 2026-11-11 | [二级页顶栏（模糊/半透明/发丝线）+ 控制中心上移 + 浅色搜索栏高光回退](2026-11-11-subpage-topbar-and-search-rollback.md) | 16.7：「控制中心」移到「墙纸」上方；二级页顶栏改成首页同款半透明 + 原生模糊，靠 `ActionBarOverlayLayout.setOverlayMode` + 列表栏高 padding 让内容滑进栏下；发丝线复用 `applyDivider`，条件 `canScrollVertically(-1)`；浅色搜索栏的灰边试验按用户要求整段回退 16.6 | 已完成 |
 | 2026-11-10 | [红 1 角标统一 + 补箭头 + 更新卡标题左移](2026-11-10-update-badge-unify.md) | 16.6：「通用」行的蓝 1 换成与更新卡同一颗 24dp 红角标；带角标的行补上系统自带箭头（克隆 `arrow_right` drawable）；角标在 `widget_frame`（竖直 LinearLayout + 空占位）里本来贴底，改由 `OnPreDraw` 隐藏同帧其它子 View 才与箭头齐平；更新卡标题左移到 16dp 内边距 | 已完成 |

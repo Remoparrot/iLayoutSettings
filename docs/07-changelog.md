@@ -3,12 +3,39 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前主线是 **16.8（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前主线是 **17.0（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
 
 ---
+
+# iLayoutSettings · LSPosed 模块（v17.0：HyperOS 4 适配）
+
+## v17.0 变更
+
+- **顶栏模糊 / 发丝线 / 透明度在澎湃 4 恢复**：OS4 删掉了 `HyperMaterialUtils.SUPPORT_HYPER_MATERIAL`
+  字段，16.8 的能力探测读到空值直接放弃安装全部模糊 hook；17.0 改为三级探测
+  （`SUPPORT_HYPER_MATERIAL` → `mIsSupport` → `isSupport()`），半径字段同时写
+  `mBlurEffect`（OS3）/ `mBlurRadius`（OS4），并强制新增的 `hasMaterialPermission` 门槛与
+  `applyBlur(true)`。另：OS4 折叠时 `action_bar_container` 从 506px 缩到 331px 但列表仍锚在 506，
+  内容进不了栏下、栏后只有页面底色；17.0 仅在 SDK≥37 时把列表按「展开栏高 − 当前栏高」
+  `translationY` 上移，内容真正滑进栏下被模糊。
+- **退出搜索不再出现两条搜索栏**：OS4 在 ActionMode 销毁后会把原生顶部搜索栏重新设为可见；
+  新增 `BottomSearch.hideAnchor()`，在 `setBarVisible()` 和每次 global layout（非搜索态）幂等隐藏。
+- **卡片左右边距重新跟随主题**：OS4 的 `SettingsFragment.updateCardGroupMarginForSmallScreen()`
+  用设置自己的 `card_group_margin_horizontal`（12dp）覆盖 miuix 的主题化边距，导致
+  `theme_values.xml` 里的 `miuix_recyclerview_card_group_margin_*`（16.5dp）失效。17.0 hook
+  该方法后把主题值写回 `CardItemDecoration`（实测卡片左右 38px → 53px）。
+- **搜索栏玻璃背景不再冻结**：OS4 把列表放进硬件层，`root.draw(software canvas)` 每帧返回同一帧
+  （诊断：滚动 400ms 捕获 101 次只有 1 次「变化」），玻璃背景就停在滚动结束前那一屏。SDK≥37 改
+  `PixelCopy` 直接从窗口 surface 抓帧（诊断计数变为 `cap=242 chg=192`），OS3 仍走原软件捕获。
+- **布局不变**：曾把「电池 / VPN」从网络卡移到隐私卡让「通用」紧跟「个人热点」，
+  用户要求「不要改布局」后整段回退——首页分组与 16.8 完全一致。
+- **兼容**：所有 OS4 专用路径按 `Build.VERSION.SDK_INT >= 37` 门控，OS3（Android 16）保持 16.8 行为；
+  **OS3 分支本会话未上机验证**。
+- **版本**：17.0 / versionCode **100**；APK `dist/iLayoutSettings-17.0.apk`，302,626 B，
+  SHA-256 `562F3151AFEEA2300896FFEC673F30F205FA3FF9785655A6964DD8B64635A67E`。
 
 # iLayoutSettings · LSPosed 模块（v16.8：二级页顶栏收尾 + 「通用」共用模糊）
 

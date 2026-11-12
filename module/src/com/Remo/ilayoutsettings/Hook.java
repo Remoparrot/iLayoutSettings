@@ -44,6 +44,7 @@ final class Hook {
                 try {
                     Object self = param.thisObject;
                     HeaderData.apply(self);
+                    CardMargins.apply(self);
                     BottomSearch.install(self);
                 } catch (Throwable t) {
                     XLog.e("after buildAdapter", t);
@@ -75,6 +76,7 @@ final class Hook {
                 try {
                     Object self = param.thisObject;
                     HeaderData.apply(self);
+                    CardMargins.apply(self);
                     BottomSearch.install(self);
                     HeadsetWatcher.attach(self);
                     // After a uiMode change MIUI may reuse the fragment view; make
@@ -110,6 +112,9 @@ final class Hook {
 
         SubPageIcons.install(cl);
         AirplaneSwitch.install(cl);
+        // HyperOS 4 overwrites the themed card margins with its own 12dp
+        // resource; re-apply the theme value after that method ran.
+        CardMargins.install(cl);
         // Badge on the update card + guaranteed AirPods glyph on the headset card.
         HeaderOverlay.install(cl);
         // Last-row divider removal (home). Position is resolved by title so the

@@ -57,6 +57,8 @@ final class SearchGlass extends FrameLayout {
     private static final boolean DEBUG_BLUR_ONLY = false;
     /** Temporary diagnostic: lens with no displacement, rim or shadow. */
     private static final boolean DEBUG_PASS_THROUGH = false;
+    /** Temporary diagnostic: publish the draw decision as the view's content description. */
+    private static final boolean DEBUG_DIAG = false;
     /** 120Hz: at most one capture per display frame. */
     private static final long CAPTURE_INTERVAL_MS = 8;
     /**
@@ -201,7 +203,85 @@ final class SearchGlass extends FrameLayout {
     private int tintGradientH;
     private boolean tintGradientDark;
 
+    /**
+     * OS4 capture path: copy the glass rectangle out of the window surface.
+     * The result is scaled back to the backdrop bitmap the lens shader expects.
+     */
+    private void captureWithPixelCopy() {
+        if (pixelCopyInFlight || getWidth() <= 0 || getHeight() <= 0) {
+            return;
+        }
+        final android.app.Activity activity = activityOf(getContext());
+        if (activity == null) {
+            return;
+        }
+        try {
+            int pad = dp(CAPTURE_PAD_DP);
+            int[] loc = new int[2];
+            getLocationInWindow(loc);
+            android.graphics.Rect src = new android.graphics.Rect(
+                    Math.max(0, loc[0] - pad),
+                    Math.max(0, loc[1] - pad),
+                    loc[0] + getWidth() + pad,
+                    loc[1] + getHeight() + pad);
+            View decor = activity.getWindow().getDecorView();
+            src.intersect(0, 0, decor.getWidth(), decor.getHeight());
+            if (src.width() <= 0 || src.height() <= 0) {
+                return;
+            }
+            final int outW = Math.max(1, Math.round((getWidth() + pad * 2) * CAPTURE_SCALE));
+            final int outH = Math.max(1, Math.round((getHeight() + pad * 2) * CAPTURE_SCALE));
+            final Bitmap direct = Bitmap.createBitmap(src.width(), src.height(),
+                    Bitmap.Config.ARGB_8888);
+            pixelCopyInFlight = true;
+            android.view.PixelCopy.request(activity.getWindow(), src, direct,
+                    new android.view.PixelCopy.OnPixelCopyFinishedListener() {
+                        @Override
+                        public void onPixelCopyFinished(int result) {
+                            pixelCopyInFlight = false;
+                            if (result != android.view.PixelCopy.SUCCESS) {
+                                lastCaptureError = "pixelcopy:" + result;
+                                direct.recycle();
+                                return;
+                            }
+                            try {
+                                Bitmap scaled = Bitmap.createScaledBitmap(direct, outW, outH, true);
+                                if (direct != scaled) {
+                                    direct.recycle();
+                                }
+                                backdrop = scaled;
+                                captureCount++;
+                                lastCenterColor = scaled.getWidth() > 0 && scaled.getHeight() > 0
+                                        ? scaled.getPixel(scaled.getWidth() / 2,
+                                                scaled.getHeight() / 2) : 0;
+                                if (backdropChanged()) {
+                                    invalidate();
+                                }
+                            } catch (Throwable t) {
+                                lastCaptureError = t.getClass().getSimpleName();
+                            }
+                        }
+                    }, new android.os.Handler(android.os.Looper.getMainLooper()));
+        } catch (Throwable t) {
+            pixelCopyInFlight = false;
+            lastCaptureError = "pc:" + t.getClass().getSimpleName();
+        }
+    }
+
+    private static android.app.Activity activityOf(android.content.Context context) {
+        android.content.Context c = context;
+        while (c instanceof android.content.ContextWrapper) {
+            if (c instanceof android.app.Activity) {
+                return (android.app.Activity) c;
+            }
+            c = ((android.content.ContextWrapper) c).getBaseContext();
+        }
+        return null;
+    }
+
     private Bitmap backdrop;
+    /** One PixelCopy request at a time; the callback is asynchronous. */
+    private boolean pixelCopyInFlight;
     private RenderNode blurNode;
     private RenderNode lensNode;
     private RuntimeShader lensShader;
@@ -231,6 +311,11 @@ final class SearchGlass extends FrameLayout {
     private Bitmap prevBackdrop;
 
     private long lastPrefsLoad;
+    private long diagAt;
+    private String lastCaptureError;
+    private int captureCount;
+    private int changeCount;
+    private int lastCenterColor;
     private float prefRefractionHeight = Prefs.DEFAULT_REFRACTION_HEIGHT;
     private float prefRefractionAmount = Prefs.DEFAULT_REFRACTION_AMOUNT;
     private float prefBlur = Prefs.DEFAULT_GLASS_BLUR;
@@ -367,6 +452,15 @@ final class SearchGlass extends FrameLayout {
     }
 
     private void capture() {
+        // HyperOS 4 keeps the Settings list inside a hardware layer, so drawing
+        // the view tree into a software bitmap returns the same frozen frame on
+        // every pass (the glass backdrop stopped following the scroll). Read
+        // the window surface instead: PixelCopy always returns the frame that
+        // is actually on screen, including the scrolled list.
+        if (Build.VERSION.SDK_INT >= 37) {
+            captureWithPixelCopy();
+            return;
+        }
         try {
             View root = getRootView();
             if (root == null || getWidth() <= 0 || getHeight() <= 0) {
@@ -406,6 +500,9 @@ final class SearchGlass extends FrameLayout {
                 }
             }
             long now = System.currentTimeMillis();
+            captureCount++;
+            lastCenterColor = backdrop.getWidth() > 0 && backdrop.getHeight() > 0
+                    ? backdrop.getPixel(backdrop.getWidth() / 2, backdrop.getHeight() / 2) : 0;
             if (now - lastDiag > 5000 && backdrop.getWidth() > 0 && backdrop.getHeight() > 0) {
                 lastDiag = now;
                 int center = backdrop.getPixel(backdrop.getWidth() / 2,
@@ -422,6 +519,8 @@ final class SearchGlass extends FrameLayout {
             }
         } catch (Throwable t) {
             XLog.w("search glass capture failed: " + t);
+            lastCaptureError = t.getClass().getSimpleName() + (t.getMessage() == null
+                    ? "" : (":" + t.getMessage()));
             backdrop = null;
         }
     }
@@ -446,6 +545,7 @@ final class SearchGlass extends FrameLayout {
             changed = !prevBackdrop.sameAs(current);
         }
         if (changed) {
+            changeCount++;
             try {
                 Canvas copy = new Canvas(prevBackdrop);
                 copy.drawBitmap(current, 0f, 0f, null);
@@ -643,16 +743,49 @@ final class SearchGlass extends FrameLayout {
         }
         int save = canvas.save();
         canvas.clipPath(clipPath);
-        boolean drawn = !DEBUG_BLUR_ONLY && Build.VERSION.SDK_INT >= 33
+        boolean lens = !DEBUG_BLUR_ONLY && Build.VERSION.SDK_INT >= 33
                 && drawLens(canvas, mask, radius);
-        if (!drawn) {
-            drawn = drawBlurred(canvas, mask);
+        boolean blurred = false;
+        if (!lens) {
+            blurred = drawBlurred(canvas, mask);
         }
-        if (!drawn) {
+        if (!lens && !blurred) {
             drawShade(canvas, mask);
             drawFlatRim(canvas, mask);
         }
+        publishDiag(canvas.isHardwareAccelerated(), mask, lens, blurred);
         canvas.restoreToCount(save);
+    }
+
+    /**
+     * Temporary on-device diagnostics. Written into the view's content
+     * description so {@code adb shell uiautomator dump} can read the draw
+     * decision without logcat (HyperOS 4 keeps the log buffers unreadable
+     * for the shell user).
+     */
+    private void publishDiag(boolean hardware, Rect mask, boolean lens, boolean blurred) {
+        if (!DEBUG_DIAG) {
+            return;
+        }
+        long now = android.os.SystemClock.uptimeMillis();
+        if (now - diagAt < 1500L) {
+            return;
+        }
+        diagAt = now;
+        try {
+            View target = maskView == null ? null : maskView.get();
+            setContentDescription("GL hw=" + hardware
+                    + " bd=" + (backdrop != null)
+                    + " lens=" + lens
+                    + " blur=" + blurred
+                    + " err=" + lastCaptureError
+                    + " cap=" + captureCount
+                    + " chg=" + changeCount
+                    + " px=" + Integer.toHexString(lastCenterColor)
+                    + " mask=" + mask.toShortString()
+                    + " pill=" + (target == null ? "null" : target.getWidth() + "x" + target.getHeight()));
+        } catch (Throwable ignored) {
+        }
     }
 
     /**
