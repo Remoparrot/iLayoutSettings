@@ -3,7 +3,13 @@
 > 把澎湃 OS（HyperOS 3）「设置」首页改成 iOS 风格：入口重排、条件卡片（软件更新 / 耳机 / iCloud）、搜索栏沉底、卡片细节修正。
 > **全部复用 MIUI 原生控件与原生数据，模块不重绘任何页面。**
 
-[![Version](https://img.shields.io/badge/version-16.8-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
+> [!IMPORTANT]
+> **16.9 必须配合本 Release 里的 `Settings2_Glass_v37_unsigned.apk` 使用。**
+> 这套设置是基于澎湃 3 设置的改版，加入了澎湃 4 的「高级材质 / 材质风格」等功能；
+> 不安装这套设置、直接把模块套在官方设置或其它版本上，可能与 LSPosed 模块不兼容
+> （布局 / 顶栏 hook 失效、搜索栏异常，甚至设置闪退）。
+
+[![Version](https://img.shields.io/badge/version-16.9-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-HyperOS%203%20%7C%20Android%2015%2B-green)](docs/01-overview.md)
 [![LSPosed](https://img.shields.io/badge/framework-LSPosed-orange)](docs/04-install.md)
@@ -72,11 +78,12 @@
 
 ## 安装
 
-1. 下载 [`dist/iLayoutSettings-16.8.apk`](dist/iLayoutSettings-16.8.apk)，或到 [Releases · v16.8](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.8) 下同名附件（302,626 B，SHA-256 `9F9004AA…1094`，与 `dist/` 同一份）；
+1. 先安装本 Release 里的 `Settings2_Glass_v37_unsigned.apk`（基于澎湃 3 设置改版、带澎湃 4 功能），再用你的平台签名 / 原有流程装进系统；
+2. 安装 [`dist/iLayoutSettings-16.9.apk`](dist/iLayoutSettings-16.9.apk)，或到 [Releases · v16.9](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.9) 下同名附件（302,626 B，SHA-256 `BBD6350F…50CF`，与 `dist/` 同一份）；
    **16.0 起包名是** `com.Remo.ilayoutsettings`，从 16.0 升级可直接覆盖（同一签名）；
-2. LSPosed 中启用 **iLayoutSettings**，作用域只勾选 **设置**（`com.android.settings`）；
-3. **强制停止「设置」**（或重启手机），再打开设置；
-4. 打开桌面上的 **iLayoutSettings** 图标即可调参数（搜索栏模糊 / 折射 / 厚度；顶栏模糊 / 透明度 / 发丝线开关）。
+3. LSPosed 中启用 **iLayoutSettings**，作用域只勾选 **设置**（`com.android.settings`）；
+4. **强制停止「设置」**（或重启手机），再打开设置；
+5. 打开桌面上的 **iLayoutSettings** 图标即可调参数（搜索栏模糊 / 折射 / 厚度；顶栏模糊 / 透明度 / 发丝线开关）。
 
 > 本机 MIUI 会拦截 adb 安装新包（`INSTALL_FAILED_USER_RESTRICTED`）：把 APK 复制到手机后
 > 在文件管理器里点开安装即可；或在开发者选项里允许「USB 安装」。
@@ -112,7 +119,7 @@ pwsh -File module/build.ps1 `
 ```
 
 输出 `dist/iLayoutSettings-<versionName>.apk`。
-发版用 `tools/release.ps1 -Version 16.8`：构建 → 校验 → 自动提交/推送 → 打 tag → 建 Release → 上传 APK，一条命令完成。
+发版用 `tools/release.ps1 -Version 16.9`：构建 → 校验 → 自动提交/推送 → 打 tag → 建 Release → 上传 APK，一条命令完成。
 完整工具链版本、可复现性说明见 [构建指南](docs/03-build.md)。
 
 ## 文档

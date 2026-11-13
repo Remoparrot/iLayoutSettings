@@ -1,12 +1,13 @@
 # 安装与调试
 
-> 状态：**现行** · 对应版本：16.8 (99)
+> 状态：**现行** · 对应版本：16.9 (100)
 
 ## 1. 前置
 
 - 已 root / 已装 **LSPosed**（1.x 或 2.x，Zygisk 或 Riru 均可）；
 - 系统为澎湃 OS 3（HyperOS 3）；
-- 已安装 `dist/iLayoutSettings-16.8.apk`（与 [Release v16.8](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.8) 的附件同一份；应用名 **iLayoutSettings**，包名 `com.Remo.ilayoutsettings`）。
+- 已安装本 Release 的 `Settings2_Glass_v37_unsigned.apk`（基于澎湃 3 设置改版、带澎湃 4 功能；不装可能与模块不兼容）；
+- 已安装 `dist/iLayoutSettings-16.9.apk`（与 [Release v16.9](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.9) 的附件同一份；应用名 **iLayoutSettings**，包名 `com.Remo.ilayoutsettings`）。
 
 ## 2. 16.0 迁移（从 15.x 升级才需要）
 

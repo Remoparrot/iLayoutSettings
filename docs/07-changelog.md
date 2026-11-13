@@ -3,10 +3,25 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前主线是 **16.8（iLayoutSettings）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前发布是 **16.9（iLayoutSettings，16.8 基线 + 版本号）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
+
+---
+
+# iLayoutSettings 16.9（16.8 基线 + 版本号）
+
+## v16.9 变更
+
+- **16.9 = 16.8 的代码与功能基线，只改版本号**：`versionName` 16.8 → 16.9，
+  `versionCode` 99 → 100；APK 内 `classes.dex` 与 `resources.arsc` 与 16.8 逐字节一致，
+  仅 `AndroidManifest.xml` 的版本字段不同。
+- **17.0 已撤回**：17.0 是澎湃 4 专用适配，与基于澎湃 3 的 `Settings2_Glass_v37` 不兼容，
+  GitHub Release 与 tag 已删除；OS4 代码仍保留在 main 历史和本地 `os4-17.0` 分支。
+- **必须配合 `Settings2_Glass_v37_unsigned.apk` 使用**：这套设置基于澎湃 3 设置改版，
+  加入了澎湃 4 的「高级材质 / 材质风格」等功能；不装可能与 LSPosed 模块不兼容。
+- versionName 16.9 / versionCode 100。
 
 ---
 
