@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     iLayoutSettings 自动发版：构建 → 校验 → 打 tag → 建 GitHub Release → 上传 APK。
@@ -214,17 +214,19 @@ $bodyTemplate = @'
 - 包名：`{{PKG}}`
 - 签名证书 SHA-256：`{{CERT}}`
 
-### 本版内容（16.10）
+### 本版内容（16.11）
 
-- **搜索栏玻璃不再卡住**：澎湃 4 + 高级材质下，`SearchGlass` 不再把整棵窗口树画进软件画布，
-  改为只抓 `scroll_headers` 列表子树。以前顶栏 / `bgEffectView` 的 AGSL `RenderEffect`
-  会让抓帧每帧抛 `Software rendering doesn't support RuntimeShader`，玻璃滑到「控制中心」以下
-  就停在最后一帧，重开设置又变成半透明底板；现在玻璃跟着列表滚动，失败也保留上一帧。
-- **关于本机「本机详情」卡回到原位置**：二级页加 padding 前先减去 MIUI 已经写进
-  NestedScrollView 的 331px inset，卡片从 1902px 回到原设置的 1571px；
-  另加预绘制兜底清理重复 inset。
-- 必须配合 `Settings2_Glass_v37_unsigned.apk` 使用（16.9 / 16.10 同一套设置）。
-- 版本 **16.10 / versionCode 101**；OS3（SDK<37）仍走 16.9 的旧抓帧路径。
+- **顶栏玻璃重新跟手**：澎湃 4 折叠时 `action_bar_container` 从 513px 缩到 331px，
+  但 `scroll_headers` 仍锚在 513，内容永远到不了栏底；MIUI 的 `mOverBgView` 白色遮罩
+  又盖在栏上。16.11 清父链 clip、把列表按栏高差上移 182px、隐藏 over-bg 遮罩，
+  内容真正滑进顶栏下被原生模糊；回顶部自动回 0。
+- **退出搜索只保留一条搜索栏**：澎湃 4 在 ActionMode 结束后会重新显示原生顶部搜索栏，
+  以前会和底部胶囊同时出现。`BottomSearch.hideAnchor()` 在每次非搜索态的稳定布局里
+  重新隐藏原生 anchor，现在只剩底部一条。
+- 保留 16.10 的修复：底部搜索栏玻璃只抓 `scroll_headers` 列表子树（不再冻结/变半透明）；
+  关于本机「本机详情」卡回到原位置 1571px。
+- 必须配合 `Settings2_Glass_v37_unsigned.apk` 使用（16.9 / 16.10 / 16.11 同一套设置）。
+- 版本 **16.11 / versionCode 102**；OS3（SDK<37）仍走旧路径。
 
 ### 安装
 
@@ -238,9 +240,9 @@ $bodyTemplate = @'
 
 ### 截图（澎湃 4）
 
-| 搜索栏玻璃 · 浅色（控制中心以下） | 搜索栏玻璃 · 深色 | 关于本机 · 卡片已回到原位置 |
+| 顶栏玻璃 · 浅色（内容滑进栏下） | 顶栏玻璃 · 深色 | 退出搜索只剩底部一条 |
 | --- | --- | --- |
-| ![搜索栏玻璃 · 浅色](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/v{{VERSION}}/docs/assets/search-glass-16.10-light.png) | ![搜索栏玻璃 · 深色](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/v{{VERSION}}/docs/assets/search-glass-16.10-dark.png) | ![关于本机](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/v{{VERSION}}/docs/assets/devinfo-16.10-light.png) |
+| ![顶栏玻璃 · 浅色](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/v{{VERSION}}/docs/assets/topbar-16.11-light.png) | ![顶栏玻璃 · 深色](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/v{{VERSION}}/docs/assets/topbar-16.11-dark.png) | ![单搜索栏](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/v{{VERSION}}/docs/assets/search-single-16.11.png) |
 
 完整变更见 [docs/07-changelog.md](https://github.com/Remoparrot/iLayoutSettings/blob/v{{VERSION}}/docs/07-changelog.md)。
 '@

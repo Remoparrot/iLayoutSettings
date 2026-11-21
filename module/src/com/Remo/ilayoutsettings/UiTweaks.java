@@ -41,9 +41,16 @@ final class UiTweaks {
     /** Last radius pushed through {@code MiuiBlurUtils.setBackgroundBlur}. */
     private static final java.util.Map<View, Integer> APPLIED_APPBAR_BLUR =
             new java.util.WeakHashMap<>();
+    /** Header -> MIUI's own gradient over-background view (kept at alpha 0). */
+    private static final java.util.Map<View, View> OVER_BG =
+            new java.util.WeakHashMap<>();
     /** Header layouts that already have the slow pref poll running. */
     private static final java.util.Map<View, Boolean> POLLING =
             new java.util.WeakHashMap<>();
+    /** Last translationY applied to the home list (0 = header fully open). */
+    private static int lastListShift;
+    /** List that received {@link #lastListShift}; fragments rebuild the list. */
+    private static java.lang.ref.WeakReference<View> lastShiftedList;
 
     /**
      * Removes the clip MIUI puts on the scrolling container while its own
@@ -53,6 +60,16 @@ final class UiTweaks {
     private static void unclip(View header, Context context) {
         try {
             Object shell = HeaderData.field(header, "mScrollableView");
+            // HyperOS 4 removed mScrollableView from NestedHeaderLayout and
+            // keeps the scroll shell behind getScrollableView(); without the
+            // fallback the list stays clipped at the bar's lower edge, so no
+            // content reaches the blur layer and the bar reads as a flat strip.
+            if (!(shell instanceof View)) {
+                Object viaMethod = call(header, "getScrollableView");
+                if (viaMethod instanceof View) {
+                    shell = viaMethod;
+                }
+            }
             if (shell instanceof View && ((View) shell).getClipBounds() != null) {
                 ((View) shell).setClipBounds(null);
             }
@@ -60,13 +77,82 @@ final class UiTweaks {
             if (list instanceof View && ((View) list).getClipBounds() != null) {
                 ((View) list).setClipBounds(null);
             }
+            // HyperOS 4 wraps the list in a SpringBackLayout that clips its own
+            // children at the bar edge; clear the whole path up to the header.
+            // HyperOS 3 already lays the list under the bar, so keep its
+            // original (narrower) clip handling there.
+            if (android.os.Build.VERSION.SDK_INT >= 37 && list instanceof View) {
+                clearClipUp((View) list, header, 0);
+            }
         } catch (Throwable t) {
             XLog.w("top bar unclip failed: " + t);
         }
     }
 
+    /** Clears clipBounds and lets children overdraw on the list's ancestors. */
+    private static void clearClipUp(View from, View header, int depth) {
+        if (from == null || depth > 6) {
+            return;
+        }
+        try {
+            if (from != header) {
+                if (from.getClipBounds() != null) {
+                    from.setClipBounds(null);
+                }
+                if (from instanceof android.view.ViewGroup
+                        && ((android.view.ViewGroup) from).getClipChildren()) {
+                    ((android.view.ViewGroup) from).setClipChildren(false);
+                }
+            }
+            android.view.ViewParent parent = from.getParent();
+            if (parent instanceof View && parent != header) {
+                clearClipUp((View) parent, header, depth + 1);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /**
+     * Hides MIUI's own over-background: on HyperOS 4 that is the white
+     * gradient/veil drawn over the bar while content scrolls under it. It sits
+     * on top of the list translate and reads as an opaque strip, so the text
+     * behind never shows through and the top glass looks "stopped". Alpha 0
+     * (not GONE) keeps MIUI's blur state machine running; the module's own
+     * native blur is applied separately by refreshTopBar.
+     */
+    static void hideOverBackground(View header) {
+        if (header == null) {
+            return;
+        }
+        try {
+            View over = OVER_BG.get(header);
+            if (over == null) {
+                Object field = HeaderData.field(header, "mOverBgView");
+                if (!(field instanceof View)) {
+                    return;
+                }
+                over = (View) field;
+                OVER_BG.put(header, over);
+            }
+            if (over.getAlpha() != 0f) {
+                over.setAlpha(0f);
+                if (over.getBackground() != null) {
+                    over.setBackground(null);
+                }
+            }
+        } catch (Throwable t) {
+            XLog.w("hide over-bg failed: " + t);
+        }
+    }
+
     /** {@code com.android.settings:id/action_bar_container}, resolved once. */
     private static int sAppBarId;
+    /** {@code scroll_headers} id resolved once; getIdentifier() is not cheap. */
+    private static int sScrollHeadersId;
+    private static boolean sScrollHeadersResolved;
+    /** Header -> its scrolling list (WeakHashMap: fragments rebuild the tree). */
+    private static final java.util.Map<View, View> SCROLL_LISTS =
+            new java.util.WeakHashMap<>();
 
     private UiTweaks() {
     }
@@ -446,6 +532,12 @@ final class UiTweaks {
             // bar = "the divider disappeared").
             applyDivider(appBar, dark ? 0x4DAAAAAA : 0x1F000000,
                     barActive && Prefs.topBarDivider(context));
+            // HyperOS 4's own white gradient veil sits above the list; drop it
+            // so the module's tint + native blur is what the bar shows. OS3's
+            // over-bg is part of its own blur stack, leave it alone there.
+            if (android.os.Build.VERSION.SDK_INT >= 37) {
+                hideOverBackground(header);
+            }
 
             Integer lastBackground = APPLIED_BG.get(appBar);
             boolean tintChanged = lastBackground == null
@@ -473,6 +565,27 @@ final class UiTweaks {
             // account card used to be cut off at the bar's lower edge instead
             // of sliding under a blurred bar.
             unclip(header, context);
+            // HyperOS 4 shrinks action_bar_container from the open height to the
+            // condensed one but leaves the RecyclerView anchored at the open
+            // height: rows never reach the bar, so the blur has nothing to
+            // sample and a blank gap opens between bar and content (the top
+            // glass appears "stopped"). Slide the list up by the collapsed
+            // amount instead of relayouting it, so MIUI's nested-scroll offsets
+            // stay untouched. HyperOS 3 lays the list out under the bar itself,
+            // so this must only run on SDK 37+.
+            if (android.os.Build.VERSION.SDK_INT >= 37) {
+                Object listToShift = scrollList(header, context);
+                if (listToShift instanceof View) {
+                    int shift = Math.max(0, openHeight - barHeight);
+                    View list = (View) listToShift;
+                    View previous = lastShiftedList == null ? null : lastShiftedList.get();
+                    if (shift != lastListShift || previous != list) {
+                        lastListShift = shift;
+                        lastShiftedList = new java.lang.ref.WeakReference<>(list);
+                        list.setTranslationY(-shift);
+                    }
+                }
+            }
             // Keep the action bar's own background blur in sync too. It sits
             // behind the native over-bg layer, but some themes show it alone.
             // The radius is in pixels: MiuiBlurUtils caps it at 400 px.
@@ -542,11 +655,19 @@ final class UiTweaks {
      */
     private static Object scrollList(View header, Context context) {
         try {
-            int id = context.getResources().getIdentifier(
-                    "scroll_headers", "id", "com.android.settings");
-            if (id != 0) {
-                View list = header.getRootView().findViewById(id);
+            View cached = SCROLL_LISTS.get(header);
+            if (cached != null && cached.isAttachedToWindow()) {
+                return cached;
+            }
+            if (!sScrollHeadersResolved) {
+                sScrollHeadersResolved = true;
+                sScrollHeadersId = context.getResources().getIdentifier(
+                        "scroll_headers", "id", "com.android.settings");
+            }
+            if (sScrollHeadersId != 0) {
+                View list = header.getRootView().findViewById(sScrollHeadersId);
                 if (list != null) {
+                    SCROLL_LISTS.put(header, list);
                     return list;
                 }
             }
@@ -560,9 +681,13 @@ final class UiTweaks {
                 View child = group.getChildAt(i);
                 String name = child.getClass().getSimpleName();
                 if (name.contains("RecyclerView") || name.contains("ListView")) {
+                    SCROLL_LISTS.put(header, child);
                     return child;
                 }
             }
+        }
+        if (fallback instanceof View) {
+            SCROLL_LISTS.put(header, (View) fallback);
         }
         return fallback;
     }

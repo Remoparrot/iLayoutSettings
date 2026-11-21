@@ -14,6 +14,7 @@
 
 | 日期 | 标题 | 一句话结论 | 状态 |
 | --- | --- | --- | --- |
+| 2026-11-21 | [顶栏玻璃跟手 + 退出搜索单搜索栏](2026-11-21-topbar-glass-and-single-search.md) | 16.11：OS4 栏高从 513 缩到 331 但列表仍锚在 513，顶栏模糊无内容；清父链 clip + 列表 translationY(-182) + 隐藏 `mOverBgView` 后顶栏跟手。`BottomSearch.hideAnchor()` 在非搜索态每次稳定布局重隐藏原生 anchor，退出搜索只剩底部一条 | 已完成 |
 | 2026-11-21 | [澎湃 4 搜索栏玻璃截帧 / 关于本机卡片位置](2026-11-21-pengpai4-glass-and-about-fix.md) | 16.10：澎湃 4 高级材质下 `root.draw()` 每帧抛 RuntimeShader，玻璃从「控制中心」以下冻结、重开变半透明；改成只画 `scroll_headers` 列表子树 + scratch 交换 + 失败保留上一帧。关于本机卡片低 331px 是 MIUI 的 NestedScrollView inset 与模块 padding 叠加，减法后回到原位置 1571px | 已完成 |
 | 2026-11-11 | [二级页顶栏收尾：进入偏移 / 我的设备留白 / 「通用」共用模糊](2026-11-11-subpage-topbar-fixes.md) | 16.8：二级页加完 padding 立刻把第 0 行锚回顶部（进入不再自带滚动偏移）；`findScrollable` 只认最外层竖向滚动容器（修「我的设备」331px 卡片留白）；「我的设备 / 通用」抬 wrapper + 预绘制清 clip，内容滑进栏下共用同一套模糊 | 已完成 |
 | 2026-11-11 | [二级页顶栏（模糊/半透明/发丝线）+ 控制中心上移 + 浅色搜索栏高光回退](2026-11-11-subpage-topbar-and-search-rollback.md) | 16.7：「控制中心」移到「墙纸」上方；二级页顶栏改成首页同款半透明 + 原生模糊，靠 `ActionBarOverlayLayout.setOverlayMode` + 列表栏高 padding 让内容滑进栏下；发丝线复用 `applyDivider`，条件 `canScrollVertically(-1)`；浅色搜索栏的灰边试验按用户要求整段回退 16.6 | 已完成 |

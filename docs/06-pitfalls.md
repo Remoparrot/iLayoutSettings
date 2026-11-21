@@ -1,6 +1,6 @@
 # 踩坑记录
 
-> 状态：**现行** · 对应版本：16.10 (101)
+> 状态：**现行** · 对应版本：16.11 (102)
 > 规则：每踩一个新坑就追加一条，写清 **现象 → 根因 → 解法 → 如何避免**。旧结论被推翻时保留原文并标「已过时」。
 
 ## 最贵的五个坑（先看这五条）
@@ -391,6 +391,31 @@
   只影响原生命令输出解码，不改脚本文件本身的 UTF-8 BOM。
 - **如何避免**：PowerShell 5.1 里任何「curl 输出 → ConvertFrom-Json」都要先设 UTF-8 控制台编码；
   Release 创建和 asset 上传要能被单独重跑（本次就是手动补传 asset 并用下载哈希校验）。
+
+#### 坑 F19：顶栏玻璃「停住」——列表根本没滑到栏下
+
+- **现象**：底部搜索栏玻璃已经跟手，但顶栏一直是一条平的半透明带；列表内容在栏底
+  （331px）被硬切，账户卡/图标不会在栏下出现。深色下栏是全黑，浅色下是浅灰带。
+- **根因**：澎湃 4 折叠时 `action_bar_container` 从 513px 缩到 331px，但 `scroll_headers`
+  仍锚在 513；`NestedHeaderLayout.mScrollableView` 在 OS4 被删除，旧 `unclip()` 只清到
+  `scroll_headers` 自己的 `clipBounds`，父链 `SpringBackLayout` 仍在栏底裁切。加上
+  `mOverBgView` 的白色遮罩盖在栏上，即使有内容也被盖住。
+- **解法**：SDK≥37 时 `unclip()` 回退 `getScrollableView()` 并 `clearClipUp` 清父链
+  `clipBounds`/`clipChildren`；`refreshTopBar()` 给列表 `setTranslationY(-(openHeight-barHeight))`；
+  `hideOverBackground()` 把 `mOverBgView` alpha 置 0 并清背景。回顶部时 shift 回 0。
+- **如何避免**：看到「顶栏玻璃不跟手」先确认列表有没有真的滑到栏下（截图看栏底是否硬切），
+  再检查父链 clip 和 over-bg；不要只调模糊半径——没有内容可采样，调多大都是平带。
+
+#### 坑 F20：退出搜索后原生顶部搜索栏又出现，变成两条
+
+- **现象**：点底部搜索 → 退出后，顶部原生玻璃搜索栏留在页面上，和底部胶囊同时出现；
+  顶部那条不动，像「上面的玻璃停了」。
+- **根因**：澎湃 4 在搜索 ActionMode 结束时重新显示 `mAnchorView`；模块只在 install 时
+  隐藏过一次，之后没有再隐藏。
+- **解法**：`BottomSearch.hideAnchor()` 在 `setBarVisible` 和每次稳定布局
+  （`!searching && !isInActionMode`）里重新设 `mAnchorView` GONE，并保留 `sAnchor` 兜底。
+- **如何避免**：对 MIUI 的「隐藏」要按布局幂等重做，不要假设 install 时设一次就永久生效；
+  搜索模式切换（ActionMode/onResume/重建）都会把系统栏恢复。
 
 ---
 

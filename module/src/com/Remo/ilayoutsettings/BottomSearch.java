@@ -376,6 +376,15 @@ final class BottomSearch {
                             if (!searching && now < suppressShowUntil) {
                                 return; // search is starting; keep the bar hidden
                             }
+                            if (!searching && !isInActionMode(fragment)) {
+                                // HyperOS 4 re-shows MIUI's own top search bar
+                                // when the search action mode ends. Without this
+                                // the home page keeps the native top glass pill
+                                // (looking "stuck" above) and sometimes shows
+                                // both search bars. Re-hide it on every settled
+                                // layout pass that is not in search mode.
+                                hideAnchor(fragment);
+                            }
                             boolean shown = wrap.getVisibility() == View.VISIBLE;
                             if (searching && shown) {
                                 animateBar(wrap, false);
@@ -540,12 +549,39 @@ final class BottomSearch {
         }
     }
 
+    /**
+     * Keeps MIUI's own top search bar hidden.
+     *
+     * <p>HyperOS 4 re-shows the native anchor when the search action mode is
+     * destroyed. The leftover top glass pill then sits above our bottom bar
+     * (occasionally both are visible), and its glass reads as "stuck" because
+     * it is a stale header view that no longer belongs on the home page.
+     * Calling this on every layout pass that is not in search mode leaves a
+     * single search bar on screen.</p>
+     */
+    private static void hideAnchor(Object fragment) {
+        try {
+            Object raw = HeaderData.field(fragment, "mAnchorView");
+            View anchor = raw instanceof View ? (View) raw : sAnchor;
+            if (anchor == null) {
+                return;
+            }
+            if (anchor.getVisibility() != View.GONE) {
+                anchor.setVisibility(View.GONE);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
     private static void setBarVisible(Object fragment, boolean visible) {
         try {
             Activity activity = activity(fragment);
             if (activity == null) {
                 return;
             }
+            // HyperOS 4 re-shows the native search bar when the action mode
+            // ends; keep it gone whenever the bottom bar owns visibility.
+            hideAnchor(fragment);
             ViewGroup content = (ViewGroup) activity.findViewById(android.R.id.content);
             View wrap = content == null ? null : content.findViewWithTag(TAG);
             if (wrap == null) {

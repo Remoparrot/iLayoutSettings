@@ -3,10 +3,28 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前发布是 **16.10（iLayoutSettings，16.9 基线 + 澎湃 4 玻璃/关于本机修复）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前发布是 **16.11（iLayoutSettings，16.10 基线 + 顶栏玻璃/单搜索栏修复）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
+
+---
+
+# iLayoutSettings 16.11（顶栏玻璃 + 单搜索栏）
+
+## v16.11 变更
+
+- **顶栏玻璃在澎湃 4 下重新跟手**：OS4 折叠时 `action_bar_container` 从 513px 缩到 331px，
+  但 `scroll_headers` 仍锚在 513，内容永远到不了栏底；MIUI 的 `mOverBgView` 白色遮罩
+  又盖在栏上，顶栏看起来是一条「停住」的平带。`UiTweaks.refreshTopBar()` 在 SDK≥37 现在：
+  - 从列表父链清 `clipBounds` / `clipChildren`（`clearClipUp`）；
+  - 按 `openHeight - barHeight` 给列表 `translationY` 上移（当前 182px），回顶部自动回 0；
+  - 把 `mOverBgView` 透明化（`hideOverBackground`），让原生模糊显示内容。
+  浅色/深色均实拍确认内容滑进栏下并被模糊；OS3（SDK<37）仍走 16.10 的行为。
+- **退出搜索只保留一条搜索栏**：澎湃 4 在 ActionMode 结束时会把原生顶部搜索栏重新显示，
+  造成「顶部玻璃搜索栏 + 底部胶囊」两条。`BottomSearch.hideAnchor()` 在 `setBarVisible`
+  和每次稳定布局（非搜索态）里重新隐藏 `mAnchorView`；退出搜索后只剩底部一条。
+- 版本 **16.11 / versionCode 102**；APK `dist/iLayoutSettings-16.11.apk`。
 
 ---
 

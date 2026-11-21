@@ -1,6 +1,6 @@
 # 项目状态快照
 
-> **2026-11-21 更新：当前发布 16.10（16.9 基线 + 澎湃 4 搜索栏玻璃截帧 / 关于本机卡片位置修复）。**
+> **2026-11-21 更新：当前发布 16.11（16.10 + 顶栏玻璃跟手 / 单搜索栏修复）。**
 > 17.0 已撤回（OS4 官方设置专用适配，与 `Settings2_Glass_v37` 不兼容）。
 > 状态：**现行** · 最后更新：2026-11-21
 > 每次会话结束必须更新本文件。只写「现在是什么样」，历史过程放 `sessions/`。
@@ -9,19 +9,20 @@
 
 | 项 | 值 |
 | --- | --- |
-| versionName / versionCode | **16.10 / 101**（唯一来源：`module/AndroidManifest.xml`） |
+| versionName / versionCode | **16.11 / 102**（唯一来源：`module/AndroidManifest.xml`） |
 | 包名 | **`com.Remo.ilayoutsettings`**（16.0 由 `com.abradant.iossettings` 改名，属于破坏性变更） |
 | 应用名 / 仓库名 | **iLayoutSettings**（GitHub 仓库同步改名，旧地址会 301 跳转） |
 | minSdk / targetSdk | 29 / 36 |
 | 作用域 | `com.android.settings` |
-| 当前包 | `dist/iLayoutSettings-16.10.apk`（302,626 B，SHA-256 `7A4E2048…E32DA`；**已在 25053RT47C / HyperOS 4.0.4.0 / Android 17 上覆盖安装并实测**） |
-| 旧包 | `dist/` 只保留当前包；16.9 / 16.8 / 16.7 / 16.6 / 16.5 / 16.4 / 16.3 / 16.2 / 16.1 / 16.0 / 15.x / 14.8 在各自 GitHub Release |
+| 当前包 | `dist/iLayoutSettings-16.11.apk`（302,626 B，SHA-256 `E31F8145…5CC48`；**已在 25053RT47C / HyperOS 4.0.4.0 / Android 17 上覆盖安装并实测**） |
+| 旧包 | `dist/` 只保留当前包；16.10 / 16.9 / 16.8 / 16.7 / 16.6 / 16.5 / 16.4 / 16.3 / 16.2 / 16.1 / 16.0 / 15.x / 14.8 在各自 GitHub Release |
 
 ## 发布物指纹
 
 | 包 | 大小 | SHA-256 | 签名证书 SHA-256 |
 | --- | --- | --- | --- |
-| `iLayoutSettings-16.10.apk`（**当前**） | 302,626 B | `7A4E2048644B85047757604C7093AA1E7E352642D920B8AFBFC330BCFB5E32DA` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-16.11.apk`（**当前**） | 302,626 B | `E31F8145EC077FF822F12AF4502D614D555CAEACEFCE66A631738C56B625CC48` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-16.10.apk`（历史，Release） | 302,626 B | `7A4E2048644B85047757604C7093AA1E7E352642D920B8AFBFC330BCFB5E32DA` | 同上 |
 | `iLayoutSettings-16.9.apk`（历史，Release） | 302,626 B | `BBD6350F0A4DFF076094804A863DF01DD10C591A2529051FF93D8B820F6650CF` | 同上 |
 | `iLayoutSettings-16.8.apk`（历史，Release） | 302,626 B | `9F9004AA9F19E8AED94CA05269396A223E775CDC155614CAB03108FC8EC71094` | 同上 |
 | `iLayoutSettings-16.7.apk`（历史，Release） | 298,530 B | `25E0FCA8A39256DFCEC726DCEEC50CB8B268427CDE27A0C18F61589E11CDD973` | 同上 |
@@ -43,9 +44,9 @@
 | --- | --- |
 | 仓库 | https://github.com/Remoparrot/iLayoutSettings （旧 `iLyayot` 自动跳转） |
 | 默认分支 | `main` |
-| 最新 Release | [v16.10](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.10)（附件 `iLayoutSettings-16.10.apk`，302,626 B，SHA-256 `7A4E2048…E32DA`） |
+| 最新 Release | [v16.11](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.11)（附件 `iLayoutSettings-16.11.apk`，302,626 B，SHA-256 `E31F8145…5CC48`） |
 | 自动发版 | `tools/release.ps1`：构建 → 校验 → **自动 add/commit/push 当前分支** → 打 tag → 建 Release → 上传附件；脚本必须是 UTF-8 **带 BOM**，且在发 POST 前自检正文（中文丢失 / 占位符残留即中止） |
-| 旧 Release | v16.9、16.8、16.7、16.6、16.5、16.4、16.3、16.2、16.1、16.0、15.5、14.8 保留（本地 `dist/` 不再保留旧包） |
+| 旧 Release | v16.10、16.9、16.8、16.7、16.6、16.5、16.4、16.3、16.2、16.1、16.0、15.5、14.8 保留（本地 `dist/` 不再保留旧包） |
 
 ## 现在能做什么
 
@@ -83,6 +84,11 @@
   玻璃停在最后一帧（「滑到控制中心以下就卡住」），重开设置后又因没有首帧 backdrop
   退化成半透明底板。列表子树既绕开这些材质视图，又把卡片内容真正画进玻璃；
   抓帧失败保留上一帧（不再清空 backdrop），日志按 1s 节流。
+- ✅ **退出搜索只保留一条搜索栏（16.11）**：`BottomSearch.hideAnchor()` 在
+  `setBarVisible` 和每次稳定下来的 `onGlobalLayout`（非搜索态）里重新把 MIUI 的
+  `mAnchorView` 设 GONE。澎湃 4 在搜索 ActionMode 结束时会把原生顶部搜索栏重新显示，
+  以前会出现「原生顶部玻璃搜索栏 + 模块底部搜索栏」两条，顶部那条还会看起来卡住；
+  现在退出搜索后只保留底部胶囊。
 - ✅ **搜索栏进出场过渡（16.0 / 16.1 修时序）**：进出搜索 220ms 滑动 + 缩放 + 淡入淡出；
   退出时底部栏保持隐藏，等 MIUI 收起顶部搜索框（`ActionModeAnimationListener#onStop(open=false)`）
   后才出现，不再短暂同时显示两个搜索栏
@@ -101,6 +107,14 @@
   就带模糊；**16.5 起不再按「是否滚动」开关模糊和底色，并且清掉 MIUI 给滚动容器的
   `clipBounds`**——账户卡等内容滑进栏下就是模糊的，不再被不透明栏硬切。
   旧 110dp 读取时折算为 73%
+- ✅ **顶栏玻璃在澎湃 4 下重新跟手（16.11）**：OS4 折叠时 `action_bar_container`
+  从 513px 缩到 331px，但列表仍锚在 513，内容永远到不了栏底；同时 MIUI 的
+  `mOverBgView` 白色遮罩盖在栏上。现在 `UiTweaks.refreshTopBar()` 在 SDK≥37：
+  - 从列表父链一路清 `clipBounds` / `clipChildren`（`clearClipUp`），
+  - 把 `scroll_headers` 按 `openHeight - barHeight` 上移 `translationY`（当前实测 182px），
+  - 把 `mOverBgView` alpha 置 0 并清背景（`hideOverBackground`），
+  内容因此真正滑进顶栏下，由原生模糊显示。回顶部时 shift 自动回 0；浅色/深色都验证过。
+  这一条只作用于 SDK≥37，OS3 保持 16.10 行为。
 - ✅ **二级页顶栏（16.7 新增，16.8 收尾，`SubPageTopBar`）**：二级页的 `action_bar_container` 与首页同一套参数——
   底色按 `topbar_alpha`、模糊按 `topbar_blur`（像素换算后走 `MiuiBlurUtils.setBackgroundBlur`）。
   二级页是普通列布局，需把 `ActionBarOverlayLayout` 切到 overlay 模式并给列表加**栏高 padding**，
@@ -176,23 +190,32 @@
 18. **16.10 关于本机卡片位置依赖 MIUI 的列表 inset**：只有 `NestedScrollView.getPaddingTop() > 0`
     时才做减法；如果某版 ROM 不再给 ScrollView 加 inset，模块会按原来的规则补满栏高，
     卡片会回到「模块位置」（不是原设置位置）。预绘制兜底只在列表回到顶部时运行。
+19. **16.11 顶栏跟手依赖「展开栏高」和 `scroll_headers`**：`OPEN_BAR_HEIGHT` 记录见过的最大
+    栏高；如果设置进程在栏已折叠时冷启动、且一次都没见过展开态，`shift` 可能是 0，
+    需要滚动一下才恢复。列表 id / 父链层级变化时 `clearClipUp` 和 `translationY` 会软失败，
+    表现退回「顶栏是平的」。`mOverBgView` 字段缺失时白色遮罩也清不掉。
+20. **16.11 单搜索栏依赖 MIUI 的 `mAnchorView` / `sAnchor`**：`hideAnchor()` 找到 anchor 才隐藏；
+    如果 ROM 改名或把原生搜索栏换到别处，退出搜索仍可能出现两条搜索栏。
 
 ## 下一步（优先级从高到低）
 
-1. 复验 16.10：首页上下滚动经过「控制中心」、从玻璃起手上滑、重开设置后再滚动，
-   都要看到玻璃里是当前行内容；关于本机页首卡位置应保持 1571px（与去掉模块 padding 时一致）；
+1. 复验 16.11：
+   - 首页上下滚动经过「控制中心」时，顶栏和底部搜索栏玻璃里都要看到当前行内容；
+   - 回顶部后顶栏恢复大标题、列表不偏移；重开设置再滚动仍正常；
+   - 点底部搜索再退出，只保留底部一条搜索栏；
+   - 关于本机页首卡位置保持 1571px（与去掉模块 padding 时一致）；
 2. 观察 16.6 搜索栏在**第三方主题/彩色壁纸/浅色纯白页**下的光边与折射。16.7 已试过给浅色加
    1px 灰色轮廓 + 内移白高光，实测偏重（灰环 + 白环），按反馈回退——**要再动先让用户看对比图**；
-2. 观察小爱入口在 ROM 升级后的可用性；必要时把 `VoiceService` 的 `ComponentName` 做成
+3. 观察小爱入口在 ROM 升级后的可用性；必要时把 `VoiceService` 的 `ComponentName` 做成
    可配置，或改走 `ACTION_ASSIST`；
-3. 观察 16.5 的「常开模糊」在**搜索模式**、第三方主题、平板/横屏下的表现（栏高变化会不会
+4. 观察顶栏「常开模糊」在**搜索模式**、第三方主题、平板/横屏下的表现（栏高变化会不会
    让线提前出现）；必要时把发丝线的显示条件收紧到「折叠进度 > 阈值」；
-4. 16.8 的延迟 refresh 目前是 700/1600/3200ms 三次；若「我的设备」在慢设备上仍偶发丢
+5. 16.8 的延迟 refresh 目前是 700/1600/3200ms 三次；若「我的设备」在慢设备上仍偶发丢
    padding，改成 hook fragment `onCreateView` 重挂更稳（代价是多一个类钩子）；
-5. 图标如需跟随系统主题，补 `mipmap-anydpi-v26` adaptive icon（前景 = 齿轮+玻璃盘，背景 = 渐变）；
-6. 接 GitHub Actions：tag 触发 `tools/release.ps1` 的只读版本（构建 + 上传）；
-7. 清理 `Hook` 未引用的遗留类（`GlassToggle`、`IntroCard`、`AboutIos` 等）；
-8. 平板/分屏适配。
+6. 图标如需跟随系统主题，补 `mipmap-anydpi-v26` adaptive icon（前景 = 齿轮+玻璃盘，背景 = 渐变）；
+7. 接 GitHub Actions：tag 触发 `tools/release.ps1` 的只读版本（构建 + 上传）；
+8. 清理 `Hook` 未引用的遗留类（`GlassToggle`、`IntroCard`、`AboutIos` 等）；
+9. 平板/分屏适配。
 
 ## 环境事实（本机）
 

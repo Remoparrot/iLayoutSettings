@@ -1,6 +1,6 @@
 # 架构与 Hook 链路
 
-> 状态：**现行** · 对应版本：16.10 (101)
+> 状态：**现行** · 对应版本：16.11 (102)
 > 源码：`module/src/com/Remo/ilayoutsettings/`
 
 ## 1. 从加载到生效
@@ -132,6 +132,9 @@ LSPosed
    收到 `onStop(open=false)`（收起动画结束、`mIsInActionMode` 已为 false）后才播底部栏进场，
    另有 700ms 兜底。`isSearching()` 也改成优先读 `mIsInActionMode`：原来的
    `search_result_ll` 探测在首次布局后永远为真，害得从二级页返回时底部栏被误隐藏；
+   **16.11**：澎湃 4 在 ActionMode 结束后会重新显示原生顶部搜索栏；`hideAnchor()` 在
+   `setBarVisible` 和每次稳定布局（`!searching && !isInActionMode`）里把 `mAnchorView`
+   重新设 GONE，退出搜索后只剩底部一条；
 6. `SearchGlass` 负责视觉层（16.6 重做）：
    - **SDK≥37（澎湃 4）只抓列表子树**：`captureListOnly()` 找 `scroll_headers`，先填页面底色，
      再把 `list.draw()` 画进 `captureScratch`，整棵成功后才换给 `backdrop`。澎湃 4 的顶栏 /
@@ -207,6 +210,15 @@ LSPosed
   `refreshBlur()` 会复用它，不预写就会第一帧没模糊。`topbar_blur` 是 **0–100%**，
   内部映射到 0–150dp（MIUI 在 400px 处截断，2.75x 屏约 145dp）；默认 **5% / 2% 透明度**；
   16.1 的旧值（>100）读取时按 150dp 折算，110dp → 73%，不会归零。
+- **澎湃 4 顶栏跟手（16.11）**：OS4 折叠时 `action_bar_container` 从 513px 缩到 331px，
+  但 `scroll_headers` 仍锚在 513，内容永远到不了栏底；`mOverBgView` 的白色遮罩又盖在栏上。
+  `refreshTopBar()` 在 SDK≥37 时：
+  - `unclip()` 先从 `getScrollableView()` 回退取滚动壳（OS4 删了 `mScrollableView`），
+    再沿列表父链清 `clipBounds` 并关 `clipChildren`（`clearClipUp`）；
+  - 用 `OPEN_BAR_HEIGHT - 当前栏高` 给列表 `setTranslationY(-shift)`，回顶部 shift 回 0；
+    当前实测 513→331 时 shift=182；
+  - `hideOverBackground()` 把 `mOverBgView` alpha 置 0 并清背景，让原生模糊显示内容。
+  OS3 不进入这段（列表本来就在栏下），避免二次位移。
 - **发丝线跟着栏一起出现**：显示条件 = 列表滚动超过 4dp **或** 栏已从大标题高度收缩
   （`OPEN_BAR_HEIGHT` 记下见过的最大栏高，当前高度比它小 1dp 即视为折叠中），
   回到顶部、栏恢复原高后隐藏。这样折叠动画里「栏开始压住内容」的瞬间线就在，
