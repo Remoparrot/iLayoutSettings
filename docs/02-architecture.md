@@ -1,6 +1,6 @@
 # 架构与 Hook 链路
 
-> 状态：**现行** · 对应版本：16.8 (99)
+> 状态：**现行** · 对应版本：16.10 (101)
 > 源码：`module/src/com/Remo/ilayoutsettings/`
 
 ## 1. 从加载到生效
@@ -133,6 +133,13 @@ LSPosed
    另有 700ms 兜底。`isSearching()` 也改成优先读 `mIsInActionMode`：原来的
    `search_result_ll` 探测在首次布局后永远为真，害得从二级页返回时底部栏被误隐藏；
 6. `SearchGlass` 负责视觉层（16.6 重做）：
+   - **SDK≥37（澎湃 4）只抓列表子树**：`captureListOnly()` 找 `scroll_headers`，先填页面底色，
+     再把 `list.draw()` 画进 `captureScratch`，整棵成功后才换给 `backdrop`。澎湃 4 的顶栏 /
+     `bgEffectView` 带 AGSL `RenderEffect`，`root.draw()` 软件画布会抛
+     `Software rendering doesn't support RuntimeShader`，旧路径从列表滑到栏下起每帧失败，
+     玻璃停在最后一帧；重开设置时没有首帧 backdrop，又退化成半透明底板。列表子树绕开材质视图、
+     包含卡片内容、也不含玻璃自身。找不到列表时才退回旧的 `root.draw()`；抓帧失败保留上一帧，
+     日志按 1s 节流（16.10）；
    - 抓窗口（跳过自身子树）→ **1dp 模糊**（`RenderEffect`）→ `RuntimeShader` 折射（默认 **12dp 厚度 / 19dp 力度**）；
    - **不再画 MIUI 的 `miuix_appcompat_search_mode_edit_text_bg_light/dark`**：玻璃自己画半透明底色
      （深色白 10%、浅色浅灰 `#E6E6EB` 50%），并做上下等亮的光边（AGSL 里用 `abs(grad.y)` 选边，
@@ -235,6 +242,9 @@ LSPosed
      再由 `ensureOverlay` 反射调 `ActionBarOverlayLayout.setOverlayMode(true)`；
    - `padListUnderBar` 给列表加 `paddingTop = 栏高` 并 `setClipToPadding(false)`。ScrollView 自己的
      padding 会被 MIUI 的 inset pass 重置，所以改加在它唯一的内容子 View（`LinearLayout`）上；
+     **16.10 起先减去 MIUI 已经写进列表的 `getPaddingTop()`**（`add = max(0, overlap - miuiInset)`）：
+     关于本机页的 NestedScrollView 自带 331px inset，再叠 331px 会把「本机详情」卡从 1571px 推到
+     1902px。预绘制里另有 `trimDoubleInset` 兜底，只对回到顶部、已经叠了两层 inset 的 ScrollView 生效；
    - 加完 padding 立刻 `scrollToPosition(0)` / `scrollTo(0,0)`（`resetScrollToTop`）：padding 变化后
      `LinearLayoutManager` 会把已 attach 的第 0 行按旧局部坐标重排，`padding - childTop` 读出来
      就像「已经滚了 500px」，进入页面时顶栏和发丝线会提前出现（16.8 修）；

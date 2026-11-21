@@ -1,6 +1,6 @@
 # 踩坑记录
 
-> 状态：**现行** · 对应版本：16.8 (99)
+> 状态：**现行** · 对应版本：16.10 (101)
 > 规则：每踩一个新坑就追加一条，写清 **现象 → 根因 → 解法 → 如何避免**。旧结论被推翻时保留原文并标「已过时」。
 
 ## 最贵的五个坑（先看这五条）
@@ -349,6 +349,35 @@
 - **解法**：按原样使用（用户指定），只在 ImageView 里用 `CENTER_INSIDE/FIT_CENTER` 控制大小；
   不补画、不镜像、不擅自扩画布。记录里写明素材限制，后续如用户换图直接替换资源名即可。
 - **如何避免**：接图标素材时先看 alpha 包围盒是否贴边；贴边就说明被裁过，提前和用户确认接受。
+
+#### 坑 F16：澎湃 4 + 高级材质下 `root.draw()` 每帧抛 RuntimeShader
+
+- **现象**：首页滑到「控制中心」以下后，搜索栏玻璃停在最后一帧；回到桌面再打开设置，
+  玻璃变成一块半透明灰白底板。日志每帧刷
+  `search glass capture failed: java.lang.IllegalArgumentException: Software rendering doesn't support RuntimeShader`。
+- **根因**：`SearchGlass.capture()` 把整个 root 画进软件 `Canvas`；澎湃 4 的顶栏 / 全屏
+  `bgEffectView` 走「高级材质」时会挂 AGSL `RenderEffect`。软件画布不支持 RuntimeShader，
+  绘制到那个 View 就抛异常。材质效果只有在列表滑进栏下后才启用，所以现象恰好从「控制中心」以下开始；
+  抓帧失败又把 `backdrop` 清空，重开时没有首帧，玻璃就退化成半透明底板。
+- **解法**：SDK≥37 不再画整个 root，只画 `com.android.settings:id/scroll_headers` 列表子树
+  （`captureListOnly`），列表先画进 `captureScratch`，成功后再换给 `backdrop`；失败保留上一帧，
+  日志 1s 节流。列表子树不含材质顶栏/背景 effect，也天然不含搜索栏自己。
+- **如何避免**：抓窗口前先问「树里有没有硬件专属效果（RenderEffect / RuntimeShader / 硬件层）」；
+  有就只抓不包含它的子树，或改用 `PixelCopy`/surface 抓帧。失败时**不要**清空上一帧——
+  那会把「卡住」升级成「变半透明」。
+
+#### 坑 F17：MIUI 已经给 ScrollView 加了栏高 inset，模块又加了一遍
+
+- **现象**：关于本机页「本机详情」卡比原设置低 331px；用 uiautomator 看，
+  `scroll_layout.top=331`、`version_card_click_view` 从 662 开始，而版本卡 overlay 只到 1571。
+- **根因**：`SubPageTopBar.padListUnderBar()` 按 `overlapUnderBar`（331）给 `scroll_layout` 加 padding，
+  但 MIUI 的 inset pass 已经把同一个 331 写到了外层 NestedScrollView 的 `paddingTop`；
+  两层相加，第一张卡被推后一整栏。
+- **解法**：加 padding 前先减掉 `list.getPaddingTop()`（`add = max(0, overlap - miuiInset)`）；
+  再加一个预绘制兜底 `trimDoubleInset`，只处理「已叠两层 + 列表在顶部」的 ScrollView。
+- **如何避免**：给系统容器加 inset 前先打印/检查它自己的 padding；MIUI 的 content inset 和模块
+  的「栏下 padding」经常是同一件事。验收时用「去掉模块 padding 的同一页」做像素对照，
+  不要只看「看起来不那么空了」。
 
 ---
 

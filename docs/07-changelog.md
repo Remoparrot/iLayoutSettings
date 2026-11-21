@@ -3,10 +3,36 @@
 > 状态：**历史** · 面向：想知道「某个版本改了什么」的人
 >
 > 本文是开发过程中的原始版本日志，时间跨度 v3.1 → v17.0，**包含已放弃的实验分支**（液态玻璃、GUI 参数页、smali 搬运等）。
-> 当前发布是 **16.9（iLayoutSettings，16.8 基线 + 版本号）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
+> 当前发布是 **16.10（iLayoutSettings，16.9 基线 + 澎湃 4 玻璃/关于本机修复）**，功能与取舍以 [架构](02-architecture.md)、[设计思路](05-design-notes.md) 为准；
 > 当前发布包的指纹以 [状态](00-status.md) 为准——本文末尾「7. 校验」写的是后续版本的数据（216,015 B），**不适用于 14.8**。
 >
 > 新增版本时在**本文顶部**追加一节，格式与下面一致。
+
+---
+
+# iLayoutSettings 16.10（澎湃 4 搜索栏玻璃 + 关于本机卡片位置）
+
+## v16.10 变更
+
+- **搜索栏玻璃在澎湃 4 / 高级材质下不再卡住**：`SearchGlass` 在 SDK≥37 改成只把
+  `scroll_headers` 列表子树画进 backdrop，不再 `root.draw()` 整棵窗口树。
+  澎湃 4 的顶栏 / `bgEffectView` 带 AGSL `RenderEffect`，软件画布会抛
+  `IllegalArgumentException: Software rendering doesn't support RuntimeShader`；
+  旧路径在列表滑到「控制中心」以下、材质效果激活后每帧失败，玻璃停在最后一帧；
+  重开设置时又没有首帧 backdrop，退化成半透明底板。
+  列表子树绕开这些材质视图，卡片内容真正进入玻璃；抓帧失败保留上一帧（不再清空 backdrop），
+  日志按 1s 节流，避免 120Hz 刷屏。
+- **抓帧缓冲**：列表先画到 `captureScratch`，整棵画成功后才与 `backdrop` 交换，
+  失败不会留下画了一半的帧。
+- **关于本机「本机详情」卡回到原设置位置**：`SubPageTopBar.padListUnderBar()` 现在先减掉
+  MIUI 已经写进列表的 `getPaddingTop()`（关于本机页的 NestedScrollView 自带 331px inset）。
+  16.9 会在 `scroll_layout` 上再叠 331px，卡片从原位置 1571px 被推到 1902px；
+  16.10 的 `add = max(0, overlap - miuiInset)` 让卡片回到 1571px（与去掉模块 padding 时逐像素一致）。
+  另加预绘制兜底：已经叠了两层 inset 的 ScrollView 在回到顶部时会清掉多余的一层
+  （`sub-page double inset trimmed …`）。
+- **兼容性**：仍以 16.9 / 16.8 行为基线；OS3（SDK<37）不进入新的列表抓帧路径。
+  必须配合 `Settings2_Glass_v37_unsigned.apk` 使用。
+- 版本 **16.10 / versionCode 101**；APK `dist/iLayoutSettings-16.10.apk`。
 
 ---
 

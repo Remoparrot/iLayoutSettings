@@ -86,6 +86,8 @@ final class SubPageTopBar {
     private static final Map<View, Boolean> OVERLAY_ON_MAP = new WeakHashMap<>();
     /** Views that got the expanded-bar top padding (value = top inset). */
     private static final Map<View, Integer> LIST_PADDING = new WeakHashMap<>();
+    /** Original padding of the view above, so it can be restored on a rebuild. */
+    private static final Map<View, Integer> BASE_PADDING = new WeakHashMap<>();
     /** Lists whose wrapper was lifted under the bar (clip must stay off). */
     private static final Set<View> LIFTED_LISTS =
             java.util.Collections.newSetFromMap(new WeakHashMap<View, Boolean>());
@@ -417,11 +419,28 @@ final class SubPageTopBar {
         if (top <= 0) {
             return;
         }
-        padTarget.setPadding(padTarget.getPaddingLeft(), top, padTarget.getPaddingRight(),
+        // MIUI may already have inset the scroll container / content by the
+        // expanded bar height. The About page's NestedScrollView reports
+        // paddingTop == 331 while its scroll_layout child is still at the old
+        // place; padding the child again pushed the whole "本机详情" card down
+        // by a second 331 px (card top 1902 instead of 1571). Only add the part
+        // MIUI did not already add.
+        int miuiInset = list.getPaddingTop();
+        int add = Math.max(0, top - miuiInset);
+        XLog.i("sub-page padding calc desired=" + top + " miui=" + miuiInset
+                + " target=" + padTarget.getPaddingTop() + " add=" + add
+                + " (" + padTarget.getClass().getSimpleName() + ")");
+        if (add <= 0) {
+            return;
+        }
+        if (!BASE_PADDING.containsKey(padTarget)) {
+            BASE_PADDING.put(padTarget, padTarget.getPaddingTop());
+        }
+        padTarget.setPadding(padTarget.getPaddingLeft(), add, padTarget.getPaddingRight(),
                 padTarget.getPaddingBottom());
-        LIST_PADDING.put(padTarget, top);
+        LIST_PADDING.put(padTarget, add);
         resetScrollToTop(list);
-        XLog.i("sub-page list padded to " + top + "px (bar " + appBar.getHeight()
+        XLog.i("sub-page list padded to " + add + "px (bar " + appBar.getHeight()
                 + ", " + padTarget.getClass().getSimpleName() + ")");
     }
 
@@ -545,6 +564,64 @@ final class SubPageTopBar {
 
     /* -------------------------------- watcher --------------------------------- */
 
+    /**
+     * Removes a second top inset if MIUI adds its own one <em>after</em> the
+     * module already padded the ScrollView's child.
+     *
+     * <p>The first pass usually sees MIUI's inset already (the About page
+     * reports {@code getPaddingTop() == 331}), and {@link #padListUnderBar}
+     * subtracts it directly. This pre-draw fallback covers the remaining order:
+     * the padding pass runs before MIUI's inset pass, the list later gets a
+     * second 331 px, and the first card ends up a whole bar height too low.
+     * It only runs at rest and only for ScrollView pages; RecyclerView pages
+     * keep the 16.8 behaviour.</p>
+     */
+    private static void trimDoubleInset(Activity activity, View decor, View list) {
+        try {
+            if (!(list instanceof ViewGroup) || !isScrollView(list)
+                    || list.canScrollVertically(-1)) {
+                return;
+            }
+            ViewGroup group = (ViewGroup) list;
+            if (group.getChildCount() == 0 || group.getChildAt(0) == null) {
+                return;
+            }
+            View target = group.getChildAt(0);
+            Integer applied = LIST_PADDING.get(target);
+            if (applied == null || applied <= 0) {
+                return;
+            }
+            int miuiInset = list.getPaddingTop();
+            if (miuiInset <= 0) {
+                return;
+            }
+            int overlap = overlapUnderBar(appBarOf(activity, decor), list);
+            if (overlap <= 0) {
+                return;
+            }
+            int want = Math.max(0, overlap - miuiInset);
+            float density = list.getResources().getDisplayMetrics().density;
+            if (applied <= want + Math.round(2 * density)) {
+                return;
+            }
+            int base = BASE_PADDING.containsKey(target) ? BASE_PADDING.get(target) : 0;
+            int newTop = Math.max(base, want);
+            target.setPadding(target.getPaddingLeft(), newTop,
+                    target.getPaddingRight(), target.getPaddingBottom());
+            if (newTop <= 0) {
+                LIST_PADDING.remove(target);
+                BASE_PADDING.remove(target);
+            } else {
+                LIST_PADDING.put(target, newTop);
+            }
+            XLog.i("sub-page double inset trimmed " + applied + " -> " + newTop
+                    + "px (bar overlap " + overlap + ", miui " + miuiInset
+                    + ", " + target.getClass().getSimpleName() + ")");
+        } catch (Throwable t) {
+            XLog.w("sub-page double inset trim failed: " + t);
+        }
+    }
+
     private static void attachScrollWatcher(final Activity activity, final View decor) {
         View list = findScrollable(decor);
         if (list == null || !SCROLL_WATCHED.add(list)) {
@@ -573,6 +650,7 @@ final class SubPageTopBar {
                         if (LIFTED_LISTS.contains(list)) {
                             clearAncestorClip(list);
                         }
+                        trimDoubleInset(activity, decor, list);
                         ensureBarBackground(appBarOf(activity, decor));
                         return true;
                     }

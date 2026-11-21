@@ -1,17 +1,17 @@
 # iLayoutSettings · iOS 设置布局
 
-> 把澎湃 OS（HyperOS 3）「设置」首页改成 iOS 风格：入口重排、条件卡片（软件更新 / 耳机 / iCloud）、搜索栏沉底、卡片细节修正。
+> 把澎湃 OS（HyperOS 3 / 4）「设置」首页改成 iOS 风格：入口重排、条件卡片（软件更新 / 耳机 / iCloud）、搜索栏沉底、卡片细节修正。
 > **全部复用 MIUI 原生控件与原生数据，模块不重绘任何页面。**
 
 > [!IMPORTANT]
-> **16.9 必须配合本 Release 里的 `Settings2_Glass_v37_unsigned.apk` 使用。**
+> **16.10 必须配合本 Release 里的 `Settings2_Glass_v37_unsigned.apk` 使用。**
 > 这套设置是基于澎湃 3 设置的改版，加入了澎湃 4 的「高级材质 / 材质风格」等功能；
 > 不安装这套设置、直接把模块套在官方设置或其它版本上，可能与 LSPosed 模块不兼容
 > （布局 / 顶栏 hook 失效、搜索栏异常，甚至设置闪退）。
 
-[![Version](https://img.shields.io/badge/version-16.9-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
+[![Version](https://img.shields.io/badge/version-16.10-1f6feb)](https://github.com/Remoparrot/iLayoutSettings/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-HyperOS%203%20%7C%20Android%2015%2B-green)](docs/01-overview.md)
+[![Platform](https://img.shields.io/badge/platform-HyperOS%203%20%2F%204%20%7C%20Android%2015%2B-green)](docs/01-overview.md)
 [![LSPosed](https://img.shields.io/badge/framework-LSPosed-orange)](docs/04-install.md)
 
 ---
@@ -35,13 +35,13 @@
 | 条件卡图标 | 用指定资源包里的 `ic_cloud` / `ic_sub_airpods`（已打进模块）；设置同名 drawable 只作兜底 |
 | 专注模式 / 相机 / 搜索入口 | 分别在「屏幕时间」「外观」「墙纸」附近，复用系统或模块图标 |
 | 飞行模式开关 | 右侧原生 `SlidingSwitch`，图标优先用设置主题里的 `ic_airplane_mode_settings` |
-| 底部搜索栏 | `miuix_appcompat_search_stub` 原生布局 + **自绘 Kyant 液态玻璃**（G2 连续圆角 + 模糊 + 折射 + 上下光边，不再叠 MIUI 9-patch） |
+| 底部搜索栏 | `miuix_appcompat_search_stub` 原生布局 + **自绘 Kyant 液态玻璃**（G2 连续圆角 + 模糊 + 折射 + 上下光边，不再叠 MIUI 9-patch）；**16.10：澎湃 4 高级材质下截帧只绘列表子树，滑到「控制中心」以下不再卡住/变半透明** |
 | 搜索栏图标 / 小爱 | 指定 iOS 27 搜索/麦克风图标，随深浅色染色；点麦克风走与电源键长按相同的 `VoiceService` 入口唤醒小爱 |
 | 搜索栏过渡 | 进出搜索 220ms 滑动+缩放+淡入淡出；**退出时等 MIUI 收起顶部搜索框后再出现底部栏**，不再短暂出现两个搜索栏 |
 | 参数界面 | 应用内滑杆：搜索栏模糊（0.1dp）/ 折射 19dp / 厚度 12dp；顶栏模糊 0–100%、顶栏透明度 0–100%、显示顶栏分割线（16.6 删除「高级设置」总开关，全部常显） |
 | 卡片细节修正 | 去掉每组最后一行的双层圆角/放大图标；外观页预览加卡片底 |
 | 顶部模糊 / 发丝线 | 默认 5% 模糊 + 2% 透明度，**顶栏始终带模糊**——账户卡等内容滑到栏下面就是糊的，不再被不透明栏切掉；发丝线跟着栏一起出现（浅色黑 12%，深色中性灰 30%）；**设置内切换深浅色后线不消失**，折叠栏第一次出现就带模糊 |
-| 二级页顶栏（16.7 / 16.8） | 二级页顶栏与首页同一套参数：半透明底色 + 原生模糊 + 内容滑进栏下；0.5dp 半透明发丝线只在滚动时出现，回顶部即隐藏。**16.8：进入二级页不再自带滚动偏移（顶栏/发丝线不会提前出现）；「我的设备 / 通用」的内容也滑进栏下、共用同一套模糊** |
+| 二级页顶栏（16.7 / 16.8 / 16.10） | 二级页顶栏与首页同一套参数：半透明底色 + 原生模糊 + 内容滑进栏下；0.5dp 半透明发丝线只在滚动时出现，回顶部即隐藏。**16.8：进入二级页不再自带滚动偏移（顶栏/发丝线不会提前出现）；「我的设备 / 通用」的内容也滑进栏下、共用同一套模糊。16.10：关于本机页不再叠加 MIUI 的 331px inset，「本机详情」卡回到原设置位置（1571px）** |
 | 应用图标 | 蓝紫渐变 + 半透明玻璃盘 + 白齿轮（[预览](docs/assets/icon-16.4.png)）；`tools/make_launcher_icon.py` 生成五档 mipmap，脚本内另有两套候选（[并排对比](docs/assets/icon-candidates-16.4.png)） |
 
 ## 截图
@@ -76,10 +76,19 @@
 | --- | --- | --- |
 | ![通用 · 浅色](docs/assets/general-16.8-light.png) | ![通用 · 深色](docs/assets/general-16.8-dark.png) | ![我的设备](docs/assets/devinfo-16.8-light.png) |
 
+16.10：澎湃 4 高级材质下，搜索栏玻璃跟着列表滚动（「控制中心」以下不再卡住），
+「关于本机」的「本机详情」卡回到原设置位置：
+
+| 搜索栏玻璃 · 浅色（滑到控制中心以下） | 搜索栏玻璃 · 深色 |
+| --- | --- |
+| ![搜索栏玻璃 · 浅色 16.10](docs/assets/search-glass-16.10-light.png) | ![搜索栏玻璃 · 深色 16.10](docs/assets/search-glass-16.10-dark.png) |
+
+![关于本机 · 卡片回到原位置 16.10](docs/assets/devinfo-16.10-light.png)
+
 ## 安装
 
 1. 先安装本 Release 里的 `Settings2_Glass_v37_unsigned.apk`（基于澎湃 3 设置改版、带澎湃 4 功能），再用你的平台签名 / 原有流程装进系统；
-2. 安装 [`dist/iLayoutSettings-16.9.apk`](dist/iLayoutSettings-16.9.apk)，或到 [Releases · v16.9](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.9) 下同名附件（302,626 B，SHA-256 `BBD6350F…50CF`，与 `dist/` 同一份）；
+2. 安装 [`dist/iLayoutSettings-16.10.apk`](dist/iLayoutSettings-16.10.apk)，或到 [Releases · v16.10](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.10) 下同名附件（302,626 B，SHA-256 `7A4E2048…E32DA`，与 `dist/` 同一份）；
    **16.0 起包名是** `com.Remo.ilayoutsettings`，从 16.0 升级可直接覆盖（同一签名）；
 3. LSPosed 中启用 **iLayoutSettings**，作用域只勾选 **设置**（`com.android.settings`）；
 4. **强制停止「设置」**（或重启手机），再打开设置；
@@ -94,14 +103,14 @@
 `sub-page action bar overlay mode on`、`icloud row added below Game Center`、
 按条件出现的 `update card added: …` / `airpods card added: …`、`headset devices changed, refresh cards`，
 以及 `card icon … <- module (supplied theme)`、`liquid glass shader compiled`、
-`search glass mask=...`、`airplane icon set: ...`。
+`search glass mask=...`、`sub-page double inset trimmed …`、`airplane icon set: ...`。
 详见 [安装与调试](docs/04-install.md)。
 
 ## 兼容性
 
 | 项 | 值 |
 | --- | --- |
-| 系统 | 澎湃 OS 3（HyperOS 3）· Android 15/16 |
+| 系统 | 澎湃 OS 3 / 4（HyperOS 3 / 4）· Android 15/16/17；澎湃 4 需配合 `Settings2_Glass_v37` |
 | 目标进程 | `com.android.settings`（仅此一个作用域） |
 | 模块 | Xposed API 82 / LSPosed 1.x、2.x |
 | minSdk / targetSdk | 29 / 36 |
@@ -119,7 +128,7 @@ pwsh -File module/build.ps1 `
 ```
 
 输出 `dist/iLayoutSettings-<versionName>.apk`。
-发版用 `tools/release.ps1 -Version 16.9`：构建 → 校验 → 自动提交/推送 → 打 tag → 建 Release → 上传 APK，一条命令完成。
+发版用 `tools/release.ps1 -Version 16.10`：构建 → 校验 → 自动提交/推送 → 打 tag → 建 Release → 上传 APK，一条命令完成。
 完整工具链版本、可复现性说明见 [构建指南](docs/03-build.md)。
 
 ## 文档

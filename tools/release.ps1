@@ -207,33 +207,35 @@ $bodyTemplate = @'
 - 包名：`{{PKG}}`
 - 签名证书 SHA-256：`{{CERT}}`
 
+### 本版内容（16.10）
+
+- **搜索栏玻璃不再卡住**：澎湃 4 + 高级材质下，`SearchGlass` 不再把整棵窗口树画进软件画布，
+  改为只抓 `scroll_headers` 列表子树。以前顶栏 / `bgEffectView` 的 AGSL `RenderEffect`
+  会让抓帧每帧抛 `Software rendering doesn't support RuntimeShader`，玻璃滑到「控制中心」以下
+  就停在最后一帧，重开设置又变成半透明底板；现在玻璃跟着列表滚动，失败也保留上一帧。
+- **关于本机「本机详情」卡回到原位置**：二级页加 padding 前先减去 MIUI 已经写进
+  NestedScrollView 的 331px inset，卡片从 1902px 回到原设置的 1571px；
+  另加预绘制兜底清理重复 inset。
+- 必须配合 `Settings2_Glass_v37_unsigned.apk` 使用（16.9 / 16.10 同一套设置）。
+- 版本 **16.10 / versionCode 101**；OS3（SDK<37）仍走 16.9 的旧抓帧路径。
+
 ### 安装
 
-1. 16.0 起包名是 `com.Remo.ilayoutsettings`：从 16.0 升级可直接覆盖（同一签名）；
-   从 15.x 升级必须先卸载旧包 `com.abradant.iossettings`；
-2. 安装本附件，然后在 LSPosed 里启用 **iLayoutSettings**，作用域只勾 **设置**（`com.android.settings`）；
-3. 强制停止「设置」后重新打开。
+1. 先按原有平台签名 / 系统分区流程安装 `Settings2_Glass_v37_unsigned.apk`；
+2. 安装本附件 `{{APK}}`，从 16.0 起同签名可直接覆盖；
+3. LSPosed 中启用 **iLayoutSettings**，作用域只勾 **设置**（`com.android.settings`）；
+4. 强制停止「设置」后重新打开。
 
-> 本机 MIUI 可能拦截 adb 安装新包（`INSTALL_FAILED_USER_RESTRICTED`），请把 APK 拷到手机手动安装。
+> 本机 MIUI 可能拦截 adb 安装新包（`INSTALL_FAILED_USER_RESTRICTED`），
+> 请把 APK 拷到手机后在文件管理器里点开安装。
 
-### 本版内容（16.8）
+### 截图（澎湃 4）
 
-- **进入二级页不再自带滚动偏移**：16.7 的二级页一进入就处于「已滚动」状态、顶栏和发丝线提前出现；
-  本版在加 padding 后把列表锚回顶部，二级页一律从顶部开始；
-- **「我的设备 / 通用」卡片留白修复**：不再把内层 `description_grid` 当成列表加 padding，
-  下方「REDMI Turbo 4 Pro」卡上方的巨大空白消失；
-- **「通用」顶栏共用模糊**：设备详情页的内容现在会滑进栏下，被同一套半透明底色 + 原生模糊处理，
-  发丝线也正常出现（浅色黑 12%、深色中性灰 30%）；
-- **发丝线条件收紧**：只有内容真的到了栏下才画线，内容到不了栏底的页面不再出现悬空的线；
-- 版本 16.8 / versionCode 99。
-
-### 截图
-
-| 通用 · 浅色（滚动后） | 通用 · 深色（滚动后） | 我的设备 · 卡片留白已修 |
+| 搜索栏玻璃 · 浅色（控制中心以下） | 搜索栏玻璃 · 深色 | 关于本机 · 卡片已回到原位置 |
 | --- | --- | --- |
-| ![通用 · 浅色](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/main/docs/assets/general-16.8-light.png) | ![通用 · 深色](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/main/docs/assets/general-16.8-dark.png) | ![我的设备](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/main/docs/assets/devinfo-16.8-light.png) |
+| ![搜索栏玻璃 · 浅色](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/v{{VERSION}}/docs/assets/search-glass-16.10-light.png) | ![搜索栏玻璃 · 深色](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/v{{VERSION}}/docs/assets/search-glass-16.10-dark.png) | ![关于本机](https://raw.githubusercontent.com/Remoparrot/iLayoutSettings/v{{VERSION}}/docs/assets/devinfo-16.10-light.png) |
 
-完整变更见 [docs/07-changelog.md](../blob/main/docs/07-changelog.md)。
+完整变更见 [docs/07-changelog.md](https://github.com/Remoparrot/iLayoutSettings/blob/v{{VERSION}}/docs/07-changelog.md)。
 '@
 $body = [string]$bodyTemplate
 $body = $body.Replace('{{VERSION}}', $versionName).Replace('{{CODE}}', [string]$versionCode)

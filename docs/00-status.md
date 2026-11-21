@@ -1,26 +1,29 @@
 # 项目状态快照
 
-> **2026-11-13 更新：17.0 已撤回，当前发布为 16.9（16.8 基线 + 版本号）。** 下文 17.0 段落为撤回前快照，发布物请以 Release v16.9 为准。
-> 状态：**现行** · 最后更新：2026-11-11
+> **2026-11-21 更新：当前发布 16.10（16.9 基线 + 澎湃 4 搜索栏玻璃截帧 / 关于本机卡片位置修复）。**
+> 17.0 已撤回（OS4 官方设置专用适配，与 `Settings2_Glass_v37` 不兼容）。
+> 状态：**现行** · 最后更新：2026-11-21
 > 每次会话结束必须更新本文件。只写「现在是什么样」，历史过程放 `sessions/`。
 
 ## 当前版本
 
 | 项 | 值 |
 | --- | --- |
-| versionName / versionCode | **16.8 / 99**（唯一来源：`module/AndroidManifest.xml`） |
+| versionName / versionCode | **16.10 / 101**（唯一来源：`module/AndroidManifest.xml`） |
 | 包名 | **`com.Remo.ilayoutsettings`**（16.0 由 `com.abradant.iossettings` 改名，属于破坏性变更） |
 | 应用名 / 仓库名 | **iLayoutSettings**（GitHub 仓库同步改名，旧地址会 301 跳转） |
 | minSdk / targetSdk | 29 / 36 |
 | 作用域 | `com.android.settings` |
-| 当前包 | `dist/iLayoutSettings-16.8.apk`（302,626 B，SHA-256 `9F9004AA…1094`；**已在 25053RT47C 上覆盖安装并实测**） |
-| 旧包 | `dist/` 只保留当前包；16.6 / 16.5 / 16.4 / 16.3 / 16.2 / 16.1 / 16.0 / 15.x / 14.8 在各自 GitHub Release |
+| 当前包 | `dist/iLayoutSettings-16.10.apk`（302,626 B，SHA-256 `7A4E2048…E32DA`；**已在 25053RT47C / HyperOS 4.0.4.0 / Android 17 上覆盖安装并实测**） |
+| 旧包 | `dist/` 只保留当前包；16.9 / 16.8 / 16.7 / 16.6 / 16.5 / 16.4 / 16.3 / 16.2 / 16.1 / 16.0 / 15.x / 14.8 在各自 GitHub Release |
 
 ## 发布物指纹
 
 | 包 | 大小 | SHA-256 | 签名证书 SHA-256 |
 | --- | --- | --- | --- |
-| `iLayoutSettings-16.8.apk`（**当前**） | 302,626 B | `9F9004AA9F19E8AED94CA05269396A223E775CDC155614CAB03108FC8EC71094` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-16.10.apk`（**当前**） | 302,626 B | `7A4E2048644B85047757604C7093AA1E7E352642D920B8AFBFC330BCFB5E32DA` | `941e18c51012be17f592ae25847a341d165bf77a27f9bc5a1b2e3ad14895248c` |
+| `iLayoutSettings-16.9.apk`（历史，Release） | 302,626 B | `BBD6350F0A4DFF076094804A863DF01DD10C591A2529051FF93D8B820F6650CF` | 同上 |
+| `iLayoutSettings-16.8.apk`（历史，Release） | 302,626 B | `9F9004AA9F19E8AED94CA05269396A223E775CDC155614CAB03108FC8EC71094` | 同上 |
 | `iLayoutSettings-16.7.apk`（历史，Release） | 298,530 B | `25E0FCA8A39256DFCEC726DCEEC50CB8B268427CDE27A0C18F61589E11CDD973` | 同上 |
 | `iLayoutSettings-16.6.apk`（历史，Release） | 294,434 B | `F167D3820FEEAF83FED1B8C7FFDF8CD006BF9ADB38EFE4C24E4E9116076BE6FE` | 同上 |
 | `iLayoutSettings-16.5.apk`（历史，Release） | 286,069 B | `8449352927AD053BD49FDDF3505AADE4532F90933E680CDF94AE72257854B566` | 同上 |
@@ -40,9 +43,9 @@
 | --- | --- |
 | 仓库 | https://github.com/Remoparrot/iLayoutSettings （旧 `iLyayot` 自动跳转） |
 | 默认分支 | `main` |
-| 最新 Release | [v16.8](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.8)（附件 `iLayoutSettings-16.8.apk`，302,626 B，SHA-256 `9F9004AA…1094`） |
+| 最新 Release | [v16.10](https://github.com/Remoparrot/iLayoutSettings/releases/tag/v16.10)（附件 `iLayoutSettings-16.10.apk`，302,626 B，SHA-256 `7A4E2048…E32DA`） |
 | 自动发版 | `tools/release.ps1`：构建 → 校验 → **自动 add/commit/push 当前分支** → 打 tag → 建 Release → 上传附件；脚本必须是 UTF-8 **带 BOM**，且在发 POST 前自检正文（中文丢失 / 占位符残留即中止） |
-| 旧 Release | v16.5、16.4、16.3、16.2、16.1、16.0、15.5、14.8 保留（本地 `dist/` 不再保留旧包） |
+| 旧 Release | v16.9、16.8、16.7、16.6、16.5、16.4、16.3、16.2、16.1、16.0、15.5、14.8 保留（本地 `dist/` 不再保留旧包） |
 
 ## 现在能做什么
 
@@ -73,6 +76,13 @@
   模糊 + 折射 + 半透明底色；轮廓是 Kyant Shapes 的 **G2 连续曲率胶囊**；光边只在**上下**
   且两侧等亮，无内阴影。搜索/麦克风图标换成指定 iOS 27 图标，随深浅色自动变色；
   点麦克风通过 `com.miui.voiceassist/.VoiceService`（与电源键长按同一条入口）唤醒小爱。
+- ✅ **搜索栏玻璃在澎湃 4 高级材质下不再冻结（16.10）**：`SearchGlass.captureListOnly()`
+  在 SDK≥37 只把 `scroll_headers` 列表子树画进 backdrop，不再 `root.draw()` 整棵窗口树。
+  澎湃 4 的顶栏 / `bgEffectView` 带 AGSL `RenderEffect`，软件画布会抛
+  `Software rendering doesn't support RuntimeShader`；旧路径从列表滑进栏下那一刻起每帧失败，
+  玻璃停在最后一帧（「滑到控制中心以下就卡住」），重开设置后又因没有首帧 backdrop
+  退化成半透明底板。列表子树既绕开这些材质视图，又把卡片内容真正画进玻璃；
+  抓帧失败保留上一帧（不再清空 backdrop），日志按 1s 节流。
 - ✅ **搜索栏进出场过渡（16.0 / 16.1 修时序）**：进出搜索 220ms 滑动 + 缩放 + 淡入淡出；
   退出时底部栏保持隐藏，等 MIUI 收起顶部搜索框（`ActionModeAnimationListener#onStop(open=false)`）
   后才出现，不再短暂同时显示两个搜索栏
@@ -100,6 +110,10 @@
   加完 padding 后把第 0 行重新锚回 padding 顶部，进入二级页不再自带滚动偏移；
   「我的设备 / 通用」的 version-card 页会抬升列表 wrapper（`topMargin -= 栏高`）并在预绘制里清父级 clip，
   内容因此能滑进栏下；实测显示 / 无线局域网 / 通知 / 通用 / 关于手机 五类页均生效（浅色 + 深色）。
+  **16.10**：加 padding 前先减去 MIUI 已经写进列表的 `getPaddingTop()`。关于本机页的
+  NestedScrollView 已经有 331px inset，模块再给 `scroll_layout` 加 331px，导致「本机详情」卡
+  从原位置 1571px 被推到 1902px；现在 `add = max(0, overlap - miuiInset)`，并在预绘制里对
+  已经叠了两层 inset 的 ScrollView 做一次「double inset trimmed」兜底。
 - ✅ **GUI（16.6 简化）**：删除「高级设置」总开关，搜索栏玻璃与顶栏两组滑杆直接显示；
   发丝线开关只控制是否显示/隐藏。搜索栏玻璃滑杆仍支持 0.1dp 步进
 - ✅ **应用图标（16.4 换风格）**：蓝紫渐变 + 半透明玻璃盘 + 白齿轮，`tools/make_launcher_icon.py`
@@ -155,10 +169,19 @@
 16. **二级页顶栏的 tint 是同一只 `ColorDrawable`**（16.8）：`MiuiBlurUtils.setBackgroundBlur`
     依赖 view 背景层，若某主题给 `action_bar_container` 换了自带模糊的 drawable，会被模块的
     纯色 drawable 覆盖，模糊只剩 `setBackgroundBlur` 这一路。
+17. **16.10 玻璃只画列表子树**：依赖 `com.android.settings:id/scroll_headers` 和 SDK≥37。
+    找不到列表时仍退回旧的 `root.draw()`；如果 ROM 的顶栏材质也走软件层级，旧路径仍可能失败，
+    此时玻璃保留上一帧（不会再变半透明）。同 ROM 若把列表换成别的 id / 硬件层，需要在
+    `SearchGlass.captureList()` 里补 id 或改成抓 surface。
+18. **16.10 关于本机卡片位置依赖 MIUI 的列表 inset**：只有 `NestedScrollView.getPaddingTop() > 0`
+    时才做减法；如果某版 ROM 不再给 ScrollView 加 inset，模块会按原来的规则补满栏高，
+    卡片会回到「模块位置」（不是原设置位置）。预绘制兜底只在列表回到顶部时运行。
 
 ## 下一步（优先级从高到低）
 
-1. 观察 16.6 搜索栏在**第三方主题/彩色壁纸/浅色纯白页**下的光边与折射。16.7 已试过给浅色加
+1. 复验 16.10：首页上下滚动经过「控制中心」、从玻璃起手上滑、重开设置后再滚动，
+   都要看到玻璃里是当前行内容；关于本机页首卡位置应保持 1571px（与去掉模块 padding 时一致）；
+2. 观察 16.6 搜索栏在**第三方主题/彩色壁纸/浅色纯白页**下的光边与折射。16.7 已试过给浅色加
    1px 灰色轮廓 + 内移白高光，实测偏重（灰环 + 白环），按反馈回退——**要再动先让用户看对比图**；
 2. 观察小爱入口在 ROM 升级后的可用性；必要时把 `VoiceService` 的 `ComponentName` 做成
    可配置，或改走 `ACTION_ASSIST`；
@@ -178,5 +201,5 @@
 | JDK | 21.0.2（`D:\Android\jdk21\jdk-21.0.2`，16.4 构建实测；17 亦可） |
 | build-tools | 37.0.0（`D:\Android\Sdk\build-tools\37.0.0`，aapt2 / d8 / zipalign / apksigner 实测可用） |
 | android.jar | API 37（`D:\Android\Sdk\platforms\android-37.0\android.jar`，构建显式传 `-AndroidJar`） |
-| 设备 | 25053RT47C / HyperOS 3 / Android 16，adb `D:\platform-tools\adb.exe` |
+| 设备 | 25053RT47C / HyperOS 4.0.4.0.XOLCNXM / Android 17 + `Settings2_Glass_v37`（versionCode 37 / versionName 17），adb `D:\platform-tools\adb.exe` |
 | 调试产物目录 | 手机上统一放 `/sdcard/Download/iLayoutSettings/`（不要散落在存储根目录；测试截图拉回后即删） |

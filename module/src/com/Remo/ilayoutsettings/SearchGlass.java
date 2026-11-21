@@ -218,6 +218,26 @@ final class SearchGlass extends FrameLayout {
     /** How often the settings screen's changes are picked up, in ms. */
     private static final long PREFS_RELOAD_MS = 500;
     private java.lang.ref.WeakReference<SearchHost> captureHost;
+    /**
+     * The home list used as the glass backdrop on 澎湃 4 + 高级材质.
+     *
+     * <p>The window tree contains the material top bar / background-effect
+     * view, whose AGSL {@code RenderEffect} cannot be recorded into a software
+     * bitmap ({@code IllegalArgumentException: Software rendering doesn't
+     * support RuntimeShader}). Drawing only {@code scroll_headers} skips those
+     * views, keeps the glass out of its own backdrop, and - unlike the old
+     * whole-root capture - still works once the advanced material kicks in.
+     * Weak so a fragment rebuild does not leak the old list.</p>
+     */
+    private java.lang.ref.WeakReference<View> captureListRef;
+    /** Last time a capture failure was logged; avoids a 120 Hz log flood. */
+    private long lastCaptureErrorLogAt;
+    /**
+     * Off-screen buffer for the list capture. The list is drawn here first and
+     * only swapped into {@link #backdrop} when the draw succeeds, so a failed
+     * capture never leaves the glass with a half-painted frame.
+     */
+    private Bitmap captureScratch;
     private boolean capturing;
     private long nextCaptureAt;
     private int fpsFrames;
@@ -363,10 +383,156 @@ final class SearchGlass extends FrameLayout {
         prevBackdrop = null;
         blurNode = null;
         lensNode = null;
+        captureListRef = null;
         super.onDetachedFromWindow();
     }
 
+    /** The home list the glass samples (cached; the fragment can be rebuilt). */
+    private View captureList() {
+        View cached = captureListRef == null ? null : captureListRef.get();
+        if (cached != null && cached.isAttachedToWindow()) {
+            return cached;
+        }
+        android.app.Activity activity = activityOf(getContext());
+        if (activity == null) {
+            return null;
+        }
+        int listId = getResources().getIdentifier(
+                "scroll_headers", "id", "com.android.settings");
+        View found = listId == 0 ? null : activity.findViewById(listId);
+        captureListRef = found == null ? null : new java.lang.ref.WeakReference<>(found);
+        return found;
+    }
+
+    private static android.app.Activity activityOf(android.content.Context context) {
+        android.content.Context c = context;
+        while (c instanceof android.content.ContextWrapper) {
+            if (c instanceof android.app.Activity) {
+                return (android.app.Activity) c;
+            }
+            c = ((android.content.ContextWrapper) c).getBaseContext();
+        }
+        return null;
+    }
+
+    /**
+     * 16.10: 澎湃 4 + 高级材质 capture path. The top bar and the full-screen
+     * background-effect view carry an AGSL RenderEffect; a software canvas
+     * throws {@code Software rendering doesn't support RuntimeShader} the
+     * moment the material becomes active (i.e. as soon as the list scrolls
+     * under the bar). The old whole-root capture therefore failed on every
+     * frame from that point on, leaving the last bitmap on screen ("glass is
+     * stuck below 控制中心") and, after a refresh, no bitmap at all
+     * ("glass became translucent").
+     *
+     * <p>Only the {@code scroll_headers} subtree is drawn here. It is outside
+     * the material effect views, contains the rows that actually pass behind
+     * the pill, and does not contain the glass itself. Drawing the list (not
+     * individual rows) keeps miuix's card decorations, so the white card
+     * surfaces are still part of the backdrop.</p>
+     */
+    private boolean captureListOnly() {
+        try {
+            View list = captureList();
+            if (list == null || !list.isShown()
+                    || list.getWidth() <= 0 || list.getHeight() <= 0) {
+                return false;
+            }
+            if (getWidth() <= 0 || getHeight() <= 0) {
+                return false;
+            }
+            int pad = dp(CAPTURE_PAD_DP);
+            int w = Math.max(1, Math.round((getWidth() + pad * 2) * CAPTURE_SCALE));
+            int h = Math.max(1, Math.round((getHeight() + pad * 2) * CAPTURE_SCALE));
+            if (backdrop == null || backdrop.getWidth() != w || backdrop.getHeight() != h) {
+                backdrop = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            }
+            if (captureScratch == null || captureScratch.getWidth() != w
+                    || captureScratch.getHeight() != h) {
+                captureScratch = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            }
+            Bitmap target = captureScratch;
+            // The list subtree has no background of its own: rows scrolled away
+            // leave transparent pixels, which the lens shader would mix into a
+            // dark slate. Start from the page colour so empty areas still look
+            // like the page.
+            target.eraseColor(UiTweaks.isDarkMode(getContext()) ? 0xFF1C1C1E : 0xFFF2F2F7);
+            Canvas canvas = new Canvas(target);
+            canvas.scale(CAPTURE_SCALE, CAPTURE_SCALE);
+            // Clip in view coordinates; the scale turns this into the pill's
+            // bitmap rect (pad .. pad + bar size) after scaling.
+            canvas.clipRect(pad, pad, pad + getWidth(), pad + getHeight());
+            int[] viewLoc = new int[2];
+            getLocationInWindow(viewLoc);
+            // The canvas is in window coordinates: backdrop pixel (0,0) is the
+            // window point (bar - pad), so translating by the bar's window
+            // position is enough. list.draw() then applies the list's own
+            // position/translation exactly once.
+            canvas.translate(pad - viewLoc[0], pad - viewLoc[1]);
+            capturing = true;
+            try {
+                list.draw(canvas);
+            } finally {
+                capturing = false;
+            }
+            // Swap only after the whole list has been recorded successfully.
+            captureScratch = backdrop;
+            backdrop = target;
+            logBackdrop();
+            return true;
+        } catch (Throwable t) {
+            noteCaptureError("list:" + t);
+            return false;
+        }
+    }
+
+    /** Logs the captured backdrop strip at most every five seconds. */
+    private void logBackdrop() {
+        try {
+            if (backdrop == null || backdrop.isRecycled()) {
+                return;
+            }
+            long now = System.currentTimeMillis();
+            if (now - lastDiag <= 5000 || backdrop.getWidth() <= 0
+                    || backdrop.getHeight() <= 0) {
+                return;
+            }
+            lastDiag = now;
+            int center = backdrop.getPixel(backdrop.getWidth() / 2,
+                    backdrop.getHeight() / 2);
+            StringBuilder strip = new StringBuilder();
+            int y = backdrop.getHeight() / 2;
+            for (int i = 0; i <= 8; i++) {
+                int x = Math.min(backdrop.getWidth() - 1, i * (backdrop.getWidth() - 1) / 8);
+                strip.append(Integer.toHexString(backdrop.getPixel(x, y))).append(' ');
+            }
+            XLog.i("search glass backdrop " + backdrop.getWidth() + "x"
+                    + backdrop.getHeight() + " center=#" + Integer.toHexString(center)
+                    + " strip=" + strip);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** Keeps one bad capture per second from flooding logcat at 120 Hz. */
+    private void noteCaptureError(String detail) {
+        long now = android.os.SystemClock.uptimeMillis();
+        if (now - lastCaptureErrorLogAt >= 1000L) {
+            lastCaptureErrorLogAt = now;
+            XLog.w("search glass capture failed: " + detail);
+        }
+    }
+
     private void capture() {
+        // 澎湃 4: draw the list subtree instead of the whole window. The window
+        // carries the advanced-material AGSL effects and cannot be drawn into a
+        // software bitmap; see captureListOnly().
+        if (Build.VERSION.SDK_INT >= 37) {
+            View list = captureList();
+            if (list != null) {
+                captureListOnly();
+                return;
+            }
+        }
         try {
             View root = getRootView();
             if (root == null || getWidth() <= 0 || getHeight() <= 0) {
@@ -405,24 +571,12 @@ final class SearchGlass extends FrameLayout {
                     host.capturing = hostWasCapturing;
                 }
             }
-            long now = System.currentTimeMillis();
-            if (now - lastDiag > 5000 && backdrop.getWidth() > 0 && backdrop.getHeight() > 0) {
-                lastDiag = now;
-                int center = backdrop.getPixel(backdrop.getWidth() / 2,
-                        backdrop.getHeight() / 2);
-                StringBuilder strip = new StringBuilder();
-                int y = backdrop.getHeight() / 2;
-                for (int i = 0; i <= 8; i++) {
-                    int x = Math.min(backdrop.getWidth() - 1, i * (backdrop.getWidth() - 1) / 8);
-                    strip.append(Integer.toHexString(backdrop.getPixel(x, y))).append(' ');
-                }
-                XLog.i("search glass backdrop " + backdrop.getWidth() + "x"
-                        + backdrop.getHeight() + " center=#" + Integer.toHexString(center)
-                        + " strip=" + strip);
-            }
+            logBackdrop();
         } catch (Throwable t) {
-            XLog.w("search glass capture failed: " + t);
-            backdrop = null;
+            // Keep the last good backdrop: clearing it makes the pill fall back
+            // to a flat translucent plate, which is exactly the "refresh turns
+            // the glass semi-transparent" report. A later capture replaces it.
+            noteCaptureError(String.valueOf(t));
         }
     }
 
