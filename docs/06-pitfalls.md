@@ -379,6 +379,19 @@
   的「栏下 padding」经常是同一件事。验收时用「去掉模块 padding 的同一页」做像素对照，
   不要只看「看起来不那么空了」。
 
+#### 坑 F18：PowerShell 5.1 解码 curl 的 UTF-8 JSON，Release 建完但附件没上传
+
+- **现象**：`tools/release.ps1` 打印出 Release JSON（中文全是 `�`），随后
+  `ConvertFrom-Json : ArgumentException`，Release 页面能打开但没有 APK 附件。
+- **根因**：Windows PowerShell 5.1 用控制台代码页（本机 GBK）解码原生命令 stdout；
+  `curl.exe` 返回的是 UTF-8 JSON，中文 release body 被拆成非法序列，`ConvertFrom-Json` 直接抛异常，
+  脚本在创建 Release 之后、上传 asset 之前中断。
+- **解法**：调用 `curl.exe` 前执行
+  `[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)`；
+  只影响原生命令输出解码，不改脚本文件本身的 UTF-8 BOM。
+- **如何避免**：PowerShell 5.1 里任何「curl 输出 → ConvertFrom-Json」都要先设 UTF-8 控制台编码；
+  Release 创建和 asset 上传要能被单独重跑（本次就是手动补传 asset 并用下载哈希校验）。
+
 ---
 
 ## 已过时的结论（保留备查）

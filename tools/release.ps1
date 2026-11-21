@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     iLayoutSettings 自动发版：构建 → 校验 → 打 tag → 建 GitHub Release → 上传 APK。
@@ -58,6 +58,13 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
+
+# curl returns UTF-8 JSON containing the Chinese release notes. Windows
+# PowerShell 5.1 decodes native stdout with the console code page (GBK on this
+# machine), so the UTF-8 bytes become garbage and ConvertFrom-Json throws after
+# the Release was already created (v16.10: the APK asset upload was skipped).
+# Force UTF-8 before any curl call; this only affects decoding of native output.
+try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
 
 $here = $PSScriptRoot
 $root = Split-Path -Parent $here

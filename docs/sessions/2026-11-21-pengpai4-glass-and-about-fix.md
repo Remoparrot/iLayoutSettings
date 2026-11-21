@@ -71,6 +71,15 @@ MIUI 已给 NestedScrollView 加了栏高 inset、模块又给 `scroll_layout` �
    **解法**：`git fetch origin release/16.9:release/16.9` 后从它拉分支。
    **如何避免**：接手前先 `git ls-remote origin`，不要只看本地分支和 main 的文件。
 
+4. **现象**：v16.10 Release 页面建出来了，但 APK 附件是空的；脚本在
+   `ConvertFrom-Json` 处抛异常。
+   **根因**：PowerShell 5.1 用 GBK 控制台代码页解码 `curl.exe` 的 UTF-8 JSON，
+   body 里的中文变成非法序列，JSON 解析失败；Release 已创建、asset 上传被跳过。
+   **解法**：curl 前设 `[Console]::OutputEncoding = UTF8`；本次先用 REST 手动补传 asset，
+   再下载回来比对 SHA-256（一致）。
+   **如何避免**：见 [踩坑 F18](../06-pitfalls.md)；发版脚本的「创建 Release」和「上传 asset」
+   必须能分开重跑。
+
 ## 6. 验证与证据
 
 设备：25053RT47C / HyperOS 4.0.4.0.XOLCNXM / Android 17，设置 `Settings2_Glass_v37`（37/17）。
